@@ -21,4 +21,10 @@
    * Detailed logging using Amazon CloudWatch for debugging and monitoring.  
 8. **Scalability & Performance:**   
    * Optimize Lambda function performance (cold starts, memory).
+9. **Infrasctructure**
+   * Stacks should be identified by app name in case there are several stacks in one account for different apps
+   * Resources (e.g. table names, functions) should be identifiable by stack and app name to make them identifiable in console
+10. **API Layer**
+   * Use GraphQL with AppSync
+
 

@@ -1,0 +1,63 @@
+name: Quality Checks
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: ./tools/scripts/setup-dev.sh
+      
+      - name: Build shared packages
+        run: |
+          cd packages/shared-types && npm run build
+          cd ../validation && npm run build
+      
+      - name: Lint web app
+        run: cd apps/web && npm run lint
+      
+      - name: Type check web app
+        run: cd apps/web && npm run typecheck
+      
+      - name: Build API service
+        run: cd services/api && npm run build
+      
+      - name: Build infrastructure
+        run: cd infrastructure/aws-cdk && npm run build
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: ./tools/scripts/setup-dev.sh
+      
+      - name: Run integration tests
+        run: |
+          # TODO: Add integration test runner
+          echo "Running integration tests..."
+      
+      - name: Run e2e tests
+        run: |
+          # TODO: Add e2e test runner (Playwright, Cypress, etc.)
+          echo "Running e2e tests..."

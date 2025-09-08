@@ -1,0 +1,156 @@
+type User {
+  id: ID!
+  email: String!
+  name: String!
+  role: UserRole!
+  createdAt: String!
+  updatedAt: String!
+}
+
+enum UserRole {
+  STANDARD
+  ADMIN
+}
+
+type Project {
+  id: ID!
+  userId: ID!
+  name: String!
+  description: String
+  createdAt: String!
+  updatedAt: String!
+  lastModified: String!
+  snippets: [Snippet!]!
+}
+
+type Snippet {
+  id: ID!
+  projectId: ID!
+  userId: ID!
+  textField1: String!
+  textField2: String!
+  position: Position!
+  tags: [String!]!
+  categories: [String!]!
+  version: Int!
+  createdAt: String!
+  updatedAt: String!
+  connections: [Connection!]!
+  versions: [SnippetVersion!]!
+}
+
+type SnippetVersion {
+  id: ID!
+  snippetId: ID!
+  version: Int!
+  textField1: String!
+  textField2: String!
+  createdAt: String!
+}
+
+type Connection {
+  id: ID!
+  projectId: ID!
+  sourceSnippetId: ID!
+  targetSnippetId: ID!
+  sourceSnippet: Snippet!
+  targetSnippet: Snippet!
+  label: String
+  createdAt: String!
+  updatedAt: String!
+}
+
+type Position {
+  x: Float!
+  y: Float!
+}
+
+input PositionInput {
+  x: Float!
+  y: Float!
+}
+
+input CreateProjectInput {
+  name: String!
+  description: String
+}
+
+input UpdateProjectInput {
+  name: String
+  description: String
+}
+
+input CreateSnippetInput {
+  projectId: ID!
+  textField1: String
+  textField2: String
+  position: PositionInput!
+  tags: [String!]
+  categories: [String!]
+}
+
+input UpdateSnippetInput {
+  textField1: String
+  textField2: String
+  position: PositionInput
+  tags: [String!]
+  categories: [String!]
+}
+
+input CreateConnectionInput {
+  projectId: ID!
+  sourceSnippetId: ID!
+  targetSnippetId: ID!
+  label: String
+}
+
+input UpdateConnectionInput {
+  label: String
+}
+
+type Query {
+  me: User
+  projects: [Project!]!
+  project(id: ID!): Project
+  snippet(id: ID!): Snippet
+  snippetVersions(snippetId: ID!): [SnippetVersion!]!
+  
+  # Admin queries
+  users: [User!]!
+  systemAnalytics: SystemAnalytics!
+}
+
+type Mutation {
+  # Project mutations
+  createProject(input: CreateProjectInput!): Project!
+  updateProject(id: ID!, input: UpdateProjectInput!): Project!
+  deleteProject(id: ID!): Boolean!
+  
+  # Snippet mutations
+  createSnippet(input: CreateSnippetInput!): Snippet!
+  updateSnippet(id: ID!, input: UpdateSnippetInput!): Snippet!
+  deleteSnippet(id: ID!): Boolean!
+  revertSnippet(id: ID!, version: Int!): Snippet!
+  
+  # Connection mutations
+  createConnection(input: CreateConnectionInput!): Connection!
+  updateConnection(id: ID!, input: UpdateConnectionInput!): Connection!
+  deleteConnection(id: ID!): Boolean!
+  
+  # Admin mutations
+  createUser(email: String!, name: String!, temporaryPassword: String!): User!
+  deleteUser(id: ID!): Boolean!
+  resetUserPassword(id: ID!): String!
+}
+
+type SystemAnalytics {
+  totalUsers: Int!
+  totalProjects: Int!
+  totalSnippets: Int!
+  averageSnippetsPerUser: Float!
+}
+
+schema {
+  query: Query
+  mutation: Mutation
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@auteurium/graphql-schema",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "codegen": "graphql-codegen --config codegen.ts",
+    "watch": "graphql-codegen --config codegen.ts --watch"
+  },
+  "dependencies": {
+    "graphql": "^16.8.1"
+  },
+  "devDependencies": {
+    "@graphql-codegen/cli": "^5.0.0",
+    "@graphql-codegen/typescript": "^4.0.1",
+    "@graphql-codegen/typescript-resolvers": "^4.0.1",
+    "typescript": "^5.2.2"
+  }
+}
