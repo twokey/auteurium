@@ -1,0 +1,170 @@
+/*
+ * MONITORING STACK - TEMPORARILY DISABLED FOR EARLY DEVELOPMENT
+ *
+ * This stack is disabled to reduce costs during development (~$5-7/month savings).
+ *
+ * TO RE-ENABLE:
+ * 1. Rename this file back to: auteurium-monitoring-stack.ts
+ * 2. Uncomment the monitoring stack lines in ../auteurium-app.ts
+ * 3. Run: cdk deploy Auteurium-Monitoring-dev
+ *
+ * PROVIDES:
+ * - CloudWatch Dashboard with API/CloudFront metrics
+ * - Automated alerts for errors and high latency
+ * - SNS notifications for production issues
+ * - Centralized logging with 1-week retention
+ */
+
+import * as cdk from 'aws-cdk-lib'
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch'
+import * as logs from 'aws-cdk-lib/aws-logs'
+import * as sns from 'aws-cdk-lib/aws-sns'
+import * as subscriptions from 'aws-cdk-lib/aws-sns-subscriptions'
+import * as cloudwatchActions from 'aws-cdk-lib/aws-cloudwatch-actions'
+import { Construct } from 'constructs'
+import { AuteuriumApiStack } from './auteurium-api-stack'
+import { AuteuriumWebStack } from './auteurium-web-stack'
+
+interface AuteuriumMonitoringStackProps extends cdk.StackProps {
+  stage: string
+  apiStack: AuteuriumApiStack
+  webStack: AuteuriumWebStack
+}
+
+export class AuteuriumMonitoringStack extends cdk.Stack {
+  constructor(scope: Construct, id: string, props: AuteuriumMonitoringStackProps) {
+    super(scope, id, props)
+
+    const { stage, apiStack, webStack } = props
+
+    // SNS topic for alerts
+    const alertTopic = new sns.Topic(this, `AuteuriumAlerts-${stage}`, {
+      topicName: `auteurium-alerts-${stage}`,
+      displayName: `Auteurium Alerts (${stage})`
+    })
+
+    // Log groups
+    const apiLogGroup = new logs.LogGroup(this, `AuteuriumApiLogs-${stage}`, {
+      logGroupName: `/aws/appsync/apis/${apiStack.graphqlApi.apiId}`,
+      retention: logs.RetentionDays.ONE_WEEK,
+      removalPolicy: stage === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY
+    })
+
+    // CloudWatch Dashboard
+    const dashboard = new cloudwatch.Dashboard(this, `AuteuriumDashboard-${stage}`, {
+      dashboardName: `auteurium-${stage}`,
+      widgets: [
+        [
+          // API Metrics
+          new cloudwatch.GraphWidget({
+            title: 'GraphQL API Requests',
+            left: [
+              new cloudwatch.Metric({
+                namespace: 'AWS/AppSync',
+                metricName: '4XXError',
+                dimensionsMap: {
+                  GraphQLAPIId: apiStack.graphqlApi.apiId
+                },
+                statistic: 'Sum'
+              }),
+              new cloudwatch.Metric({
+                namespace: 'AWS/AppSync',
+                metricName: '5XXError',
+                dimensionsMap: {
+                  GraphQLAPIId: apiStack.graphqlApi.apiId
+                },
+                statistic: 'Sum'
+              })
+            ],
+            right: [
+              new cloudwatch.Metric({
+                namespace: 'AWS/AppSync',
+                metricName: 'Latency',
+                dimensionsMap: {
+                  GraphQLAPIId: apiStack.graphqlApi.apiId
+                },
+                statistic: 'Average'
+              })
+            ]
+          })
+        ],
+        [
+          // CloudFront Metrics
+          new cloudwatch.GraphWidget({
+            title: 'CloudFront Requests',
+            left: [
+              new cloudwatch.Metric({
+                namespace: 'AWS/CloudFront',
+                metricName: 'Requests',
+                dimensionsMap: {
+                  DistributionId: webStack.distribution.distributionId
+                },
+                statistic: 'Sum'
+              })
+            ],
+            right: [
+              new cloudwatch.Metric({
+                namespace: 'AWS/CloudFront',
+                metricName: 'OriginLatency',
+                dimensionsMap: {
+                  DistributionId: webStack.distribution.distributionId
+                },
+                statistic: 'Average'
+              })
+            ]
+          })
+        ]
+      ]
+    })
+
+    // Alarms
+    const apiErrorAlarm = new cloudwatch.Alarm(this, `AuteuriumApiErrors-${stage}`, {
+      alarmName: `auteurium-api-errors-${stage}`,
+      alarmDescription: 'High error rate in GraphQL API',
+      metric: new cloudwatch.Metric({
+        namespace: 'AWS/AppSync',
+        metricName: '5XXError',
+        dimensionsMap: {
+          GraphQLAPIId: apiStack.graphqlApi.apiId
+        },
+        statistic: 'Sum'
+      }),
+      threshold: 5,
+      evaluationPeriods: 2,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING
+    })
+
+    const apiLatencyAlarm = new cloudwatch.Alarm(this, `AuteuriumApiLatency-${stage}`, {
+      alarmName: `auteurium-api-latency-${stage}`,
+      alarmDescription: 'High latency in GraphQL API',
+      metric: new cloudwatch.Metric({
+        namespace: 'AWS/AppSync',
+        metricName: 'Latency',
+        dimensionsMap: {
+          GraphQLAPIId: apiStack.graphqlApi.apiId
+        },
+        statistic: 'Average'
+      }),
+      threshold: 5000, // 5 seconds
+      evaluationPeriods: 3,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING
+    })
+
+    // Add SNS actions to alarms
+    if (stage === 'prod') {
+      apiErrorAlarm.addAlarmAction(new cloudwatchActions.SnsAction(alertTopic))
+      apiLatencyAlarm.addAlarmAction(new cloudwatchActions.SnsAction(alertTopic))
+    }
+
+    // Export monitoring resources
+    new cdk.CfnOutput(this, 'DashboardUrl', {
+      value: `https://${this.region}.console.aws.amazon.com/cloudwatch/home?region=${this.region}#dashboards:name=${dashboard.dashboardName}`,
+      exportName: `Auteurium-DashboardUrl-${stage}`
+    })
+
+    new cdk.CfnOutput(this, 'AlertTopicArn', {
+      value: alertTopic.topicArn,
+      exportName: `Auteurium-AlertTopicArn-${stage}`
+    })
+  }
+}

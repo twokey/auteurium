@@ -1,13 +1,15 @@
+export interface Position {
+  x: number
+  y: number
+}
+
 export interface Snippet {
   id: string
   projectId: string
   userId: string
   textField1: string
   textField2: string
-  position: {
-    x: number
-    y: number
-  }
+  position: Position
   tags: string[]
   categories: string[]
   version: number
@@ -21,17 +23,15 @@ export interface SnippetVersion {
   version: number
   textField1: string
   textField2: string
+  userId: string
   createdAt: string
 }
 
-export interface CreateSnippetInput {
+export interface SnippetInput {
   projectId: string
   textField1?: string
   textField2?: string
-  position: {
-    x: number
-    y: number
-  }
+  position?: Position
   tags?: string[]
   categories?: string[]
 }
@@ -39,10 +39,12 @@ export interface CreateSnippetInput {
 export interface UpdateSnippetInput {
   textField1?: string
   textField2?: string
-  position?: {
-    x: number
-    y: number
-  }
+  position?: Position
   tags?: string[]
   categories?: string[]
+}
+
+// Legacy interfaces for backward compatibility
+export interface CreateSnippetInput extends SnippetInput {
+  position: Position // Required in create
 }

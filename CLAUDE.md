@@ -61,37 +61,116 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
-**Current Status**: Documentation-only phase. No package.json or build configuration exists yet.
+**Prerequisites**: Node.js 22+ (LTS), npm 10+, TypeScript 5.9+, AWS CLI configured (for deployment)
 
-When implementation begins, the following commands will be needed:
-- Frontend build/dev server commands (React with Vite expected)
-- TypeScript compilation and type checking
-- AWS CDK deployment commands (`cdk deploy`, `cdk synth`)
-- AppSync schema management and GraphQL code generation
-- Testing framework commands (unit, integration, e2e)
-- Vector database setup and migration commands
+### Setup
+- `npm run setup` - Install all dependencies and set up development environment
+- `./tools/scripts/setup-dev.sh` - Alternative setup script
+
+### Development
+- `npm run dev` - Start web app (localhost:3000) and API service concurrently
+- `npm run dev:web` - Start only web app with Vite dev server
+- `npm run dev:api` - Start only API service in watch mode
+
+### Building
+- `npm run build` - Build all packages and applications using build-all.sh script
+- `./tools/scripts/build-all.sh` - Direct script execution for full build
+- Build order: shared-types → validation → graphql-schema → api → web → infrastructure
+
+### Code Quality
+- `npm run lint` - Run ESLint on web app and build API (includes type checking)
+- `npm run typecheck` - Run TypeScript type checking on web app
+- Individual package linting available in each workspace
+
+### GraphQL
+- `npm run generate` - Generate GraphQL types from schema using codegen
+- `./tools/scripts/generate-graphql.sh` - Direct script for GraphQL code generation
+
+### Testing
+- `npm run test` - Run API unit tests (integration/e2e tests not yet implemented)
+- `npm run test:api` - Run Jest tests in services/api
+- API uses Jest, integration tests planned for tests/integration/
+- E2E tests with Playwright planned for tests/e2e/
+
+### Deployment
+- `npm run deploy [stage] [profile]` - Deploy to AWS (default: dev environment)
+- `./tools/scripts/deploy-stack.sh dev` - Deploy to dev environment
+- Uses AWS CDK, requires AWS CLI configuration
+- Available stages: dev, prod
+
+### CDK Commands (from infrastructure/aws-cdk/)
+- `npm run cdk synth` - Synthesize CloudFormation templates
+- `npm run cdk deploy --all` - Deploy all stacks
+- `npm run cdk destroy --all` - Destroy all stacks
+- `npm run cdk diff` - Show differences between deployed and local stacks
+
+## Monorepo Structure
+
+**Workspaces Configuration**: Uses npm workspaces with apps/*, packages/*, services/*, infrastructure/aws-cdk
+
+- **apps/web** - React frontend with React Flow, Vite, Tailwind CSS, AWS Amplify
+- **packages/shared-types** - TypeScript definitions shared across monorepo
+- **packages/graphql-schema** - GraphQL schema and generated types
+- **packages/validation** - Zod schemas for request validation
+- **services/api** - AWS Lambda GraphQL resolvers with PowerTools
+- **services/media** - Media handling Lambda functions (pre-signed URLs, upload completion)
+- **infrastructure/aws-cdk** - Infrastructure as Code with CDK stacks
+- **tests/** - Integration and E2E test suites
+- **tools/scripts/** - Build, deployment, and development automation scripts
 
 ## Architecture Notes
 
-**Current Structure**: Documentation files in `/docs/` contain detailed requirements and design specifications:
-- `application-requirements.md`: Complete feature specifications and user roles
-- `technology-stack.md`: Technology choices and rationale  
-- `backend-logic.md`: Critical implementation areas and AWS architecture
-- `canvas-design.md`: UI/UX design and interaction patterns
+**Data Model**:
+- Users → Projects → Snippets (1:many relationships)
+- Snippets have directional many-to-many connections with optional labels
+- Project-scoped tags/categories
+- Snippet versioning with revert capability
+- Two text fields per snippet, positioned on infinite canvas
 
-**Key Implementation Areas**:
-- **Frontend**: React with React Flow for canvas, positioned snippets with many-to-many connections
-- **Backend**: AWS Lambda functions with TypeScript, GraphQL API via AppSync
-- **Authentication**: AWS Cognito with user data isolation (admin users cannot access snippet content)
-- **Critical Logic**: Cascade deletes (project deletion removes all snippets), directional snippet connections
-- **Media Handling**: Pre-signed S3 URLs for direct uploads, backend registration of successful uploads
-- **Infrastructure**: AWS CDK with resource naming conventions (app name + stack identification)
+**Frontend Architecture**:
+- React with React Flow for canvas interactions
+- Zustand for state management
+- AWS Amplify for authentication and GraphQL
+- Apollo Client for GraphQL operations
+- React Router for navigation
+- Tailwind CSS for styling
 
-**Data Model**: Projects contain snippets (two text fields each), snippets have connections with optional labels, project-scoped tags/categories
+**Backend Architecture**:
+- GraphQL API via AWS AppSync
+- Lambda resolvers with TypeScript
+- DynamoDB for data storage (designed for future vector database migration)
+- AWS Cognito for authentication with user data isolation
+- S3 for media uploads with pre-signed URLs
+- CloudWatch for basic logging (monitoring stack disabled for cost savings)
 
-**Backend Implementation Details**:
-- **Data Validation**: Comprehensive request payload validation with validation library
-- **Error Handling**: Consistent API error format, CloudWatch logging for debugging
-- **Idempotency**: Built-in mechanisms for critical operations (creation, linking)
-- **GenAI Integration**: Secure API key management, error handling and retries
-- **Performance**: Lambda optimization for cold starts and memory usage
+**Critical Implementation Areas**:
+- **Authentication**: AWS Cognito integration, admin users cannot access snippet content
+- **Cascade Deletes**: Project deletion removes all snippets and connections
+- **Media Handling**: Direct S3 uploads via pre-signed URLs, backend registration on completion
+- **Data Validation**: Zod schemas in packages/validation for consistent validation
+- **Error Handling**: Consistent API error format, comprehensive CloudWatch logging
+- **Infrastructure**: CDK stacks with app-specific resource naming for multi-app AWS accounts
+- **Cost Optimization**: Monitoring stack disabled during development (~$5-7/month savings)
+
+**Build Dependencies**:
+1. packages/shared-types (foundational types)
+2. packages/validation (depends on shared-types)
+3. packages/graphql-schema (schema and codegen)
+4. services/api (depends on shared-types, validation)
+5. apps/web (depends on generated GraphQL types)
+6. infrastructure/aws-cdk (independent)
+
+## Monitoring Configuration
+
+**Current Status**: CloudWatch monitoring stack is DISABLED for development cost savings (~$5-7/month)
+
+**Re-enabling Monitoring** (when ready for production):
+1. Rename `infrastructure/aws-cdk/lib/stacks/auteurium-monitoring-stack.ts.disabled` to `.ts`
+2. Uncomment monitoring lines in `infrastructure/aws-cdk/lib/auteurium-app.ts`
+3. Run: `cdk deploy Auteurium-Monitoring-dev`
+
+**Monitoring Features** (when enabled):
+- Custom CloudWatch dashboard with API and CloudFront metrics
+- Automated alerts for API errors (>5 errors) and high latency (>5 seconds)
+- SNS notifications for production issues
+- Centralized logging with configurable retention

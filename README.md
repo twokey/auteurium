@@ -28,8 +28,9 @@ This is a monorepo containing:
 
 ### Prerequisites
 
-- Node.js 18+
-- npm 8+
+- Node.js 22+ (LTS)
+- npm 10+
+- TypeScript 5.9+
 - AWS CLI configured (for deployment)
 
 ### Setup

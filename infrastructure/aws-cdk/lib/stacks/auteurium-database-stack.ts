@@ -11,6 +11,7 @@ export class AuteuriumDatabaseStack extends cdk.Stack {
   public readonly projectsTable: dynamodb.Table
   public readonly snippetsTable: dynamodb.Table
   public readonly connectionsTable: dynamodb.Table
+  public readonly versionsTable: dynamodb.Table
 
   constructor(scope: Construct, id: string, props: AuteuriumDatabaseStackProps) {
     super(scope, id, props)
@@ -83,6 +84,58 @@ export class AuteuriumDatabaseStack extends cdk.Stack {
       indexName: 'TargetSnippetIndex',
       partitionKey: { name: 'targetSnippetId', type: dynamodb.AttributeType.STRING },
       projectionType: dynamodb.ProjectionType.ALL
+    })
+
+    // Add GSI for connection type queries (useful for Neptune migration)
+    this.connectionsTable.addGlobalSecondaryIndex({
+      indexName: 'ConnectionTypeIndex',
+      partitionKey: { name: 'connectionType', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'createdAt', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL
+    })
+
+    // Versions table (for snippet history)
+    this.versionsTable = new dynamodb.Table(this, `AuteuriumVersions-${stage}`, {
+      tableName: `auteurium-versions-${stage}`,
+      partitionKey: { name: 'snippetId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'version', type: dynamodb.AttributeType.NUMBER },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: stage === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
+      pointInTimeRecovery: stage === 'prod'
+    })
+
+    // Add GSI for user-based version queries
+    this.versionsTable.addGlobalSecondaryIndex({
+      indexName: 'UserVersionsIndex',
+      partitionKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'createdAt', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL
+    })
+
+    // Output table names for Lambda environment variables
+    new cdk.CfnOutput(this, `UsersTableName-${stage}`, {
+      value: this.usersTable.tableName,
+      exportName: `AuteuriumUsersTable-${stage}`
+    })
+
+    new cdk.CfnOutput(this, `ProjectsTableName-${stage}`, {
+      value: this.projectsTable.tableName,
+      exportName: `AuteuriumProjectsTable-${stage}`
+    })
+
+    new cdk.CfnOutput(this, `SnippetsTableName-${stage}`, {
+      value: this.snippetsTable.tableName,
+      exportName: `AuteuriumSnippetsTable-${stage}`
+    })
+
+    new cdk.CfnOutput(this, `ConnectionsTableName-${stage}`, {
+      value: this.connectionsTable.tableName,
+      exportName: `AuteuriumConnectionsTable-${stage}`
+    })
+
+    new cdk.CfnOutput(this, `VersionsTableName-${stage}`, {
+      value: this.versionsTable.tableName,
+      exportName: `AuteuriumVersionsTable-${stage}`
     })
   }
 }

@@ -1,0 +1,194 @@
+import { GraphQLContext } from '../../types/context'
+import { Snippet, SnippetInput, UpdateSnippetInput } from '@auteurium/shared-types'
+import {
+  createSnippet,
+  updateSnippet,
+  deleteSnippet,
+  revertSnippetToVersion
+} from '../../database/snippets'
+import { getProject } from '../../database/projects'
+import { requireAuth, requireOwnership, enforceContentPrivacy } from '../../middleware/validation'
+import { validateInput } from '../../middleware/validation'
+import { z } from 'zod'
+
+// Validation schemas
+const createSnippetSchema = z.object({
+  input: z.object({
+    projectId: z.string(),
+    textField1: z.string().optional().default(''),
+    textField2: z.string().optional().default(''),
+    position: z.object({
+      x: z.number(),
+      y: z.number()
+    }).optional().default({ x: 0, y: 0 }),
+    tags: z.array(z.string()).optional().default([]),
+    categories: z.array(z.string()).optional().default([])
+  })
+})
+
+const updateSnippetSchema = z.object({
+  projectId: z.string(),
+  snippetId: z.string(),
+  input: z.object({
+    textField1: z.string().optional(),
+    textField2: z.string().optional(),
+    position: z.object({
+      x: z.number(),
+      y: z.number()
+    }).optional(),
+    tags: z.array(z.string()).optional(),
+    categories: z.array(z.string()).optional()
+  })
+})
+
+const deleteSnippetSchema = z.object({
+  projectId: z.string(),
+  snippetId: z.string()
+})
+
+const revertSnippetSchema = z.object({
+  projectId: z.string(),
+  snippetId: z.string(),
+  version: z.number().min(1)
+})
+
+export const snippetMutations = {
+  // Create a new snippet
+  createSnippet: async (
+    _parent: any,
+    args: any,
+    context: GraphQLContext
+  ): Promise<Snippet> => {
+    const { input } = validateInput(createSnippetSchema, args)
+    const user = requireAuth(context.user)
+
+    context.logger.info('Creating snippet', {
+      projectId: input.projectId,
+      userId: user.id
+    })
+
+    // Verify the user owns the project
+    const project = await getProject(input.projectId, user.id)
+    if (!project) {
+      throw new Error('Project not found or access denied')
+    }
+
+    // Ensure project ownership
+    requireOwnership(user, project.userId, 'project')
+
+    return await createSnippet(input, user.id)
+  },
+
+  // Update an existing snippet
+  updateSnippet: async (
+    _parent: any,
+    args: any,
+    context: GraphQLContext
+  ): Promise<Snippet> => {
+    const { projectId, snippetId, input } = validateInput(updateSnippetSchema, args)
+    const user = requireAuth(context.user)
+
+    context.logger.info('Updating snippet', {
+      projectId,
+      snippetId,
+      userId: user.id
+    })
+
+    // The updateSnippet function will verify ownership
+    return await updateSnippet(projectId, snippetId, input, user.id)
+  },
+
+  // Delete a snippet (with cascade delete of connections and versions)
+  deleteSnippet: async (
+    _parent: any,
+    args: any,
+    context: GraphQLContext
+  ): Promise<boolean> => {
+    const { projectId, snippetId } = validateInput(deleteSnippetSchema, args)
+    const user = requireAuth(context.user)
+
+    context.logger.info('Deleting snippet', {
+      projectId,
+      snippetId,
+      userId: user.id
+    })
+
+    await deleteSnippet(projectId, snippetId, user.id)
+
+    context.logger.info('Snippet deleted successfully', {
+      projectId,
+      snippetId,
+      userId: user.id
+    })
+
+    return true
+  },
+
+  // Revert snippet to a previous version
+  revertSnippetToVersion: async (
+    _parent: any,
+    args: any,
+    context: GraphQLContext
+  ): Promise<Snippet> => {
+    const { projectId, snippetId, version } = validateInput(revertSnippetSchema, args)
+    const user = requireAuth(context.user)
+
+    context.logger.info('Reverting snippet to version', {
+      projectId,
+      snippetId,
+      targetVersion: version,
+      userId: user.id
+    })
+
+    return await revertSnippetToVersion(projectId, snippetId, version, user.id)
+  },
+
+  // Bulk update snippet positions (for canvas drag operations)
+  updateSnippetPositions: async (
+    _parent: any,
+    args: any,
+    context: GraphQLContext
+  ): Promise<Snippet[]> => {
+    const user = requireAuth(context.user)
+
+    const bulkUpdateSchema = z.object({
+      projectId: z.string(),
+      updates: z.array(z.object({
+        snippetId: z.string(),
+        position: z.object({
+          x: z.number(),
+          y: z.number()
+        })
+      }))
+    })
+
+    const { projectId, updates } = validateInput(bulkUpdateSchema, args)
+
+    context.logger.info('Bulk updating snippet positions', {
+      projectId,
+      updateCount: updates.length,
+      userId: user.id
+    })
+
+    const updatedSnippets: Snippet[] = []
+
+    // Update each snippet position
+    for (const update of updates) {
+      const updatedSnippet = await updateSnippet(
+        projectId,
+        update.snippetId,
+        { position: update.position },
+        user.id
+      )
+      updatedSnippets.push(updatedSnippet)
+    }
+
+    context.logger.info('Bulk position update completed', {
+      projectId,
+      updatedCount: updatedSnippets.length,
+      userId: user.id
+    })
+
+    return updatedSnippets
+  }
+}

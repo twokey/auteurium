@@ -1,65 +1,129 @@
 import { GraphQLContext } from '../../types/context'
-import { Project, CreateProjectInput, UpdateProjectInput } from '@auteurium/shared-types'
-import { createProjectSchema, updateProjectSchema } from '@auteurium/validation'
+import { Project, ProjectInput, UpdateProjectInput } from '@auteurium/shared-types'
+import {
+  createProject,
+  updateProject,
+  deleteProject,
+  getProject
+} from '../../database/projects'
+import { deleteProjectSnippets } from '../../database/snippets'
+import { requireAuth, requireOwnership } from '../../middleware/validation'
+import { validateInput } from '../../middleware/validation'
+import { z } from 'zod'
+
+// Validation schemas
+const createProjectSchema = z.object({
+  input: z.object({
+    name: z.string().min(1).max(100),
+    description: z.string().max(500).optional()
+  })
+})
+
+const updateProjectSchema = z.object({
+  projectId: z.string(),
+  input: z.object({
+    name: z.string().min(1).max(100).optional(),
+    description: z.string().max(500).optional()
+  })
+})
+
+const deleteProjectSchema = z.object({
+  projectId: z.string()
+})
 
 export const projectMutations = {
+  // Create a new project
   createProject: async (
-    parent: any, 
-    args: { input: CreateProjectInput }, 
+    _parent: any,
+    args: any,
     context: GraphQLContext
   ): Promise<Project> => {
-    const { user, logger } = context
-    
-    if (!user) {
-      throw new Error('Authentication required')
-    }
+    const { input } = validateInput(createProjectSchema, args)
+    const user = requireAuth(context.user)
 
-    // Validate input
-    const validatedInput = createProjectSchema.parse(args.input)
-    
-    logger.info('Creating project', { userId: user.id, projectName: validatedInput.name })
-    
-    // TODO: Implement database insertion
-    throw new Error('Not implemented yet')
+    context.logger.info('Creating project', {
+      projectName: input.name,
+      userId: user.id
+    })
+
+    return await createProject(input, user.id)
   },
 
+  // Update an existing project
   updateProject: async (
-    parent: any, 
-    args: { id: string; input: UpdateProjectInput }, 
+    _parent: any,
+    args: any,
     context: GraphQLContext
   ): Promise<Project> => {
-    const { user, logger } = context
-    
-    if (!user) {
-      throw new Error('Authentication required')
+    const { projectId, input } = validateInput(updateProjectSchema, args)
+    const user = requireAuth(context.user)
+
+    context.logger.info('Updating project', {
+      projectId,
+      userId: user.id
+    })
+
+    // Verify ownership before updating
+    const project = await getProject(projectId, user.id)
+    if (!project) {
+      throw new Error('Project not found or access denied')
     }
 
-    // Validate input
-    const validatedInput = updateProjectSchema.parse(args.input)
-    
-    logger.info('Updating project', { projectId: args.id, userId: user.id })
-    
-    // TODO: Implement database update
-    // Ensure user owns the project
-    throw new Error('Not implemented yet')
+    requireOwnership(user, project.userId, 'project')
+
+    return await updateProject(projectId, input, user.id)
   },
 
+  // Delete a project with CASCADE DELETE of all related data
   deleteProject: async (
-    parent: any, 
-    args: { id: string }, 
+    _parent: any,
+    args: any,
     context: GraphQLContext
   ): Promise<boolean> => {
-    const { user, logger } = context
-    
-    if (!user) {
-      throw new Error('Authentication required')
+    const { projectId } = validateInput(deleteProjectSchema, args)
+    const user = requireAuth(context.user)
+
+    context.logger.info('Starting cascade delete of project', {
+      projectId,
+      userId: user.id
+    })
+
+    // Verify ownership before deleting
+    const project = await getProject(projectId, user.id)
+    if (!project) {
+      throw new Error('Project not found or access denied')
     }
 
-    logger.info('Deleting project', { projectId: args.id, userId: user.id })
-    
-    // TODO: Implement cascade delete
-    // Delete all snippets and connections in the project
-    // Ensure user owns the project
-    throw new Error('Not implemented yet')
+    requireOwnership(user, project.userId, 'project')
+
+    try {
+      // Step 1: Delete all snippets in the project (this will cascade to connections and versions)
+      context.logger.info('Cascade deleting all project snippets', {
+        projectId,
+        userId: user.id
+      })
+      await deleteProjectSnippets(projectId, user.id)
+
+      // Step 2: Delete the project itself
+      context.logger.info('Deleting project record', {
+        projectId,
+        userId: user.id
+      })
+      await deleteProject(projectId, user.id)
+
+      context.logger.info('Project cascade delete completed successfully', {
+        projectId,
+        userId: user.id
+      })
+
+      return true
+    } catch (error) {
+      context.logger.error('Failed to cascade delete project', {
+        error: error instanceof Error ? error.message : error,
+        projectId,
+        userId: user.id
+      })
+      throw new Error('Failed to delete project. Some data may remain.')
+    }
   }
 }

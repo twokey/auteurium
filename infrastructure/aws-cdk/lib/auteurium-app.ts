@@ -5,7 +5,7 @@ import { AuteuriumDatabaseStack } from './stacks/auteurium-database-stack'
 import { AuteuriumApiStack } from './stacks/auteurium-api-stack'
 import { AuteuriumMediaStack } from './stacks/auteurium-media-stack'
 import { AuteuriumWebStack } from './stacks/auteurium-web-stack'
-import { AuteuriumMonitoringStack } from './stacks/auteurium-monitoring-stack'
+// import { AuteuriumMonitoringStack } from './stacks/auteurium-monitoring-stack' // DISABLED - see auteurium-monitoring-stack.ts.disabled
 
 export class AuteuriumApp extends cdk.App {
   constructor() {
@@ -50,18 +50,21 @@ export class AuteuriumApp extends cdk.App {
       stage
     })
 
-    // Monitoring stack (CloudWatch)
+    // TODO: Monitoring stack (CloudWatch) - DISABLED for development cost savings
+    // Uncomment when ready for production monitoring (~$5-7/month)
+    /*
     const monitoringStack = new AuteuriumMonitoringStack(this, `Auteurium-Monitoring-${stage}`, {
       env,
       stage,
       apiStack,
       webStack
     })
+    */
 
     // Stack dependencies
     apiStack.addDependency(authStack)
     apiStack.addDependency(databaseStack)
-    monitoringStack.addDependency(apiStack)
-    monitoringStack.addDependency(webStack)
+    // monitoringStack.addDependency(apiStack) // DISABLED
+    // monitoringStack.addDependency(webStack) // DISABLED
   }
 }
