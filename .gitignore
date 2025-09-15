@@ -16,6 +16,7 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.e2e
 
 # IDE files
 .vscode/
@@ -98,3 +99,12 @@ apps/web/src/generated/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Test artifacts and screenshots
+*.png
+e2e/data/
+test-results/
+screenshots/
+debug-*.png
+registration-*.png
+current-state.png

@@ -27,7 +27,6 @@ export const AuthPage = () => {
   })
 
   const updateView = (view: AuthView) => {
-    console.log(`🔄 AuthPage updating view from ${currentView} to ${view}`)
     setCurrentView(view)
     try {
       sessionStorage.setItem('authPageView', view)
@@ -37,7 +36,6 @@ export const AuthPage = () => {
   }
 
   const updatePendingEmail = (email: string) => {
-    console.log(`📧 AuthPage updating pending email to: ${email}`)
     setPendingEmail(email)
     try {
       sessionStorage.setItem('authPageEmail', email)
@@ -47,10 +45,8 @@ export const AuthPage = () => {
   }
 
   const handleRegistrationSuccess = (email: string) => {
-    console.log('🎯 AuthPage.handleRegistrationSuccess called with email:', email)
     updatePendingEmail(email)
     updateView('emailConfirmation')
-    console.log('✅ AuthPage switched to emailConfirmation view')
   }
 
   const handleEmailConfirmed = () => {
@@ -66,7 +62,6 @@ export const AuthPage = () => {
   }
 
   const renderAuthForm = () => {
-    console.log('🔄 AuthPage rendering view:', currentView)
     switch (currentView) {
       case 'login':
         return (

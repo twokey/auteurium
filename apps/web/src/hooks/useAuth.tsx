@@ -4,7 +4,7 @@ import { AuthService, User, AuthState } from '../services/auth'
 
 interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, password: string, name: string) => Promise<void>
+  signUp: (email: string, password: string, name: string) => Promise<any>
   signOut: () => Promise<void>
   forgotPassword: (email: string) => Promise<void>
   resetPassword: (email: string, code: string, newPassword: string) => Promise<void>
@@ -76,18 +76,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signUp = async (email: string, password: string, name: string) => {
     try {
-      console.log('🎯 useAuth.signUp called for:', email)
       updateAuthState(authState.user, true)
-
       const result = await AuthService.signUp(email, password, name)
-      console.log('📋 useAuth received result:', result)
-
       updateAuthState(null)
-      console.log('✅ useAuth.signUp completed successfully')
-
       return result
     } catch (error) {
-      console.error('❌ useAuth.signUp failed:', error)
       updateAuthState(null)
       throw error
     }

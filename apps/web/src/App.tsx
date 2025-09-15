@@ -14,8 +14,6 @@ configureAmplify()
 const AppContent = () => {
   const { isAuthenticated, isLoading } = useAuth()
 
-  console.log('🔍 AppContent state:', { isAuthenticated, isLoading })
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
