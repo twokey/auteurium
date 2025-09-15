@@ -7,16 +7,16 @@ const amplifyConfig: ResourcesConfig = {
   Auth: {
     Cognito: {
       // These will be populated by the CDK deployment
-      userPoolId: process.env.VITE_USER_POOL_ID || '',
-      userPoolClientId: process.env.VITE_USER_POOL_CLIENT_ID || '',
+      userPoolId: import.meta.env.VITE_USER_POOL_ID || '',
+      userPoolClientId: import.meta.env.VITE_USER_POOL_CLIENT_ID || '',
 
       // Optional: if you want to use hosted UI
       loginWith: {
         oauth: {
-          domain: process.env.VITE_OAUTH_DOMAIN || '',
+          domain: import.meta.env.VITE_OAUTH_DOMAIN || '',
           scopes: ['email', 'profile', 'openid'],
-          redirectSignIn: [process.env.VITE_OAUTH_REDIRECT_SIGNIN || 'http://localhost:3000'],
-          redirectSignOut: [process.env.VITE_OAUTH_REDIRECT_SIGNOUT || 'http://localhost:3000'],
+          redirectSignIn: [import.meta.env.VITE_OAUTH_REDIRECT_SIGNIN || 'http://localhost:3000'],
+          redirectSignOut: [import.meta.env.VITE_OAUTH_REDIRECT_SIGNOUT || 'http://localhost:3000'],
           responseType: 'code'
         }
       }
@@ -25,8 +25,8 @@ const amplifyConfig: ResourcesConfig = {
 
   API: {
     GraphQL: {
-      endpoint: process.env.VITE_GRAPHQL_ENDPOINT || '',
-      region: process.env.VITE_AWS_REGION || 'us-east-1',
+      endpoint: import.meta.env.VITE_GRAPHQL_ENDPOINT || '',
+      region: import.meta.env.VITE_AWS_REGION || 'us-east-1',
       defaultAuthMode: 'userPool'
     }
   }

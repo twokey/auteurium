@@ -5,7 +5,7 @@ import apolloClient from './services/graphql'
 import { configureAmplify } from './config/amplify'
 import { AuthPage } from './pages/AuthPage'
 import { Dashboard } from './pages/Dashboard'
-import { Canvas } from './pages/Canvas'
+// import { Canvas } from './pages/Canvas'
 import { Navigation } from './components/ui/Navigation'
 
 // Configure Amplify
@@ -13,6 +13,8 @@ configureAmplify()
 
 const AppContent = () => {
   const { isAuthenticated, isLoading } = useAuth()
+
+  console.log('🔍 AppContent state:', { isAuthenticated, isLoading })
 
   if (isLoading) {
     return (
@@ -41,7 +43,7 @@ const AppContent = () => {
               </main>
             </>
           } />
-          <Route path="/project/:id" element={<Canvas />} />
+          {/* <Route path="/project/:id" element={<Canvas />} /> */}
           <Route path="/admin" element={
             <>
               <Navigation />

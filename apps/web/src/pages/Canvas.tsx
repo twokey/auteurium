@@ -14,8 +14,8 @@ import {
   Node,
   BackgroundVariant,
   ReactFlowInstance,
-} from '@xyflow/react'
-import '@xyflow/react/dist/style.css'
+} from 'reactflow'
+import 'reactflow/dist/style.css'
 
 import { GET_PROJECT_WITH_SNIPPETS } from '../graphql/queries'
 import { Navigation } from '../components/ui/Navigation'

@@ -62,7 +62,10 @@ export class AuthService {
 
   static async signUp(email: string, password: string, name: string): Promise<void> {
     try {
-      await signUp({
+      console.log('🚀 Starting signUp process for:', email)
+      console.log('📝 User attributes:', { email, name })
+
+      const result = await signUp({
         username: email,
         password,
         options: {
@@ -72,8 +75,23 @@ export class AuthService {
           }
         }
       })
+
+      console.log('✅ SignUp result:', result)
+      console.log('📧 Next step:', result.nextStep)
+
+      if (result.nextStep.signUpStep === 'CONFIRM_SIGN_UP') {
+        console.log('⚠️ User needs email confirmation. User created but UNCONFIRMED.')
+        console.log('📬 Confirmation delivery details:', result.nextStep.codeDeliveryDetails)
+      }
+
+      return result
     } catch (error) {
-      console.error('Error signing up:', error)
+      console.error('❌ Error signing up:', error)
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        code: error.__type || error.code
+      })
       throw error
     }
   }

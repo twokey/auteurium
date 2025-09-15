@@ -92,3 +92,9 @@ jspm_packages/
 # Generated GraphQL types
 packages/graphql-schema/generated/
 apps/web/src/generated/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

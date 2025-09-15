@@ -5,7 +5,7 @@ import { AuthService } from './auth'
 
 // Create HTTP link
 const httpLink = createHttpLink({
-  uri: process.env.VITE_GRAPHQL_ENDPOINT || ''
+  uri: import.meta.env.VITE_GRAPHQL_ENDPOINT || ''
 })
 
 // Auth link to add JWT token to requests

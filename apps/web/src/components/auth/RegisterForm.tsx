@@ -38,9 +38,23 @@ export const RegisterForm = ({ onSwitchToLogin, onRegistrationSuccess }: Registe
     }
 
     try {
-      await signUp(email, password, name)
-      onRegistrationSuccess(email)
+      console.log('📝 RegisterForm submitting for:', email)
+      const result = await signUp(email, password, name)
+      console.log('🎉 RegisterForm received result:', result)
+
+      // Check if the result indicates email confirmation is needed
+      if (result && result.nextStep && result.nextStep.signUpStep === 'CONFIRM_SIGN_UP') {
+        console.log('📧 Email confirmation required, proceeding to confirmation step')
+        onRegistrationSuccess(email)
+      } else if (result && result.isSignUpComplete) {
+        console.log('✅ Registration completed without confirmation needed')
+        onRegistrationSuccess(email)
+      } else {
+        console.log('🔄 Registration successful, proceeding to confirmation')
+        onRegistrationSuccess(email)
+      }
     } catch (error: any) {
+      console.error('❌ RegisterForm error:', error)
       setError(error.message || 'Registration failed')
     }
   }

@@ -76,10 +76,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signUp = async (email: string, password: string, name: string) => {
     try {
+      console.log('🎯 useAuth.signUp called for:', email)
       updateAuthState(authState.user, true)
-      await AuthService.signUp(email, password, name)
+
+      const result = await AuthService.signUp(email, password, name)
+      console.log('📋 useAuth received result:', result)
+
       updateAuthState(null)
+      console.log('✅ useAuth.signUp completed successfully')
+
+      return result
     } catch (error) {
+      console.error('❌ useAuth.signUp failed:', error)
       updateAuthState(null)
       throw error
     }

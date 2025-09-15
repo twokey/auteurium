@@ -24,12 +24,21 @@ export const EmailConfirmation = ({ email, onConfirmed, onBackToLogin }: EmailCo
     }
 
     try {
+      console.log('🔐 EmailConfirmation submitting for:', email, 'code:', code)
       await confirmSignUp(email, code)
+      console.log('✅ Email confirmation successful for:', email)
+
       setSuccess('Email confirmed successfully! You can now sign in.')
       setTimeout(() => {
         onConfirmed()
       }, 2000)
     } catch (error: any) {
+      console.error('❌ Email confirmation failed:', error)
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        code: error.__type || error.code
+      })
       setError(error.message || 'Failed to confirm email')
     }
   }

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Auteurium** is a web application for creating text snippets and organizing them visually on a canvas with logical connections. This is the early development phase - the repository currently contains only documentation.
+**Auteurium** is a web application for creating text snippets and organizing them visually on a canvas with logical connections. The application is built with a complete AWS serverless architecture and React frontend, ready for development and testing.
 
 ### Core Concept
 - Users create text snippets within projects 
@@ -18,13 +18,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Monorepo Structure**: All components (frontend, backend, infrastructure) will be organized in a single GitHub repository
 
 **Technology Stack**:
-- **Frontend**: React with React Flow for canvas interactions, Tailwind CSS for styling
-- **Backend**: AWS Lambda (Node.js with TypeScript)
+- **Frontend**: React with React Flow for canvas interactions, Tailwind CSS for styling, AWS Amplify v6
+- **Backend**: AWS Lambda (Node.js with TypeScript), GraphQL resolvers
 - **API Layer**: GraphQL with AWS AppSync
-- **Authentication**: AWS Cognito
-- **Storage**: Vector database for snippet connections
+- **Authentication**: AWS Cognito with JWT validation
+- **Storage**: DynamoDB with Global Secondary Indexes (designed for Neptune migration)
 - **Infrastructure**: AWS CDK for Infrastructure as Code
-- **Hosting**: Amazon S3 + CloudFront
+- **Hosting**: Amazon S3 + CloudFront (disabled for development security)
 
 ## Key Application Features
 
@@ -64,8 +64,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Prerequisites**: Node.js 22+ (LTS), npm 10+, TypeScript 5.9+, AWS CLI configured (for deployment)
 
 ### Setup
-- `npm run setup` - Install all dependencies and set up development environment
-- `./tools/scripts/setup-dev.sh` - Alternative setup script
+- `npm install` - Install all workspace dependencies
 
 ### Development
 - `npm run dev` - Start web app (localhost:3000) and API service concurrently
@@ -73,50 +72,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run dev:api` - Start only API service in watch mode
 
 ### Building
-- `npm run build` - Build all packages and applications using build-all.sh script
-- `./tools/scripts/build-all.sh` - Direct script execution for full build
-- Build order: shared-types → validation → graphql-schema → api → web → infrastructure
+- `cd apps/web && npm run build` - Build React web application
+- `cd services/api && npm run build` - Build API Lambda functions
+- `cd infrastructure/aws-cdk && npm run build` - Build CDK infrastructure
+- Build dependencies: shared-types → validation → api → web → infrastructure
 
 ### Code Quality
-- `npm run lint` - Run ESLint on web app and build API (includes type checking)
-- `npm run typecheck` - Run TypeScript type checking on web app
-- Individual package linting available in each workspace
-
-### GraphQL
-- `npm run generate` - Generate GraphQL types from schema using codegen
-- `./tools/scripts/generate-graphql.sh` - Direct script for GraphQL code generation
+- `cd apps/web && npm run lint` - ESLint for React frontend
+- `cd apps/web && npm run typecheck` - TypeScript type checking for frontend
 
 ### Testing
-- `npm run test` - Run API unit tests (integration/e2e tests not yet implemented)
-- `npm run test:api` - Run Jest tests in services/api
-- API uses Jest, integration tests planned for tests/integration/
-- E2E tests with Playwright planned for tests/e2e/
+- `cd services/api && npm run test` - Run Jest unit tests for API resolvers
+- Tests include database operations, cascade deletes, authentication, validation
+- Test files: `src/__tests__/` with setup, middleware, integration, and database tests
 
 ### Deployment
-- `npm run deploy [stage] [profile]` - Deploy to AWS (default: dev environment)
-- `./tools/scripts/deploy-stack.sh dev` - Deploy to dev environment
-- Uses AWS CDK, requires AWS CLI configuration
-- Available stages: dev, prod
+**CDK Commands** (from infrastructure/aws-cdk/):
+- `npm run synth` - Synthesize CloudFormation templates
+- `npm run deploy` - Deploy all AWS stacks
+- `npm run destroy` - Destroy all AWS stacks
+- `npm run diff` - Show differences between deployed and local stacks
 
-### CDK Commands (from infrastructure/aws-cdk/)
-- `npm run cdk synth` - Synthesize CloudFormation templates
-- `npm run cdk deploy --all` - Deploy all stacks
-- `npm run cdk destroy --all` - Destroy all stacks
-- `npm run cdk diff` - Show differences between deployed and local stacks
+**Environment Setup**:
+- Copy `apps/web/.env.example` to `apps/web/.env.local`
+- Update environment variables with actual AWS resource IDs after deployment
+- Variables needed: USER_POOL_ID, USER_POOL_CLIENT_ID, GRAPHQL_ENDPOINT
+
 
 ## Monorepo Structure
 
 **Workspaces Configuration**: Uses npm workspaces with apps/*, packages/*, services/*, infrastructure/aws-cdk
 
-- **apps/web** - React frontend with React Flow, Vite, Tailwind CSS, AWS Amplify
+- **apps/web** - React frontend with React Flow, Vite, Tailwind CSS, AWS Amplify v6
 - **packages/shared-types** - TypeScript definitions shared across monorepo
-- **packages/graphql-schema** - GraphQL schema and generated types
 - **packages/validation** - Zod schemas for request validation
-- **services/api** - AWS Lambda GraphQL resolvers with PowerTools
-- **services/media** - Media handling Lambda functions (pre-signed URLs, upload completion)
-- **infrastructure/aws-cdk** - Infrastructure as Code with CDK stacks
-- **tests/** - Integration and E2E test suites
-- **tools/scripts/** - Build, deployment, and development automation scripts
+- **services/api** - AWS Lambda GraphQL resolvers with PowerTools and comprehensive tests
+- **infrastructure/aws-cdk** - Infrastructure as Code with CDK stacks for 5 AWS services
 
 ## Architecture Notes
 
@@ -128,20 +119,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Two text fields per snippet, positioned on infinite canvas
 
 **Frontend Architecture**:
-- React with React Flow for canvas interactions
-- Zustand for state management
-- AWS Amplify for authentication and GraphQL
-- Apollo Client for GraphQL operations
-- React Router for navigation
+- React with React Flow for canvas interactions, React Router for navigation
+- AWS Amplify v6 for authentication integration with Cognito
+- Apollo Client for GraphQL operations with AppSync
 - Tailwind CSS for styling
+- Authentication context with useAuth hook
+- Component structure: pages/, components/auth/, components/projects/, components/canvas/
 
 **Backend Architecture**:
-- GraphQL API via AWS AppSync
-- Lambda resolvers with TypeScript
-- DynamoDB for data storage (designed for future vector database migration)
-- AWS Cognito for authentication with user data isolation
-- S3 for media uploads with pre-signed URLs
-- CloudWatch for basic logging (monitoring stack disabled for cost savings)
+- GraphQL API via AWS AppSync with 20 Lambda resolvers
+- DynamoDB with 5 tables and 7 Global Secondary Indexes (designed for Neptune migration)
+- AWS Cognito for authentication with JWT validation using aws-jwt-verify
+- User data isolation: users can only access their own projects/snippets
+- S3 for media uploads with pre-signed URLs and upload completion handlers
+- CloudWatch for logging (monitoring stack disabled for cost savings)
 
 **Critical Implementation Areas**:
 - **Authentication**: AWS Cognito integration, admin users cannot access snippet content
@@ -152,13 +143,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Infrastructure**: CDK stacks with app-specific resource naming for multi-app AWS accounts
 - **Cost Optimization**: Monitoring stack disabled during development (~$5-7/month savings)
 
+**AWS Infrastructure** (5 deployed stacks):
+1. **Auteurium-Auth-dev** - Cognito User Pool with email/password authentication
+2. **Auteurium-Database-dev** - 5 DynamoDB tables: users, projects, snippets, connections, versions
+3. **Auteurium-Api-dev** - AppSync GraphQL API with Lambda resolvers for all CRUD operations
+4. **Auteurium-Media-dev** - S3 bucket with presigned URL functions for media uploads
+5. **Auteurium-Web-dev** - S3 + CloudFront for hosting (CloudFront disabled for development security)
+
 **Build Dependencies**:
-1. packages/shared-types (foundational types)
-2. packages/validation (depends on shared-types)
-3. packages/graphql-schema (schema and codegen)
-4. services/api (depends on shared-types, validation)
-5. apps/web (depends on generated GraphQL types)
-6. infrastructure/aws-cdk (independent)
+1. packages/shared-types → packages/validation → services/api → apps/web
+2. infrastructure/aws-cdk (independent, can be built separately)
 
 ## Monitoring Configuration
 
