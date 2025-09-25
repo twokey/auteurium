@@ -24,7 +24,9 @@ export class AuteuriumDatabaseStack extends cdk.Stack {
       partitionKey: { name: 'id', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: stage === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
-      pointInTimeRecovery: stage === 'prod'
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: stage === 'prod'
+      }
     })
 
     // Add GSI for email lookup
@@ -41,7 +43,9 @@ export class AuteuriumDatabaseStack extends cdk.Stack {
       sortKey: { name: 'id', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: stage === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
-      pointInTimeRecovery: stage === 'prod'
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: stage === 'prod'
+      }
     })
 
     // Snippets table
@@ -51,7 +55,9 @@ export class AuteuriumDatabaseStack extends cdk.Stack {
       sortKey: { name: 'id', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: stage === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
-      pointInTimeRecovery: stage === 'prod'
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: stage === 'prod'
+      }
     })
 
     // Add GSI for user lookup
@@ -69,7 +75,9 @@ export class AuteuriumDatabaseStack extends cdk.Stack {
       sortKey: { name: 'id', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: stage === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
-      pointInTimeRecovery: stage === 'prod'
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: stage === 'prod'
+      }
     })
 
     // Add GSI for source snippet lookup
@@ -101,7 +109,9 @@ export class AuteuriumDatabaseStack extends cdk.Stack {
       sortKey: { name: 'version', type: dynamodb.AttributeType.NUMBER },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: stage === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
-      pointInTimeRecovery: stage === 'prod'
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: stage === 'prod'
+      }
     })
 
     // Add GSI for user-based version queries

@@ -38,7 +38,7 @@ export class AuteuriumWebStack extends cdk.Stack {
     this.distribution = new cloudfront.Distribution(this, `AuteuriumDistribution-${stage}`, {
       comment: `Auteurium Web Distribution ${stage}`,
       defaultBehavior: {
-        origin: new origins.S3Origin(this.websiteBucket, {
+        origin: origins.S3BucketOrigin.withOriginAccessIdentity(this.websiteBucket, {
           originAccessIdentity
         }),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -49,7 +49,7 @@ export class AuteuriumWebStack extends cdk.Stack {
       },
       additionalBehaviors: {
         '/static/*': {
-          origin: new origins.S3Origin(this.websiteBucket, {
+          origin: origins.S3BucketOrigin.withOriginAccessIdentity(this.websiteBucket, {
             originAccessIdentity
           }),
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
