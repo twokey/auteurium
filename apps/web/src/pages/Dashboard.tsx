@@ -22,7 +22,7 @@ export const Dashboard = () => {
     errorPolicy: 'all'
   })
 
-  const projects: Project[] = data?.getProjects || []
+  const projects: Project[] = data?.projects || []
 
   const handleProjectCreated = () => {
     refetch()

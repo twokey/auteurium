@@ -63,37 +63,36 @@ export const GET_PROJECT = gql`
 
 export const GET_PROJECT_WITH_SNIPPETS = gql`
   query GetProjectWithSnippets($projectId: ID!) {
-    getProject(id: $projectId) {
+    project(id: $projectId) {
       id
       name
       description
       createdAt
       updatedAt
       lastModified
-    }
-    getSnippetsByProject(projectId: $projectId) {
-      id
-      projectId
-      textField1
-      textField2
-      position {
-        x
-        y
+      snippets {
+        id
+        projectId
+        textField1
+        textField2
+        position {
+          x
+          y
+        }
+        tags
+        categories
+        version
+        createdAt
+        updatedAt
+        connections {
+          id
+          sourceSnippetId
+          targetSnippetId
+          label
+          createdAt
+          updatedAt
+        }
       }
-      tags
-      categories
-      version
-      createdAt
-      updatedAt
-    }
-    getConnectionsByProject(projectId: $projectId) {
-      id
-      projectId
-      sourceSnippetId
-      targetSnippetId
-      label
-      createdAt
-      updatedAt
     }
   }
 `
