@@ -72,19 +72,40 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run dev:api` - Start only API service in watch mode
 
 ### Building
+- `npm run build` - Build entire monorepo using automated script
 - `cd apps/web && npm run build` - Build React web application
 - `cd services/api && npm run build` - Build API Lambda functions
 - `cd infrastructure/aws-cdk && npm run build` - Build CDK infrastructure
-- Build dependencies: shared-types → validation → api → web → infrastructure
+- `npm run generate` - Generate GraphQL types and schemas
+- Build dependencies: shared-types → validation → graphql-schema → api → web → infrastructure
+
+**Build Scripts**:
+- `tools/scripts/build-all.sh` - Automated build process for all components
+- `tools/scripts/generate-graphql.sh` - GraphQL schema and type generation
+- `tools/scripts/setup-dev.sh` - Development environment setup
+- `tools/scripts/deploy-stack.sh` - Deployment automation
 
 ### Code Quality
-- `cd apps/web && npm run lint` - ESLint for React frontend
-- `cd apps/web && npm run typecheck` - TypeScript type checking for frontend
+- `npm run lint` - Run linting for all workspaces (web + API build check)
+- `npm run typecheck` - Run TypeScript type checking for all workspaces
+- `cd apps/web && npm run lint` - ESLint for React frontend only
+- `cd apps/web && npm run typecheck` - TypeScript type checking for frontend only
 
 ### Testing
 - `cd services/api && npm run test` - Run Jest unit tests for API resolvers
+- `npm run test` - Run all tests (API + integration tests from root)
+- `npm run test:e2e` - Run Playwright end-to-end tests across all browsers
+- `npm run test:e2e:headed` - Run E2E tests with browser UI visible
+- `npm run test:e2e:debug` - Run E2E tests in debug mode
+- `npm run test:e2e:ui` - Run E2E tests with Playwright UI
+- `npm run test:e2e:report` - Show E2E test results report
 - Tests include database operations, cascade deletes, authentication, validation
 - Test files: `src/__tests__/` with setup, middleware, integration, and database tests
+
+**E2E Test Setup**:
+- Copy `.env.e2e.example` to `.env.e2e` and configure test environment
+- E2E tests run against localhost:3000 with automatic dev server startup
+- Tests configured for Chromium, Firefox, and WebKit browsers
 
 ### Infrastructure Testing
 **CDK TDD Framework** (from infrastructure/aws-cdk/):
@@ -114,6 +135,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Variables needed: USER_POOL_ID, USER_POOL_CLIENT_ID, GRAPHQL_ENDPOINT
 
 
+## Development Workflow
+
+**Quick Start**:
+1. `npm run setup` - Initialize development environment (runs setup-dev.sh)
+2. `npm run dev` - Start both web app and API in development mode
+3. `npm run test:e2e` - Run full end-to-end test suite
+
+**GraphQL Development**:
+- Schema definitions in `packages/graphql-schema/`
+- Run `npm run generate` after schema changes to regenerate TypeScript types
+- API resolvers automatically get updated type definitions
+
+**Environment Configuration**:
+- **Web App**: Copy `apps/web/.env.example` → `apps/web/.env.local`
+- **E2E Tests**: Copy `.env.e2e.example` → `.env.e2e`
+- Configure AWS resource IDs after initial deployment
+
 ## Monorepo Structure
 
 **Workspaces Configuration**: Uses npm workspaces with apps/*, packages/*, services/*, infrastructure/aws-cdk
@@ -121,8 +159,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **apps/web** - React frontend with React Flow, Vite, Tailwind CSS, AWS Amplify v6
 - **packages/shared-types** - TypeScript definitions shared across monorepo
 - **packages/validation** - Zod schemas for request validation
+- **packages/graphql-schema** - GraphQL schema definitions and code generation
 - **services/api** - AWS Lambda GraphQL resolvers with PowerTools and comprehensive tests
 - **infrastructure/aws-cdk** - Infrastructure as Code with CDK stacks for 5 AWS services
+- **e2e/** - Playwright end-to-end tests
+- **tools/scripts/** - Build, deployment, and development automation scripts
 
 ## Architecture Notes
 
@@ -166,7 +207,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 5. **Auteurium-Web-dev** - S3 + CloudFront for hosting (CloudFront disabled for development security)
 
 **Build Dependencies**:
-1. packages/shared-types → packages/validation → services/api → apps/web
+1. packages/shared-types → packages/validation → packages/graphql-schema → services/api → apps/web
 2. infrastructure/aws-cdk (independent, can be built separately)
 
 ## Infrastructure Testing Framework
