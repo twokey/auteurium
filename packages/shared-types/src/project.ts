@@ -17,3 +17,6 @@ export interface UpdateProjectInput {
   name?: string
   description?: string
 }
+
+// Alias for backward compatibility
+export type ProjectInput = CreateProjectInput

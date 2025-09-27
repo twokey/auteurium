@@ -241,8 +241,8 @@ export const connectionMutations = {
           continue
         }
 
-      } catch (error) {
-        errors.push(`Validation failed for connection: ${error.message}`)
+      } catch (error: any) {
+        errors.push(`Validation failed for connection: ${error?.message || 'Unknown error'}`)
       }
     }
 
@@ -256,9 +256,9 @@ export const connectionMutations = {
       try {
         const connection = await createConnection(connInput, user.id)
         createdConnections.push(connection)
-      } catch (error) {
+      } catch (error: any) {
         context.logger.warn('Failed to create individual connection in bulk operation', {
-          error: error.message,
+          error: error?.message || 'Unknown error',
           sourceSnippetId: connInput.sourceSnippetId,
           targetSnippetId: connInput.targetSnippetId
         })

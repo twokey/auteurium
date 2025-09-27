@@ -8,6 +8,7 @@ import {
 } from '../../database/projects'
 import { deleteProjectSnippets } from '../../database/snippets'
 import { requireAuth, requireOwnership } from '../../middleware/validation'
+import { createNotFoundError } from '../../utils/errors'
 import { validateInput } from '../../middleware/validation'
 import { z } from 'zod'
 
@@ -46,7 +47,7 @@ export const projectMutations = {
       userId: user.id
     })
 
-    return await createProject(input, user.id)
+    return await createProject(user.id, input)
   },
 
   // Update an existing project
@@ -71,7 +72,11 @@ export const projectMutations = {
 
     requireOwnership(user, project.userId, 'project')
 
-    return await updateProject(projectId, input, user.id)
+    const updatedProject = await updateProject(user.id, projectId, input)
+    if (!updatedProject) {
+      throw createNotFoundError('Project')
+    }
+    return updatedProject
   },
 
   // Delete a project with CASCADE DELETE of all related data

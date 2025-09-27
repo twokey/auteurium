@@ -41,7 +41,7 @@ export const createMockUser = () => ({
   id: 'test-user-id',
   email: 'test@example.com',
   name: 'Test User',
-  role: 'STANDARD' as const,
+  role: 'standard' as const,
   createdAt: '2025-01-01T00:00:00.000Z',
   updatedAt: '2025-01-01T00:00:00.000Z'
 })
@@ -67,7 +67,7 @@ export const createMockProject = () => ({
 
 export const createMockGraphQLContext = (user = createMockUser()) => ({
   user,
-  isAdmin: user.role === 'ADMIN',
+  isAdmin: (user.role as string) === 'admin',
   requestId: 'test-request-id',
   logger: {
     info: jest.fn(),

@@ -222,7 +222,7 @@ export const deleteConnection = async (
     }).promise()
 
     logger.info('Connection deleted', { connectionId, userId })
-  } catch (error) {
+  } catch (error: any) {
     if (error.code === 'ConditionalCheckFailedException') {
       throw createNotFoundError('Connection')
     }

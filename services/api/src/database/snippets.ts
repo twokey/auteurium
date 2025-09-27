@@ -18,8 +18,8 @@ export const createSnippet = async (
     id: snippetId,
     projectId: snippetInput.projectId,
     userId,
-    textField1: snippetInput.textField1,
-    textField2: snippetInput.textField2,
+    textField1: snippetInput.textField1 || '',
+    textField2: snippetInput.textField2 || '',
     position: snippetInput.position || { x: 0, y: 0 },
     tags: snippetInput.tags || [],
     categories: snippetInput.categories || [],
@@ -46,7 +46,7 @@ export const createSnippet = async (
     })
 
     return snippet
-  } catch (error) {
+  } catch (error: any) {
     if (error.code === 'ConditionalCheckFailedException') {
       throw createConflictError('Snippet with this ID already exists')
     }
@@ -82,7 +82,7 @@ export const getSnippet = async (
     }
 
     return snippet
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Failed to get snippet', { error, projectId, snippetId, userId })
     throw error
   }
@@ -105,7 +105,7 @@ export const getProjectSnippets = async (
     }).promise()
 
     return result.Items as Snippet[]
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Failed to get project snippets', { error, projectId, userId })
     throw error
   }
@@ -139,7 +139,7 @@ export const getUserSnippets = async (
       snippets: result.Items as Snippet[],
       lastKey: result.LastEvaluatedKey
     }
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Failed to get user snippets', { error, userId })
     throw error
   }
@@ -229,7 +229,7 @@ export const updateSnippet = async (
     })
 
     return updatedSnippet
-  } catch (error) {
+  } catch (error: any) {
     if (error.code === 'ConditionalCheckFailedException') {
       throw createNotFoundError('Snippet')
     }
@@ -275,7 +275,7 @@ export const deleteSnippet = async (
       projectId,
       userId
     })
-  } catch (error) {
+  } catch (error: any) {
     if (error.code === 'ConditionalCheckFailedException') {
       throw createNotFoundError('Snippet')
     }
@@ -301,7 +301,7 @@ export const deleteProjectSnippets = async (
       snippetsCount: snippets.length,
       userId
     })
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Failed to delete project snippets', { error, projectId, userId })
     throw error
   }
@@ -363,7 +363,7 @@ export const getSnippetVersions = async (
     }).promise()
 
     return result.Items as SnippetVersion[]
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Failed to get snippet versions', { error, snippetId, userId })
     throw error
   }
@@ -413,7 +413,7 @@ export const revertSnippetToVersion = async (
     })
 
     return revertedSnippet
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Failed to revert snippet', { error, projectId, snippetId, targetVersion, userId })
     throw error
   }

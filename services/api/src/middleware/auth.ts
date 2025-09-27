@@ -12,18 +12,18 @@ const verifier = CognitoJwtVerifier.create({
   clientId: process.env.USER_POOL_CLIENT_ID!
 })
 
-export async function validateToken(token: string): Promise<User | null> {
+export async function validateToken(token: string): Promise<User | undefined> {
   try {
     // Verify and decode the JWT token
     const payload = await verifier.verify(token)
 
     // Extract user information from the token payload
     const user: User = {
-      id: payload.sub,
-      email: payload.email || payload.username || '',
-      name: payload.name || payload.email || payload.username || 'Unknown User',
+      id: String(payload.sub || ''),
+      email: String(payload.email || payload.username || ''),
+      name: String(payload.name || payload.email || payload.username || 'Unknown User'),
       role: (payload['custom:role'] as UserRole) || UserRole.STANDARD,
-      createdAt: new Date(payload.iat * 1000).toISOString(),
+      createdAt: new Date((payload.iat || 0) * 1000).toISOString(),
       updatedAt: new Date().toISOString()
     }
 
@@ -38,7 +38,7 @@ export async function validateToken(token: string): Promise<User | null> {
     logger.error('Token validation failed', {
       error: error instanceof Error ? error.message : 'Unknown error'
     })
-    return null
+    return undefined
   }
 }
 

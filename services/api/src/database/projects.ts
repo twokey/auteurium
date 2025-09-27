@@ -197,3 +197,5 @@ const deleteProjectConnections = async (projectId: string): Promise<void> => {
     }
   }
 }
+// Alias for backward compatibility
+export const getProject = getProjectById

@@ -151,7 +151,7 @@ export const connectionQueries = {
 
     const options: GraphTraversalOptions = {
       snippetId,
-      direction,
+      direction: direction || 'both',
       maxDepth,
       connectionTypes
     }
