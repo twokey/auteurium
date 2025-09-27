@@ -86,6 +86,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Tests include database operations, cascade deletes, authentication, validation
 - Test files: `src/__tests__/` with setup, middleware, integration, and database tests
 
+### Infrastructure Testing
+**CDK TDD Framework** (from infrastructure/aws-cdk/):
+- `npm run test` - Run all infrastructure tests (93 tests, 100% coverage)
+- `npm run test:unit` - Fast unit tests for individual stacks
+- `npm run test:integration` - Cross-stack dependency tests
+- `npm run test:validation` - Runtime validation against deployed infrastructure
+- `npm run test:watch` - Watch mode for development
+- `npm run test:coverage` - Generate coverage reports
+
+**Test Organization**:
+- **Unit Tests**: `test/unit/stacks/` - Auth (20), Database (24), API (25), Media (24) tests
+- **Integration Tests**: `test/integration/cross-stack/` - Complete infrastructure synthesis
+- **Validation Tests**: `test/validation/deployment/` - Runtime version and security validation
+- **Critical Protection**: Node.js 22.x runtime enforcement, IAM permissions, security compliance
+
 ### Deployment
 **CDK Commands** (from infrastructure/aws-cdk/):
 - `npm run synth` - Synthesize CloudFormation templates
@@ -153,6 +168,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Build Dependencies**:
 1. packages/shared-types → packages/validation → services/api → apps/web
 2. infrastructure/aws-cdk (independent, can be built separately)
+
+## Infrastructure Testing Framework
+
+**TDD Approach**: The CDK infrastructure uses Test-Driven Development with comprehensive test coverage to prevent regressions and ensure consistency across all AWS stacks.
+
+**Key Testing Commands**:
+- `npm test -- auth-stack.test.ts` - Test specific stack
+- `npm test -- --testNamePattern="Node.js"` - Test with pattern matching
+- `npm test -- --changedSince=origin/main` - Test only changed files
+- `export RUN_DEPLOYMENT_TESTS=true && npm run test:validation` - Validate deployed infrastructure
+
+**Critical Test Areas**:
+- **Runtime Version Safety**: Prevents regression to older Node.js versions (enforces 22.x)
+- **Security Compliance**: IAM permissions, CORS configuration, authentication setup
+- **Resource Integrity**: Naming conventions, cross-stack references, environment variables
+- **Template Validation**: CDK Template assertions for all AWS resources
 
 ## Monitoring Configuration
 

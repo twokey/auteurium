@@ -9,8 +9,8 @@ import * as path from 'path'
 
 interface AuteuriumApiStackProps extends cdk.StackProps {
   stage: string
-  userPool: cognito.UserPool
-  userPoolClient: cognito.UserPoolClient
+  userPool: cognito.IUserPool
+  userPoolClient: cognito.IUserPoolClient
 }
 
 export class AuteuriumApiStack extends cdk.Stack {
@@ -50,7 +50,7 @@ export class AuteuriumApiStack extends cdk.Stack {
     // Lambda function for GraphQL resolvers
     const apiFunction = new lambda.Function(this, `AuteuriumApiFunction-${stage}`, {
       functionName: `auteurium-api-${stage}`,
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_22_X,
       handler: 'index.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../../../../services/api/dist')),
       timeout: cdk.Duration.seconds(30),

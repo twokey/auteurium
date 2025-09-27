@@ -4,8 +4,8 @@ import * as cognito from 'aws-cdk-lib/aws-cognito';
 import { Construct } from 'constructs';
 interface AuteuriumApiStackProps extends cdk.StackProps {
     stage: string;
-    userPool: cognito.UserPool;
-    userPoolClient: cognito.UserPoolClient;
+    userPool: cognito.IUserPool;
+    userPoolClient: cognito.IUserPoolClient;
 }
 export declare class AuteuriumApiStack extends cdk.Stack {
     readonly graphqlApi: appsync.GraphqlApi;

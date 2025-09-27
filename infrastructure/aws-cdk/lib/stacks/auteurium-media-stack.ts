@@ -22,6 +22,7 @@ export class AuteuriumMediaStack extends cdk.Stack {
     // S3 bucket for media storage
     this.mediaBucket = new s3.Bucket(this, `AuteuriumMediaBucket-${stage}`, {
       bucketName: `auteurium-media-${stage}-${this.account}`,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       cors: [
         {
           allowedMethods: [
@@ -48,7 +49,7 @@ export class AuteuriumMediaStack extends cdk.Stack {
     // Lambda function for generating presigned URLs
     this.presignedUrlFunction = new lambda.Function(this, `AuteuriumPresignedUrlFunction-${stage}`, {
       functionName: `auteurium-presigned-url-${stage}`,
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_22_X,
       handler: 'presigned-url.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../../../../services/media/dist')),
       timeout: cdk.Duration.seconds(10),
@@ -62,7 +63,7 @@ export class AuteuriumMediaStack extends cdk.Stack {
     // Lambda function for handling upload completion
     const uploadCompleteFunction = new lambda.Function(this, `AuteuriumUploadCompleteFunction-${stage}`, {
       functionName: `auteurium-upload-complete-${stage}`,
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_22_X,
       handler: 'upload-complete.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../../../../services/media/dist')),
       timeout: cdk.Duration.seconds(30),
