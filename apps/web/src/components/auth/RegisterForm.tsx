@@ -7,33 +7,57 @@ interface RegisterFormProps {
 }
 
 export const RegisterForm = ({ onSwitchToLogin, onRegistrationSuccess }: RegisterFormProps) => {
-  const [formData, setFormData] = useState({
+  const createEmptyForm = () => ({
     email: '',
     password: '',
     confirmPassword: '',
     name: ''
   })
+  const createEmptyErrors = () => ({
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+  })
+  const [formData, setFormData] = useState(createEmptyForm)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState(createEmptyErrors)
   const { signUp, isLoading } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setFieldErrors(createEmptyErrors())
 
     const { email, password, confirmPassword, name } = formData
 
-    if (!email || !password || !confirmPassword || !name) {
-      setError('Please fill in all fields')
-      return
+    const errors = createEmptyErrors()
+
+    if (!name.trim()) {
+      errors.name = 'Full name is required'
     }
 
-    if (password !== confirmPassword) {
-      setError('Passwords do not match')
-      return
+    if (!email.trim()) {
+      errors.email = 'Email is required'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.email = 'Please enter a valid email address'
     }
 
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters long')
+    if (!password) {
+      errors.password = 'Password is required'
+    } else if (password.length < 8) {
+      errors.password = 'Password must be at least 8 characters long'
+    }
+
+    if (!confirmPassword) {
+      errors.confirmPassword = 'Please confirm your password'
+    } else if (password && confirmPassword !== password) {
+      errors.confirmPassword = 'Passwords do not match'
+    }
+
+    const hasErrors = Object.values(errors).some(Boolean)
+    if (hasErrors) {
+      setFieldErrors(errors)
       return
     }
 
@@ -49,11 +73,32 @@ export const RegisterForm = ({ onSwitchToLogin, onRegistrationSuccess }: Registe
         onRegistrationSuccess(email)
       }
     } catch (error: any) {
-      setError(error.message || 'Registration failed')
+      let errorMessage = 'Registration failed'
+
+      if (error?.name === 'UsernameExistsException') {
+        errorMessage = 'An account with this email already exists'
+      } else if (error?.message) {
+        errorMessage = error.message
+      }
+
+      setError(errorMessage)
     }
   }
 
   const handleInputChange = (field: keyof typeof formData) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (error) {
+      setError('')
+    }
+    setFieldErrors(prev => {
+      if (!prev[field]) {
+        return prev
+      }
+      return {
+        ...prev,
+        [field]: ''
+      }
+    })
+
     setFormData(prev => ({
       ...prev,
       [field]: e.target.value
@@ -66,7 +111,7 @@ export const RegisterForm = ({ onSwitchToLogin, onRegistrationSuccess }: Registe
         Create your account
       </h2>
       
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-gray-700">
             Full name
@@ -74,12 +119,17 @@ export const RegisterForm = ({ onSwitchToLogin, onRegistrationSuccess }: Registe
           <input
             id="name"
             type="text"
-            required
             value={formData.name}
             onChange={handleInputChange('name')}
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             placeholder="Enter your full name"
+            aria-invalid={fieldErrors.name ? 'true' : 'false'}
           />
+          {fieldErrors.name && (
+            <p className="mt-1 text-xs text-red-600" role="alert">
+              {fieldErrors.name}
+            </p>
+          )}
         </div>
 
         <div>
@@ -89,12 +139,17 @@ export const RegisterForm = ({ onSwitchToLogin, onRegistrationSuccess }: Registe
           <input
             id="email"
             type="email"
-            required
             value={formData.email}
             onChange={handleInputChange('email')}
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             placeholder="Enter your email"
+            aria-invalid={fieldErrors.email ? 'true' : 'false'}
           />
+          {fieldErrors.email && (
+            <p className="mt-1 text-xs text-red-600" role="alert">
+              {fieldErrors.email}
+            </p>
+          )}
         </div>
         
         <div>
@@ -104,15 +159,21 @@ export const RegisterForm = ({ onSwitchToLogin, onRegistrationSuccess }: Registe
           <input
             id="password"
             type="password"
-            required
             value={formData.password}
             onChange={handleInputChange('password')}
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             placeholder="Create a password"
+            aria-invalid={fieldErrors.password ? 'true' : 'false'}
           />
-          <p className="mt-1 text-xs text-gray-500">
-            Must be at least 8 characters long
-          </p>
+          {fieldErrors.password ? (
+            <p className="mt-1 text-xs text-red-600" role="alert">
+              {fieldErrors.password}
+            </p>
+          ) : formData.password.length === 0 ? (
+            <p className="mt-1 text-xs text-gray-500">
+              Must be at least 8 characters long
+            </p>
+          ) : null}
         </div>
 
         <div>
@@ -122,12 +183,17 @@ export const RegisterForm = ({ onSwitchToLogin, onRegistrationSuccess }: Registe
           <input
             id="confirmPassword"
             type="password"
-            required
             value={formData.confirmPassword}
             onChange={handleInputChange('confirmPassword')}
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             placeholder="Confirm your password"
+            aria-invalid={fieldErrors.confirmPassword ? 'true' : 'false'}
           />
+          {fieldErrors.confirmPassword && (
+            <p className="mt-1 text-xs text-red-600" role="alert">
+              {fieldErrors.confirmPassword}
+            </p>
+          )}
         </div>
 
         {error && (
