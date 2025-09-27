@@ -18,6 +18,7 @@ export interface AuthState {
   user: User | null
   isLoading: boolean
   isAuthenticated: boolean
+  hasCheckedAuth: boolean
 }
 
 export class AuthService {
@@ -132,4 +133,3 @@ export class AuthService {
     }
   }
 }
-

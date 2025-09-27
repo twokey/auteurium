@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { Hub } from '@aws-amplify/core'
-import { AuthService, User, AuthState } from '../services/auth'
+import { AuthService, AuthState } from '../services/auth'
 
 interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<void>
@@ -17,23 +17,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     isLoading: true,
-    isAuthenticated: false
+    isAuthenticated: false,
+    hasCheckedAuth: false
   })
 
-  const updateAuthState = (user: User | null, isLoading: boolean = false) => {
-    setAuthState({
-      user,
-      isLoading,
-      isAuthenticated: !!user
-    })
+  const updateAuthState = (updates: Partial<AuthState>) => {
+    setAuthState((prev) => ({
+      ...prev,
+      ...updates,
+      isAuthenticated: updates.user !== undefined ? !!updates.user : prev.isAuthenticated
+    }))
   }
 
   const checkAuthState = async () => {
     try {
       const user = await AuthService.getCurrentUser()
-      updateAuthState(user)
+      updateAuthState({
+        user,
+        isLoading: false,
+        hasCheckedAuth: true
+      })
     } catch (error) {
-      updateAuthState(null)
+      updateAuthState({
+        user: null,
+        isLoading: false,
+        hasCheckedAuth: true
+      })
     }
   }
 
@@ -48,7 +57,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           checkAuthState()
           break
         case 'signOut':
-          updateAuthState(null)
+          updateAuthState({
+            user: null,
+            hasCheckedAuth: true,
+            isLoading: false
+          })
           break
         case 'signUp':
           // Don't automatically sign in after sign up
@@ -64,35 +77,55 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     try {
-      updateAuthState(authState.user, true)
+      updateAuthState({ isLoading: true })
       await AuthService.signIn(email, password)
       const user = await AuthService.getCurrentUser()
-      updateAuthState(user)
+      updateAuthState({
+        user,
+        isLoading: false,
+        hasCheckedAuth: true
+      })
     } catch (error) {
-      updateAuthState(null)
+      updateAuthState({ isLoading: false })
       throw error
     }
   }
 
   const signUp = async (email: string, password: string, name: string) => {
     try {
-      updateAuthState(authState.user, true)
+      updateAuthState({ isLoading: true })
       const result = await AuthService.signUp(email, password, name)
-      updateAuthState(null)
+      updateAuthState({
+        user: null,
+        isLoading: false,
+        hasCheckedAuth: true
+      })
       return result
     } catch (error) {
-      updateAuthState(null)
+      updateAuthState({
+        user: null,
+        isLoading: false,
+        hasCheckedAuth: true
+      })
       throw error
     }
   }
 
   const signOut = async () => {
     try {
-      updateAuthState(authState.user, true)
+      updateAuthState({ isLoading: true })
       await AuthService.signOut()
-      updateAuthState(null)
+      updateAuthState({
+        user: null,
+        isLoading: false,
+        hasCheckedAuth: true
+      })
     } catch (error) {
-      updateAuthState(null)
+      updateAuthState({
+        user: null,
+        isLoading: false,
+        hasCheckedAuth: true
+      })
       throw error
     }
   }

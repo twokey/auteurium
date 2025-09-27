@@ -12,9 +12,9 @@ import { Navigation } from './components/ui/Navigation'
 configureAmplify()
 
 const AppContent = () => {
-  const { isAuthenticated, isLoading } = useAuth()
+  const { isAuthenticated, hasCheckedAuth } = useAuth()
 
-  if (isLoading) {
+  if (!hasCheckedAuth) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
