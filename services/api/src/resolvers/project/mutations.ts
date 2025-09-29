@@ -21,7 +21,7 @@ const createProjectSchema = z.object({
 })
 
 const updateProjectSchema = z.object({
-  projectId: z.string(),
+  id: z.string(),
   input: z.object({
     name: z.string().min(1).max(100).optional(),
     description: z.string().max(500).optional()
@@ -29,7 +29,7 @@ const updateProjectSchema = z.object({
 })
 
 const deleteProjectSchema = z.object({
-  projectId: z.string()
+  id: z.string()
 })
 
 export const projectMutations = {
@@ -56,7 +56,7 @@ export const projectMutations = {
     args: any,
     context: GraphQLContext
   ): Promise<Project> => {
-    const { projectId, input } = validateInput(updateProjectSchema, args)
+    const { id: projectId, input } = validateInput(updateProjectSchema, args)
     const user = requireAuth(context.user)
 
     context.logger.info('Updating project', {
@@ -65,7 +65,7 @@ export const projectMutations = {
     })
 
     // Verify ownership before updating
-    const project = await getProject(projectId, user.id)
+    const project = await getProject(user.id, projectId)
     if (!project) {
       throw new Error('Project not found or access denied')
     }
@@ -85,7 +85,7 @@ export const projectMutations = {
     args: any,
     context: GraphQLContext
   ): Promise<boolean> => {
-    const { projectId } = validateInput(deleteProjectSchema, args)
+    const { id: projectId } = validateInput(deleteProjectSchema, args)
     const user = requireAuth(context.user)
 
     context.logger.info('Starting cascade delete of project', {
@@ -94,7 +94,7 @@ export const projectMutations = {
     })
 
     // Verify ownership before deleting
-    const project = await getProject(projectId, user.id)
+    const project = await getProject(user.id, projectId)
     if (!project) {
       throw new Error('Project not found or access denied')
     }
@@ -114,7 +114,7 @@ export const projectMutations = {
         projectId,
         userId: user.id
       })
-      await deleteProject(projectId, user.id)
+      await deleteProject(user.id, projectId)
 
       context.logger.info('Project cascade delete completed successfully', {
         projectId,

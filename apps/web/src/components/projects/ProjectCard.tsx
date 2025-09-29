@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type KeyboardEventHandler } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@apollo/client'
 import { DELETE_PROJECT } from '../../graphql/mutations'
@@ -36,6 +36,17 @@ export const ProjectCard = ({ project, onDeleted, onUpdated }: ProjectCardProps)
     }
   })
 
+  const handleOpenProject = () => {
+    navigate(`/project/${project.id}`)
+  }
+
+  const handleKeyDown: KeyboardEventHandler<HTMLDivElement> = (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      handleOpenProject()
+    }
+  }
+
   const handleDeleteProject = () => {
     deleteProject({
       variables: { id: project.id }
@@ -64,7 +75,13 @@ export const ProjectCard = ({ project, onDeleted, onUpdated }: ProjectCardProps)
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={handleOpenProject}
+      onKeyDown={handleKeyDown}
+      className="relative bg-white rounded-lg border border-gray-200 hover:shadow-md transition-shadow focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 cursor-pointer"
+    >
       {/* Card Header */}
       <div className="p-6 pb-4">
         <div className="flex items-start justify-between">
@@ -82,7 +99,10 @@ export const ProjectCard = ({ project, onDeleted, onUpdated }: ProjectCardProps)
           {/* Menu Button */}
           <div className="relative ml-4">
             <button
-              onClick={() => setShowMenu(!showMenu)}
+              onClick={(event) => {
+                event.stopPropagation()
+                setShowMenu(!showMenu)
+              }}
               className="text-gray-400 hover:text-gray-600 p-1 rounded-md transition-colors"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -94,20 +114,25 @@ export const ProjectCard = ({ project, onDeleted, onUpdated }: ProjectCardProps)
               <>
                 <div 
                   className="fixed inset-0 z-10" 
-                  onClick={() => setShowMenu(false)}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setShowMenu(false)
+                  }}
                 ></div>
                 <div className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg z-20 border border-gray-200">
                   <button
-                    onClick={() => {
-                      navigate(`/project/${project.id}`)
+                    onClick={(event) => {
+                      event.stopPropagation()
                       setShowMenu(false)
+                      handleOpenProject()
                     }}
                     className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   >
                     Open Canvas
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={(event) => {
+                      event.stopPropagation()
                       setShowEditModal(true)
                       setShowMenu(false)
                     }}
@@ -117,7 +142,8 @@ export const ProjectCard = ({ project, onDeleted, onUpdated }: ProjectCardProps)
                   </button>
                   <div className="border-t border-gray-200"></div>
                   <button
-                    onClick={() => {
+                    onClick={(event) => {
+                      event.stopPropagation()
                       setShowDeleteConfirm(true)
                       setShowMenu(false)
                     }}
@@ -140,17 +166,16 @@ export const ProjectCard = ({ project, onDeleted, onUpdated }: ProjectCardProps)
         </div>
       </div>
 
-      {/* Click to open */}
-      <button
-        onClick={() => navigate(`/project/${project.id}`)}
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-        aria-label={`Open ${project.name} project`}
-      />
-
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm mx-4">
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div
+            className="bg-white rounded-lg p-6 max-w-sm mx-4"
+            onClick={(event) => event.stopPropagation()}
+          >
             <h3 className="text-lg font-medium text-gray-900 mb-2">
               Delete Project
             </h3>
@@ -159,13 +184,19 @@ export const ProjectCard = ({ project, onDeleted, onUpdated }: ProjectCardProps)
             </p>
             <div className="flex gap-3">
               <button
-                onClick={() => setShowDeleteConfirm(false)}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setShowDeleteConfirm(false)
+                }}
                 className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300 transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={handleDeleteProject}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  handleDeleteProject()
+                }}
                 disabled={isDeleting}
                 className="flex-1 bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors disabled:opacity-50"
               >
