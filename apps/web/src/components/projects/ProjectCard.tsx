@@ -1,8 +1,9 @@
+import { useMutation } from '@apollo/client'
 import { useState, type KeyboardEventHandler } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useMutation } from '@apollo/client'
-import { DELETE_PROJECT } from '../../graphql/mutations'
+
 import { EditProjectModal } from './EditProjectModal'
+import { DELETE_PROJECT } from '../../graphql/mutations'
 
 interface Project {
   id: string
@@ -138,11 +139,20 @@ export const ProjectCard = ({ project, onDeleted, onUpdated }: ProjectCardProps)
             
             {showMenu && (
               <>
-                <div 
-                  className="fixed inset-0 z-10" 
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Close project card actions"
+                  className="fixed inset-0 z-10"
                   onClick={(event) => {
-                    event.stopPropagation()
-                    setShowMenu(false)
+                    if (event.target === event.currentTarget) {
+                      setShowMenu(false)
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') {
+                      setShowMenu(false)
+                    }
                   }}
                 ></div>
                 <div className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg z-20 border border-gray-200">
@@ -198,16 +208,30 @@ export const ProjectCard = ({ project, onDeleted, onUpdated }: ProjectCardProps)
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div
+          role="button"
+          tabIndex={0}
+          aria-label="Close delete project confirmation"
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-          onClick={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setShowDeleteConfirm(false)
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              setShowDeleteConfirm(false)
+            }
+          }}
           data-testid="delete-project-modal"
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={`delete-project-title-${project.id}`}
             className="bg-white rounded-lg p-6 max-w-sm mx-4"
-            onClick={(event) => event.stopPropagation()}
             data-testid="delete-project-modal-content"
           >
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+            <h3 id={`delete-project-title-${project.id}`} className="text-lg font-medium text-gray-900 mb-2">
               Delete Project
             </h3>
             <p className="text-sm text-gray-500 mb-6">

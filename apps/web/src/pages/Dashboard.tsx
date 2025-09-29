@@ -1,9 +1,10 @@
-import { useState } from 'react'
 import { useQuery } from '@apollo/client'
-import { useAuth } from '../hooks/useAuth'
-import { GET_PROJECTS } from '../graphql/queries'
-import { ProjectCard } from '../components/projects/ProjectCard'
+import { useState } from 'react'
+
 import { CreateProjectModal } from '../components/projects/CreateProjectModal'
+import { ProjectCard } from '../components/projects/ProjectCard'
+import { GET_PROJECTS } from '../graphql/queries'
+import { useAuth } from '../hooks/useAuth'
 
 interface Project {
   id: string

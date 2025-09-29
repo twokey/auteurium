@@ -1,4 +1,5 @@
 import { useState } from 'react'
+
 import { useAuth } from '../../hooks/useAuth'
 
 interface EmailConfirmationProps {
@@ -29,8 +30,9 @@ export const EmailConfirmation = ({ email, onConfirmed, onBackToLogin }: EmailCo
       setTimeout(() => {
         onConfirmed()
       }, 2000)
-    } catch (error: any) {
-      setError(error.message || 'Failed to confirm email')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to confirm email'
+      setError(message)
     }
   }
 

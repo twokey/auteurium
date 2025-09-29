@@ -1,5 +1,4 @@
-import { Amplify } from 'aws-amplify'
-import type { ResourcesConfig } from 'aws-amplify'
+import { Amplify, type ResourcesConfig } from 'aws-amplify'
 
 // These values would normally come from environment variables
 // and would be set during the CDK deployment process

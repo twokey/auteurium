@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+
 import { useAuth } from '../../hooks/useAuth'
-import { useNavigate, useLocation } from 'react-router-dom'
 
 interface NavigationProps {
   currentProject?: {
@@ -138,8 +139,20 @@ export const Navigation = ({ currentProject }: NavigationProps) => {
       {/* Click outside to close menu */}
       {showUserMenu && (
         <div
+          role="button"
+          tabIndex={0}
+          aria-label="Close user menu"
           className="fixed inset-0 z-40"
-          onClick={() => setShowUserMenu(false)}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setShowUserMenu(false)
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              setShowUserMenu(false)
+            }
+          }}
         ></div>
       )}
     </nav>

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
 import { useMutation } from '@apollo/client'
+import { useEffect, useState } from 'react'
+
 import { UPDATE_PROJECT } from '../../graphql/mutations'
 
 interface Project {
@@ -78,29 +79,31 @@ export const EditProjectModal = ({ isOpen, project, onClose, onUpdated }: EditPr
   return (
     <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      role="button"
+      tabIndex={0}
+      aria-label="Close edit project modal"
       onClick={(event) => {
-        event.stopPropagation()
-        handleClose()
+        if (event.target === event.currentTarget) {
+          handleClose()
+        }
       }}
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
-          event.stopPropagation()
+          event.preventDefault()
           handleClose()
-          return
         }
-
-        event.stopPropagation()
       }}
       data-testid="edit-project-modal"
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-project-title"
         className="bg-white rounded-lg p-6 max-w-md w-full mx-4"
-        onClick={(event) => event.stopPropagation()}
-        onKeyDown={(event) => event.stopPropagation()}
         data-testid="edit-project-modal-content"
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">
+          <h2 id="edit-project-title" className="text-xl font-semibold text-gray-900">
             Edit Project
           </h2>
           <button

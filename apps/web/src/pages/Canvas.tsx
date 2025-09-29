@@ -1,43 +1,36 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@apollo/client'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
-  ReactFlow,
+  addEdge,
   Background,
+  BackgroundVariant,
   Controls,
   MiniMap,
-  useNodesState,
+  ReactFlow,
   useEdgesState,
-  addEdge,
-  Connection,
-  Edge,
-  Node,
-  BackgroundVariant,
-  ReactFlowInstance,
+  useNodesState,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 
-import { GET_PROJECT_WITH_SNIPPETS } from '../graphql/queries'
-import { Navigation } from '../components/ui/Navigation'
-import { CanvasToolbar } from '../components/canvas/CanvasToolbar'
 import { CanvasInfoPanel } from '../components/canvas/CanvasInfoPanel'
+import { CanvasToolbar } from '../components/canvas/CanvasToolbar'
+import { Navigation } from '../components/ui/Navigation'
+import { GET_PROJECT_WITH_SNIPPETS } from '../graphql/queries'
 
-interface Project {
-  id: string
-  name: string
-  description?: string
-}
+import type { Connection, Edge, Node, ReactFlowInstance } from 'reactflow'
 
 interface Snippet {
   id: string
   textField1: string
   textField2: string
-  position: {
+  position?: {
     x: number
     y: number
-  }
+  } | null
   tags?: string[]
   categories?: string[]
+  connections?: ProjectConnection[]
 }
 
 interface ProjectConnection {
@@ -47,6 +40,17 @@ interface ProjectConnection {
   label?: string
 }
 
+interface Project {
+  id: string
+  name: string
+  description?: string
+  lastModified?: string
+  updatedAt?: string
+  createdAt?: string
+  snippets?: Snippet[]
+}
+
+const EMPTY_SNIPPET_LIST: Snippet[] = []
 const initialNodes: Node[] = []
 const initialEdges: Edge[] = []
 
@@ -65,22 +69,31 @@ export const Canvas = () => {
     errorPolicy: 'all'
   })
 
-  const project: Project | null = data?.getProject || null
-  const snippets: Snippet[] = data?.getSnippetsByProject || []
-  const connections: ProjectConnection[] = data?.getConnectionsByProject || []
+  const project: Project | null = data?.project ?? null
+  const rawSnippets = project?.snippets
+  const snippets = useMemo<Snippet[]>(() => rawSnippets ?? EMPTY_SNIPPET_LIST, [rawSnippets])
 
-  // Convert snippets to React Flow nodes
-  useEffect(() => {
-    if (snippets.length > 0) {
-      const flowNodes = snippets.map((snippet) => ({
+  const flowNodes = useMemo(() => {
+    return snippets.map((snippet) => {
+      const position = snippet.position ?? { x: 0, y: 0 }
+
+      return {
         id: snippet.id,
         type: 'default',
-        position: snippet.position,
+        position,
         data: {
           label: (
-            <div className="p-3">
+            <div
+              className="p-3"
+              data-testid="snippet-node"
+              data-snippet-id={snippet.id}
+            >
+              <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                <span className="uppercase tracking-wide">Snippet</span>
+                <span className="font-mono text-[11px] text-gray-400">#{snippet.id}</span>
+              </div>
               <div className="font-medium text-sm mb-1 text-gray-900">
-                {snippet.textField1 || 'Untitled'}
+                {snippet.textField1 || 'Untitled snippet'}
               </div>
               {snippet.textField2 && (
                 <div className="text-xs text-gray-600 max-w-48 truncate">
@@ -89,9 +102,9 @@ export const Canvas = () => {
               )}
               {snippet.tags && snippet.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
-                  {snippet.tags.slice(0, 2).map((tag, index) => (
+                  {snippet.tags.slice(0, 2).map((tag) => (
                     <span
-                      key={index}
+                      key={`${snippet.id}-${tag}`}
                       className="px-1.5 py-0.5 bg-blue-100 text-blue-800 text-xs rounded"
                     >
                       {tag}
@@ -111,28 +124,50 @@ export const Canvas = () => {
           background: '#fff',
           border: '2px solid #e5e7eb',
           borderRadius: '8px',
-          minWidth: '200px'
+          minWidth: 200,
+          boxShadow: '0 10px 15px -3px rgba(15, 23, 42, 0.08)'
         }
-      }))
-      setNodes(flowNodes)
-    }
-  }, [snippets, setNodes])
+      } as Node
+    })
+  }, [snippets])
 
-  // Convert connections to React Flow edges
   useEffect(() => {
-    if (connections.length > 0) {
-      const flowEdges = connections.map((connection) => ({
-        id: connection.id,
-        source: connection.sourceSnippetId,
-        target: connection.targetSnippetId,
-        label: connection.label,
-        type: 'default',
-        style: { stroke: '#6366f1', strokeWidth: 2 },
-        labelStyle: { fill: '#374151', fontWeight: 500 }
-      }))
-      setEdges(flowEdges)
-    }
-  }, [connections, setEdges])
+    setNodes(flowNodes)
+  }, [flowNodes, setNodes])
+
+  const flowEdges = useMemo(() => {
+    const edgesMap = new Map<string, Edge>()
+
+    snippets.forEach((snippet) => {
+      if (!snippet.connections) return
+
+      snippet.connections.forEach((connection) => {
+        if (!connection.sourceSnippetId || !connection.targetSnippetId) {
+          return
+        }
+
+        const edgeId = connection.id || `${connection.sourceSnippetId}-${connection.targetSnippetId}`
+
+        if (!edgesMap.has(edgeId)) {
+          edgesMap.set(edgeId, {
+            id: edgeId,
+            source: connection.sourceSnippetId,
+            target: connection.targetSnippetId,
+            label: connection.label,
+            type: 'default',
+            style: { stroke: '#6366f1', strokeWidth: 2 },
+            labelStyle: { fill: '#374151', fontWeight: 500 }
+          })
+        }
+      })
+    })
+
+    return Array.from(edgesMap.values())
+  }, [snippets])
+
+  useEffect(() => {
+    setEdges(flowEdges)
+  }, [flowEdges, setEdges])
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -143,16 +178,36 @@ export const Canvas = () => {
     [setEdges]
   )
 
+  const normalisedProject = project
+    ? {
+      id: project.id,
+      name: project.name,
+      description: project.description,
+      lastModified: project.lastModified || project.updatedAt || project.createdAt || new Date().toISOString()
+    }
+    : null
+
+  const snippetCount = snippets.length
+  const connectionCount = flowEdges.length
+  const currentProjectForNav = normalisedProject
+    ? { id: normalisedProject.id, name: normalisedProject.name }
+    : undefined
+
   const handleCreateSnippet = useCallback((position: { x: number; y: number }) => {
     // For now, create a temporary snippet visually
     // Later we'll implement the mutation to create actual snippets
+    const nodeId = `temp-${Date.now()}`
     const newNode: Node = {
-      id: `temp-${Date.now()}`,
+      id: nodeId,
       type: 'default',
       position,
       data: {
         label: (
-          <div className="p-3">
+          <div className="p-3" data-testid="snippet-node" data-snippet-id={nodeId}>
+            <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+              <span className="uppercase tracking-wide">Snippet</span>
+              <span className="font-mono text-[11px] text-gray-400">#{nodeId}</span>
+            </div>
             <div className="font-medium text-sm mb-1 text-gray-900">
               New Snippet
             </div>
@@ -193,7 +248,7 @@ export const Canvas = () => {
   if (loading) {
     return (
       <>
-        <Navigation currentProject={project || undefined} />
+        <Navigation currentProject={currentProjectForNav} />
         <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
@@ -204,7 +259,7 @@ export const Canvas = () => {
   if (error) {
     return (
       <>
-        <Navigation currentProject={project || undefined} />
+        <Navigation currentProject={currentProjectForNav} />
         <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
           <div className="text-center">
             <div className="text-red-500 text-lg font-medium mb-2">Error loading project</div>
@@ -242,37 +297,39 @@ export const Canvas = () => {
 
   return (
     <>
-      <Navigation currentProject={project} />
-      <div className="h-[calc(100vh-64px)] relative">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onInit={onInit}
-          fitView
-        >
-          <Background 
-            variant={BackgroundVariant.Dots} 
-            gap={20} 
-            size={1} 
-            color="#e5e7eb"
-          />
-          <Controls 
-            position="bottom-right"
-            showInteractive={false}
-          />
-          <MiniMap 
-            position="bottom-left"
-            nodeColor="#6366f1"
-            maskColor="rgba(0, 0, 0, 0.1)"
-            style={{
-              backgroundColor: '#f9fafb',
-              border: '1px solid #e5e7eb'
-            }}
-          />
-        </ReactFlow>
+      <Navigation currentProject={currentProjectForNav} />
+      <div className="h-[calc(100vh-64px)] relative" data-testid="canvas-container">
+        <div className="h-full" data-testid="react-flow-canvas">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onInit={onInit}
+            fitView
+          >
+            <Background 
+              variant={BackgroundVariant.Dots} 
+              gap={20} 
+              size={1} 
+              color="#e5e7eb"
+            />
+            <Controls 
+              position="bottom-right"
+              showInteractive={false}
+            />
+            <MiniMap 
+              position="bottom-left"
+              nodeColor="#6366f1"
+              maskColor="rgba(0, 0, 0, 0.1)"
+              style={{
+                backgroundColor: '#f9fafb',
+                border: '1px solid #e5e7eb'
+              }}
+            />
+          </ReactFlow>
+        </div>
         
         {/* Canvas Toolbar */}
         <CanvasToolbar
@@ -283,11 +340,13 @@ export const Canvas = () => {
         />
         
         {/* Canvas Info Panel */}
-        <CanvasInfoPanel
-          project={{ ...project!, lastModified: project!.description || new Date().toISOString() }}
-          snippetCount={snippets.length}
-          connectionCount={connections.length}
-        />
+        {normalisedProject && (
+          <CanvasInfoPanel
+            project={normalisedProject}
+            snippetCount={snippetCount}
+            connectionCount={connectionCount}
+          />
+        )}
       </div>
     </>
   )

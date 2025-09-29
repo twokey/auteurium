@@ -1,4 +1,5 @@
 import { useState } from 'react'
+
 import { useAuth } from '../../hooks/useAuth'
 
 interface RegisterFormProps {
@@ -72,12 +73,15 @@ export const RegisterForm = ({ onSwitchToLogin, onRegistrationSuccess }: Registe
       } else {
         onRegistrationSuccess(email)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const amplifyError = error as { name?: string; message?: string }
       let errorMessage = 'Registration failed'
 
-      if (error?.name === 'UsernameExistsException') {
+      if (amplifyError?.name === 'UsernameExistsException') {
         errorMessage = 'An account with this email already exists'
-      } else if (error?.message) {
+      } else if (typeof amplifyError?.message === 'string' && amplifyError.message.trim()) {
+        errorMessage = amplifyError.message
+      } else if (error instanceof Error && error.message) {
         errorMessage = error.message
       }
 

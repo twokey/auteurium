@@ -1,12 +1,14 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { ApolloProvider } from '@apollo/client'
-import { AuthProvider, useAuth } from './hooks/useAuth'
-import apolloClient from './services/graphql'
-import { configureAmplify } from './config/amplify'
-import { AuthPage } from './pages/AuthPage'
-import { Dashboard } from './pages/Dashboard'
-// import { Canvas } from './pages/Canvas'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+
 import { Navigation } from './components/ui/Navigation'
+import { configureAmplify } from './config/amplify'
+import { AuthProvider } from './hooks/AuthProvider'
+import { useAuth } from './hooks/useAuth'
+import { AuthPage } from './pages/AuthPage'
+import { Canvas } from './pages/Canvas'
+import { Dashboard } from './pages/Dashboard'
+import { apolloClient } from './services/graphql'
 
 // Configure Amplify
 configureAmplify()
@@ -41,7 +43,7 @@ const AppContent = () => {
               </main>
             </>
           } />
-          {/* <Route path="/project/:id" element={<Canvas />} /> */}
+          <Route path="/project/:id" element={<Canvas />} />
           <Route path="/admin" element={
             <>
               <Navigation />
@@ -64,14 +66,12 @@ const AppContent = () => {
   )
 }
 
-function App() {
-  return (
-    <ApolloProvider client={apolloClient}>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </ApolloProvider>
-  )
-}
+const App = () => (
+  <ApolloProvider client={apolloClient}>
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  </ApolloProvider>
+)
 
 export default App

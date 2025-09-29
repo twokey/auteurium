@@ -1,4 +1,5 @@
 import { useState } from 'react'
+
 import { useAuth } from '../../hooks/useAuth'
 
 interface ForgotPasswordFormProps {
@@ -29,8 +30,9 @@ export const ForgotPasswordForm = ({ onSwitchToLogin }: ForgotPasswordFormProps)
       await forgotPassword(email)
       setSuccess('Password reset code sent to your email')
       setStep('reset')
-    } catch (error: any) {
-      setError(error.message || 'Failed to send reset code')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to send reset code'
+      setError(message)
     }
   }
 
@@ -60,8 +62,9 @@ export const ForgotPasswordForm = ({ onSwitchToLogin }: ForgotPasswordFormProps)
       setTimeout(() => {
         onSwitchToLogin()
       }, 2000)
-    } catch (error: any) {
-      setError(error.message || 'Failed to reset password')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to reset password'
+      setError(message)
     }
   }
 

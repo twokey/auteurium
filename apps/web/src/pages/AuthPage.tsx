@@ -1,8 +1,9 @@
 import { useState } from 'react'
+
+import { EmailConfirmation } from '../components/auth/EmailConfirmation'
+import { ForgotPasswordForm } from '../components/auth/ForgotPasswordForm'
 import { LoginForm } from '../components/auth/LoginForm'
 import { RegisterForm } from '../components/auth/RegisterForm'
-import { ForgotPasswordForm } from '../components/auth/ForgotPasswordForm'
-import { EmailConfirmation } from '../components/auth/EmailConfirmation'
 
 type AuthView = 'login' | 'register' | 'forgotPassword' | 'emailConfirmation'
 

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+
 import { useAuth } from '../../hooks/useAuth'
 
 interface LoginFormProps {
@@ -39,15 +40,18 @@ export const LoginForm = ({ onSwitchToRegister, onSwitchToForgotPassword }: Logi
 
     try {
       await signIn(email, password)
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Handle different types of AWS Amplify errors
+      const amplifyError = error as { name?: string; message?: string }
       let errorMessage = 'Login failed'
 
-      if (error?.name === 'UserNotFoundException') {
+      if (amplifyError?.name === 'UserNotFoundException') {
         errorMessage = 'No account found with this email address'
-      } else if (error?.name === 'NotAuthorizedException') {
+      } else if (amplifyError?.name === 'NotAuthorizedException') {
         errorMessage = 'Incorrect email or password'
-      } else if (error?.message) {
+      } else if (typeof amplifyError?.message === 'string' && amplifyError.message.trim()) {
+        errorMessage = amplifyError.message
+      } else if (error instanceof Error && error.message) {
         errorMessage = error.message
       }
 

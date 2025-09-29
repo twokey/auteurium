@@ -1,4 +1,4 @@
-import { signIn, signUp, signOut, getCurrentUser, confirmSignUp, resetPassword, confirmResetPassword, fetchAuthSession } from 'aws-amplify/auth'
+import { confirmResetPassword, confirmSignUp, fetchAuthSession, getCurrentUser, resetPassword, signIn, signOut, signUp } from 'aws-amplify/auth'
 // Temporary types until shared-types is available
 export enum UserRole {
   ADMIN = 'admin',
@@ -19,6 +19,15 @@ export interface AuthState {
   isLoading: boolean
   isAuthenticated: boolean
   hasCheckedAuth: boolean
+}
+
+export interface SignUpResult {
+  isSignUpComplete?: boolean
+  nextStep?: {
+    signUpStep?: string
+    [key: string]: unknown
+  }
+  [key: string]: unknown
 }
 
 export class AuthService {
@@ -44,7 +53,7 @@ export class AuthService {
         createdAt: new Date(payload.iat! * 1000).toISOString(),
         updatedAt: new Date().toISOString()
       }
-    } catch (error) {
+    } catch (_error) {
       return null
     }
   }
@@ -61,7 +70,7 @@ export class AuthService {
     }
   }
 
-  static async signUp(email: string, password: string, name: string): Promise<any> {
+  static async signUp(email: string, password: string, name: string): Promise<SignUpResult> {
     try {
       const result = await signUp({
         username: email,
@@ -74,7 +83,7 @@ export class AuthService {
         }
       })
 
-      return result
+      return result as SignUpResult
     } catch (error) {
       console.error('Error signing up:', error)
       throw error
@@ -128,7 +137,7 @@ export class AuthService {
     try {
       const session = await fetchAuthSession()
       return session.tokens?.accessToken?.toString() || null
-    } catch (error) {
+    } catch (_error) {
       return null
     }
   }
