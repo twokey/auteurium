@@ -13,7 +13,17 @@ export const projectQueries = {
     logger.info('Fetching user projects', { userId: user.id })
 
     try {
-      return await getProjectsByUserId(user.id)
+      const projects = await getProjectsByUserId(user.id)
+
+      if (!Array.isArray(projects)) {
+        logger.warn('Projects resolver received non-array response, coercing to empty array', {
+          userId: user.id,
+          receivedType: typeof projects
+        })
+        return []
+      }
+
+      return projects
     } catch (error) {
       logger.error('Error fetching user projects', { userId: user.id, error })
       throw new Error('Failed to fetch projects')

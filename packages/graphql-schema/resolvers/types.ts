@@ -157,7 +157,7 @@ export type Project = {
   id: Scalars['ID']['output'];
   lastModified: Scalars['String']['output'];
   name: Scalars['String']['output'];
-  snippets: Array<Snippet>;
+  snippets?: Maybe<Array<Snippet>>;
   updatedAt: Scalars['String']['output'];
   userId: Scalars['ID']['output'];
 };
@@ -417,7 +417,7 @@ export type ProjectResolvers<ContextType = GraphQLContext, ParentType extends Re
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   lastModified?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
-  snippets?: Resolver<Array<ResolversTypes['Snippet']>, ParentType, ContextType>;
+  snippets?: Resolver<Maybe<Array<ResolversTypes['Snippet']>>, ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   userId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
 }>;

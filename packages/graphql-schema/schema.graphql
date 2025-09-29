@@ -20,7 +20,7 @@ type Project {
   createdAt: String!
   updatedAt: String!
   lastModified: String!
-  snippets: [Snippet!]!
+  snippets: [Snippet!]
 }
 
 type Snippet {

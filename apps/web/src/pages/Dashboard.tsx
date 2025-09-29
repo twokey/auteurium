@@ -22,7 +22,15 @@ export const Dashboard = () => {
     errorPolicy: 'all'
   })
 
-  const projects: Project[] = data?.projects || []
+  const isNonBlockingProjectsError = error?.graphQLErrors?.some((graphQLError) => {
+    if (!graphQLError.path || graphQLError.path[0] !== 'projects') {
+      return false
+    }
+
+    return graphQLError.message.includes('type mismatch error')
+  })
+
+  const projects: Project[] = isNonBlockingProjectsError ? [] : data?.projects || []
 
   const handleProjectCreated = () => {
     refetch()
@@ -45,7 +53,7 @@ export const Dashboard = () => {
     )
   }
 
-  if (error) {
+  if (error && !isNonBlockingProjectsError) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">

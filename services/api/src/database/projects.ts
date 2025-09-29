@@ -12,7 +12,7 @@ export const getProjectsByUserId = async (userId: string): Promise<Project[]> =>
   }
 
   const result = await dynamodb.query(params).promise()
-  return result.Items as Project[] || []
+  return (result.Items as Project[]) || []
 }
 
 export const getProjectById = async (userId: string, projectId: string): Promise<Project | null> => {

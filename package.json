@@ -36,7 +36,8 @@
     "@playwright/test": "^1.55.0",
     "@types/node": "^24.4.0",
     "concurrently": "^8.2.2",
-    "dotenv": "^17.2.2"
+    "dotenv": "^17.2.2",
+    "esbuild": "^0.23.0"
   },
   "engines": {
     "node": ">=22.0.0",

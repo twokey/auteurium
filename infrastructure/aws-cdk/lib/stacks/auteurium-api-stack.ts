@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib'
 import * as appsync from 'aws-cdk-lib/aws-appsync'
 import * as lambda from 'aws-cdk-lib/aws-lambda'
+import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs'
 import * as cognito from 'aws-cdk-lib/aws-cognito'
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb'
 import * as iam from 'aws-cdk-lib/aws-iam'
@@ -48,13 +49,19 @@ export class AuteuriumApiStack extends cdk.Stack {
     })
 
     // Lambda function for GraphQL resolvers
-    const apiFunction = new lambda.Function(this, `AuteuriumApiFunction-${stage}`, {
+    const apiFunction = new lambdaNodejs.NodejsFunction(this, `AuteuriumApiFunction-${stage}`, {
       functionName: `auteurium-api-${stage}`,
       runtime: lambda.Runtime.NODEJS_22_X,
-      handler: 'index.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../../../../services/api/dist')),
+      entry: path.join(__dirname, '../../../../services/api/src/index.ts'),
+      handler: 'handler',
       timeout: cdk.Duration.seconds(30),
       memorySize: 512,
+      bundling: {
+        format: lambdaNodejs.OutputFormat.CJS,
+        target: 'node22',
+        sourceMap: true,
+        tsconfig: path.join(__dirname, '../../../../services/api/tsconfig.json')
+      },
       environment: {
         STAGE: stage,
         USERS_TABLE: usersTable.tableName,
@@ -62,7 +69,8 @@ export class AuteuriumApiStack extends cdk.Stack {
         SNIPPETS_TABLE: snippetsTable.tableName,
         CONNECTIONS_TABLE: connectionsTable.tableName,
         VERSIONS_TABLE: versionsTable.tableName,
-        USER_POOL_ID: userPool.userPoolId
+        USER_POOL_ID: userPool.userPoolId,
+        USER_POOL_CLIENT_ID: userPoolClient.userPoolClientId
       }
     })
 
