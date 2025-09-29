@@ -76,8 +76,27 @@ export const EditProjectModal = ({ isOpen, project, onClose, onUpdated }: EditPr
   if (!isOpen || !project) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      onClick={(event) => {
+        event.stopPropagation()
+        handleClose()
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.stopPropagation()
+          handleClose()
+          return
+        }
+
+        event.stopPropagation()
+      }}
+    >
+      <div
+        className="bg-white rounded-lg p-6 max-w-md w-full mx-4"
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => event.stopPropagation()}
+      >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-gray-900">
             Edit Project
