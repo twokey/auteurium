@@ -105,6 +105,7 @@ export const ProjectCard = ({ project, onDeleted, onUpdated }: ProjectCardProps)
       onClick={handleOpenProject}
       onKeyDown={handleKeyDown}
       className="relative bg-white rounded-lg border border-gray-200 hover:shadow-md transition-shadow focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 cursor-pointer"
+      data-testid="project-card"
     >
       {/* Card Header */}
       <div className="p-6 pb-4">
@@ -128,6 +129,7 @@ export const ProjectCard = ({ project, onDeleted, onUpdated }: ProjectCardProps)
                 setShowMenu(!showMenu)
               }}
               className="text-gray-400 hover:text-gray-600 p-1 rounded-md transition-colors"
+              data-testid="project-card-menu-button"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
@@ -151,6 +153,7 @@ export const ProjectCard = ({ project, onDeleted, onUpdated }: ProjectCardProps)
                       handleOpenProject()
                     }}
                     className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    data-testid="project-card-open"
                   >
                     Open Canvas
                   </button>
@@ -161,6 +164,7 @@ export const ProjectCard = ({ project, onDeleted, onUpdated }: ProjectCardProps)
                       setShowMenu(false)
                     }}
                     className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    data-testid="project-card-edit"
                   >
                     Edit Project
                   </button>
@@ -172,6 +176,7 @@ export const ProjectCard = ({ project, onDeleted, onUpdated }: ProjectCardProps)
                       setShowMenu(false)
                     }}
                     className="block w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50"
+                    data-testid="project-card-delete"
                   >
                     Delete Project
                   </button>
@@ -195,10 +200,12 @@ export const ProjectCard = ({ project, onDeleted, onUpdated }: ProjectCardProps)
         <div
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
           onClick={(event) => event.stopPropagation()}
+          data-testid="delete-project-modal"
         >
           <div
             className="bg-white rounded-lg p-6 max-w-sm mx-4"
             onClick={(event) => event.stopPropagation()}
+            data-testid="delete-project-modal-content"
           >
             <h3 className="text-lg font-medium text-gray-900 mb-2">
               Delete Project

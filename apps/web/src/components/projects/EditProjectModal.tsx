@@ -91,11 +91,13 @@ export const EditProjectModal = ({ isOpen, project, onClose, onUpdated }: EditPr
 
         event.stopPropagation()
       }}
+      data-testid="edit-project-modal"
     >
       <div
         className="bg-white rounded-lg p-6 max-w-md w-full mx-4"
         onClick={(event) => event.stopPropagation()}
         onKeyDown={(event) => event.stopPropagation()}
+        data-testid="edit-project-modal-content"
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-gray-900">
@@ -132,6 +134,8 @@ export const EditProjectModal = ({ isOpen, project, onClose, onUpdated }: EditPr
               className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
               placeholder="Enter project name"
               maxLength={100}
+              name="name"
+              data-testid="project-name-input"
             />
           </div>
 
@@ -148,6 +152,8 @@ export const EditProjectModal = ({ isOpen, project, onClose, onUpdated }: EditPr
               className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 resize-none"
               placeholder="Optional project description"
               maxLength={500}
+              name="description"
+              data-testid="project-description-input"
             />
             <div className="text-right text-xs text-gray-500 mt-1">
               {description.length}/500
@@ -160,6 +166,7 @@ export const EditProjectModal = ({ isOpen, project, onClose, onUpdated }: EditPr
               onClick={handleClose}
               disabled={loading}
               className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300 transition-colors disabled:opacity-50"
+              data-testid="edit-project-cancel"
             >
               Cancel
             </button>
@@ -167,6 +174,7 @@ export const EditProjectModal = ({ isOpen, project, onClose, onUpdated }: EditPr
               type="submit"
               disabled={loading || !name.trim()}
               className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+              data-testid="edit-project-submit"
             >
               {loading ? 'Updating...' : 'Update Project'}
             </button>

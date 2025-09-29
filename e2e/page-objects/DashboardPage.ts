@@ -8,23 +8,15 @@ export class DashboardPage {
   readonly createProjectButton: Locator;
   readonly projectsGrid: Locator;
   readonly createProjectModal: Locator;
-  readonly projectNameInput: Locator;
-  readonly projectDescriptionInput: Locator;
-  readonly saveProjectButton: Locator;
-  readonly cancelProjectButton: Locator;
 
   constructor(page: Page) {
     this.page = page;
     this.navigation = page.locator('nav');
     this.userMenu = page.locator('[data-testid="user-menu"]');
     this.logoutButton = page.locator('text=Logout');
-    this.createProjectButton = page.locator('text=Create New Project');
+    this.createProjectButton = page.locator('[data-testid="create-project-button"]');
     this.projectsGrid = page.locator('[data-testid="projects-grid"]');
     this.createProjectModal = page.locator('[data-testid="create-project-modal"]');
-    this.projectNameInput = page.locator('input[name="name"]');
-    this.projectDescriptionInput = page.locator('textarea[name="description"]');
-    this.saveProjectButton = page.locator('button[type="submit"]', { hasText: 'Create' });
-    this.cancelProjectButton = page.locator('button', { hasText: 'Cancel' });
   }
 
   async goto() {
@@ -35,12 +27,15 @@ export class DashboardPage {
     await this.createProjectButton.click();
     await expect(this.createProjectModal).toBeVisible();
 
-    await this.projectNameInput.fill(name);
+    const modalContent = this.page.locator('[data-testid="create-project-modal-content"]');
+
+    await modalContent.locator('[data-testid="project-name-input"]').fill(name);
+    
     if (description) {
-      await this.projectDescriptionInput.fill(description);
+      await modalContent.locator('[data-testid="project-description-input"]').fill(description);
     }
 
-    await this.saveProjectButton.click();
+    await modalContent.locator('[data-testid="create-project-submit"]').click();
     await expect(this.createProjectModal).not.toBeVisible();
   }
 
@@ -56,7 +51,11 @@ export class DashboardPage {
     const projectCard = this.page.locator(`[data-testid="project-card"]`, {
       hasText: projectName
     });
-    const deleteButton = projectCard.locator('[data-testid="delete-project"]');
+
+    const menuButton = projectCard.locator('[data-testid="project-card-menu-button"]');
+    await menuButton.click();
+
+    const deleteButton = projectCard.locator('[data-testid="project-card-delete"]');
 
     await deleteButton.click();
 
@@ -71,19 +70,23 @@ export class DashboardPage {
     const projectCard = this.page.locator(`[data-testid="project-card"]`, {
       hasText: currentName
     });
-    const editButton = projectCard.locator('[data-testid="edit-project"]');
+    const menuButton = projectCard.locator('[data-testid="project-card-menu-button"]');
+    await menuButton.click();
+
+    const editButton = projectCard.locator('[data-testid="project-card-edit"]');
 
     await editButton.click();
 
     const editModal = this.page.locator('[data-testid="edit-project-modal"]');
+    const editModalContent = this.page.locator('[data-testid="edit-project-modal-content"]');
     await expect(editModal).toBeVisible();
 
-    await this.projectNameInput.fill(newName);
+    await editModalContent.locator('[data-testid="project-name-input"]').fill(newName);
     if (newDescription) {
-      await this.projectDescriptionInput.fill(newDescription);
+      await editModalContent.locator('[data-testid="project-description-input"]').fill(newDescription);
     }
 
-    await this.saveProjectButton.click();
+    await editModalContent.locator('[data-testid="edit-project-submit"]').click();
     await expect(editModal).not.toBeVisible();
   }
 

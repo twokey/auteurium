@@ -86,6 +86,7 @@ export const Dashboard = () => {
           <button
             onClick={() => setShowCreateModal(true)}
             className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-colors font-medium"
+            data-testid="create-project-button"
           >
             New Project
           </button>
@@ -94,7 +95,7 @@ export const Dashboard = () => {
 
       {/* Projects Grid */}
       {projects.length === 0 ? (
-        <div className="text-center py-12">
+        <div className="text-center py-12" data-testid="empty-projects-state">
           <svg
             className="mx-auto h-12 w-12 text-gray-400"
             fill="none"
@@ -117,13 +118,17 @@ export const Dashboard = () => {
             <button
               onClick={() => setShowCreateModal(true)}
               className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+              data-testid="create-first-project-button"
             >
               Create Project
             </button>
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          data-testid="projects-grid"
+        >
           {projects.map((project) => (
             <ProjectCard
               key={project.id}
