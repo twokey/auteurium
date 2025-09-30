@@ -1,19 +1,41 @@
 import { useState } from 'react'
+import type { ReactFlowInstance } from 'reactflow'
 
 interface CanvasToolbarProps {
   onCreateSnippet: (position: { x: number; y: number }) => void
   onSaveCanvas: () => void
   onZoomToFit: () => void
   isLoading?: boolean
+  reactFlowInstance: ReactFlowInstance | null
 }
 
-export const CanvasToolbar = ({ onCreateSnippet, onSaveCanvas, onZoomToFit, isLoading = false }: CanvasToolbarProps) => {
+export const CanvasToolbar = ({
+  onCreateSnippet,
+  onSaveCanvas,
+  onZoomToFit,
+  isLoading = false,
+  reactFlowInstance
+}: CanvasToolbarProps) => {
   const [isCreating, setIsCreating] = useState(false)
 
   const handleCreateSnippet = () => {
     setIsCreating(true)
-    // Create snippet in center of current viewport
-    const centerPosition = { x: 200, y: 200 }
+
+    // Calculate center position of current viewport
+    let centerPosition = { x: 200, y: 200 } // Default fallback
+
+    if (reactFlowInstance) {
+      const viewport = reactFlowInstance.getViewport()
+      const bounds = document.querySelector('[data-testid="react-flow-canvas"]')?.getBoundingClientRect()
+
+      if (bounds) {
+        // Calculate the center of the visible viewport in flow coordinates
+        const centerX = (bounds.width / 2 - viewport.x) / viewport.zoom
+        const centerY = (bounds.height / 2 - viewport.y) / viewport.zoom
+        centerPosition = { x: centerX, y: centerY }
+      }
+    }
+
     onCreateSnippet(centerPosition)
     setIsCreating(false)
   }

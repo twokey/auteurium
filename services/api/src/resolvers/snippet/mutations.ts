@@ -30,7 +30,7 @@ const createSnippetSchema = z.object({
 
 const updateSnippetSchema = z.object({
   projectId: z.string(),
-  snippetId: z.string(),
+  id: z.string(),
   input: z.object({
     textField1: z.string().optional(),
     textField2: z.string().optional(),
@@ -45,12 +45,12 @@ const updateSnippetSchema = z.object({
 
 const deleteSnippetSchema = z.object({
   projectId: z.string(),
-  snippetId: z.string()
+  id: z.string()
 })
 
 const revertSnippetSchema = z.object({
   projectId: z.string(),
-  snippetId: z.string(),
+  id: z.string(),
   version: z.number().min(1)
 })
 
@@ -87,7 +87,7 @@ export const snippetMutations = {
     args: unknown,
     context: GraphQLContext
   ): Promise<Snippet> => {
-    const { projectId, snippetId, input } = validateInput(updateSnippetSchema, args)
+    const { projectId, id: snippetId, input } = validateInput(updateSnippetSchema, args)
     const user = requireAuth(context.user)
 
     context.logger.info('Updating snippet', {
@@ -106,7 +106,7 @@ export const snippetMutations = {
     args: unknown,
     context: GraphQLContext
   ): Promise<boolean> => {
-    const { projectId, snippetId } = validateInput(deleteSnippetSchema, args)
+    const { projectId, id: snippetId } = validateInput(deleteSnippetSchema, args)
     const user = requireAuth(context.user)
 
     context.logger.info('Deleting snippet', {
@@ -132,7 +132,7 @@ export const snippetMutations = {
     args: unknown,
     context: GraphQLContext
   ): Promise<Snippet> => {
-    const { projectId, snippetId, version } = validateInput(revertSnippetSchema, args)
+    const { projectId, id: snippetId, version } = validateInput(revertSnippetSchema, args)
     const user = requireAuth(context.user)
 
     context.logger.info('Reverting snippet to version', {

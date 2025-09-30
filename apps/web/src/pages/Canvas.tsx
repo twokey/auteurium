@@ -15,14 +15,20 @@ import 'reactflow/dist/style.css'
 
 import { CanvasInfoPanel } from '../components/canvas/CanvasInfoPanel'
 import { CanvasToolbar } from '../components/canvas/CanvasToolbar'
+import { DeleteSnippetConfirmation } from '../components/modals/DeleteSnippetConfirmation'
+import { EditSnippetModal } from '../components/modals/EditSnippetModal'
+import { ManageConnectionsModal } from '../components/modals/ManageConnectionsModal'
+import { VersionHistoryModal } from '../components/modals/VersionHistoryModal'
+import { SnippetNode } from '../components/snippets/SnippetNode'
 import { Navigation } from '../components/ui/Navigation'
-import { CREATE_SNIPPET } from '../graphql/mutations'
+import { CREATE_SNIPPET, UPDATE_SNIPPET } from '../graphql/mutations'
 import { GET_PROJECT_WITH_SNIPPETS } from '../graphql/queries'
 
-import type { Connection, Edge, Node, ReactFlowInstance } from 'reactflow'
+import type { Connection, Edge, Node, NodeTypes, ReactFlowInstance } from 'reactflow'
 
 interface Snippet {
   id: string
+  projectId: string
   textField1: string
   textField2: string
   position?: {
@@ -31,6 +37,7 @@ interface Snippet {
   } | null
   tags?: string[]
   categories?: string[]
+  version: number
   connections?: ProjectConnection[]
 }
 
@@ -72,6 +79,12 @@ export const Canvas = () => {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const [isLoading, setIsLoading] = useState(false)
 
+  // Modal states
+  const [editingSnippet, setEditingSnippet] = useState<Snippet | null>(null)
+  const [deletingSnippet, setDeletingSnippet] = useState<Snippet | null>(null)
+  const [managingConnectionsSnippet, setManagingConnectionsSnippet] = useState<Snippet | null>(null)
+  const [viewingVersionsSnippet, setViewingVersionsSnippet] = useState<Snippet | null>(null)
+
   const queryVariables = projectId ? { projectId } : undefined
 
   const { data, loading, error } = useQuery<
@@ -109,6 +122,12 @@ export const Canvas = () => {
     }
   })
 
+  const [updateSnippetMutation] = useMutation(UPDATE_SNIPPET, {
+    onError: (error) => {
+      console.error('Error updating snippet position:', error)
+    }
+  })
+
   const project: Project | null = data?.project ?? null
   const rawSnippets = project?.snippets
   const snippets = useMemo<Snippet[]>(() => {
@@ -116,53 +135,52 @@ export const Canvas = () => {
     return result
   }, [rawSnippets])
 
+  // Modal handlers
+  const handleEditSnippet = useCallback((snippetId: string) => {
+    const snippet = snippets.find(s => s.id === snippetId)
+    if (snippet) setEditingSnippet(snippet)
+  }, [snippets])
+
+  const handleDeleteSnippet = useCallback((snippetId: string) => {
+    const snippet = snippets.find(s => s.id === snippetId)
+    if (snippet) setDeletingSnippet(snippet)
+  }, [snippets])
+
+  const handleManageConnections = useCallback((snippetId: string) => {
+    const snippet = snippets.find(s => s.id === snippetId)
+    if (snippet) setManagingConnectionsSnippet(snippet)
+  }, [snippets])
+
+  const handleViewVersions = useCallback((snippetId: string) => {
+    const snippet = snippets.find(s => s.id === snippetId)
+    if (snippet) setViewingVersionsSnippet(snippet)
+  }, [snippets])
+
+  // Custom node types
+  const nodeTypes = useMemo<NodeTypes>(() => ({
+    snippet: SnippetNode
+  }), [])
+
   const flowNodes = useMemo(() => {
     return snippets.map((snippet) => {
       const position = snippet.position ?? { x: 0, y: 0 }
-      const snippetTitle = snippet.textField1?.trim() ? snippet.textField1 : 'Untitled snippet'
 
       return {
         id: snippet.id,
-        type: 'default',
+        type: 'snippet',
         position,
         data: {
-          label: (
-            <div
-              className="p-3"
-              data-testid="snippet-node"
-              data-snippet-id={snippet.id}
-            >
-              <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                <span className="uppercase tracking-wide">Snippet</span>
-                <span className="font-mono text-[11px] text-gray-400">#{snippet.id}</span>
-              </div>
-              <div className="font-medium text-sm mb-1 text-gray-900">
-                {snippetTitle}
-              </div>
-            {snippet.textField2 && (
-                <div className="text-xs text-gray-600 max-w-48 truncate">
-                  {snippet.textField2}
-                </div>
-              )}
-              {snippet.tags && snippet.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {snippet.tags.slice(0, 2).map((tag) => (
-                    <span
-                      key={`${snippet.id}-${tag}`}
-                      className="px-1.5 py-0.5 bg-blue-100 text-blue-800 text-xs rounded"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                  {snippet.tags.length > 2 && (
-                    <span className="text-xs text-gray-500">
-                      +{snippet.tags.length - 2}
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          )
+          snippet: {
+            id: snippet.id,
+            textField1: snippet.textField1,
+            textField2: snippet.textField2,
+            tags: snippet.tags,
+            categories: snippet.categories
+          },
+          onEdit: handleEditSnippet,
+          onDelete: handleDeleteSnippet,
+          onManageConnections: handleManageConnections,
+          onViewVersions: handleViewVersions
         },
         style: {
           background: '#fff',
@@ -173,7 +191,7 @@ export const Canvas = () => {
         }
       } as Node
     })
-  }, [snippets])
+  }, [snippets, handleEditSnippet, handleDeleteSnippet, handleManageConnections, handleViewVersions])
 
   useEffect(() => {
     setNodes(flowNodes)
@@ -291,6 +309,28 @@ export const Canvas = () => {
     reactFlowInstance.current = instance
   }, [])
 
+  const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
+    // Find the snippet to get its projectId
+    const snippet = snippets.find(s => s.id === node.id)
+    if (!snippet || !projectId) return
+
+    // Update the snippet position in the backend
+    updateSnippetMutation({
+      variables: {
+        projectId,
+        id: node.id,
+        input: {
+          position: {
+            x: node.position.x,
+            y: node.position.y
+          }
+        }
+      }
+    }).catch((error) => {
+      console.error('Failed to save snippet position:', error)
+    })
+  }, [snippets, projectId, updateSnippetMutation])
+
   if (loading) {
     return (
       <>
@@ -353,7 +393,8 @@ export const Canvas = () => {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onInit={onInit}
-            fitView
+            onNodeDragStop={onNodeDragStop}
+            nodeTypes={nodeTypes}
           >
             <Background
               variant={BackgroundVariant.Dots}
@@ -384,6 +425,7 @@ export const Canvas = () => {
           onSaveCanvas={handleSaveCanvas}
           onZoomToFit={handleZoomToFit}
           isLoading={isLoading}
+          reactFlowInstance={reactFlowInstance.current}
         />
         
         {/* Canvas Info Panel */}
@@ -395,6 +437,40 @@ export const Canvas = () => {
           />
         )}
       </div>
+
+      {/* Modals */}
+      {editingSnippet && (
+        <EditSnippetModal
+          isOpen={true}
+          onClose={() => setEditingSnippet(null)}
+          snippet={editingSnippet}
+        />
+      )}
+
+      {deletingSnippet && (
+        <DeleteSnippetConfirmation
+          isOpen={true}
+          onClose={() => setDeletingSnippet(null)}
+          snippet={deletingSnippet}
+        />
+      )}
+
+      {managingConnectionsSnippet && (
+        <ManageConnectionsModal
+          isOpen={true}
+          onClose={() => setManagingConnectionsSnippet(null)}
+          snippet={managingConnectionsSnippet}
+          allSnippets={snippets}
+        />
+      )}
+
+      {viewingVersionsSnippet && (
+        <VersionHistoryModal
+          isOpen={true}
+          onClose={() => setViewingVersionsSnippet(null)}
+          snippet={viewingVersionsSnippet}
+        />
+      )}
     </>
   )
 }

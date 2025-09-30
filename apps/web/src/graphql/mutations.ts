@@ -55,8 +55,8 @@ export const CREATE_SNIPPET = gql`
 `
 
 export const UPDATE_SNIPPET = gql`
-  mutation UpdateSnippet($id: ID!, $input: UpdateSnippetInput!) {
-    updateSnippet(id: $id, input: $input) {
+  mutation UpdateSnippet($projectId: ID!, $id: ID!, $input: UpdateSnippetInput!) {
+    updateSnippet(projectId: $projectId, id: $id, input: $input) {
       id
       projectId
       textField1
@@ -75,14 +75,14 @@ export const UPDATE_SNIPPET = gql`
 `
 
 export const DELETE_SNIPPET = gql`
-  mutation DeleteSnippet($id: ID!) {
-    deleteSnippet(id: $id)
+  mutation DeleteSnippet($projectId: ID!, $id: ID!) {
+    deleteSnippet(projectId: $projectId, id: $id)
   }
 `
 
 export const REVERT_SNIPPET = gql`
-  mutation RevertSnippet($id: ID!, $version: Int!) {
-    revertSnippet(id: $id, version: $version) {
+  mutation RevertSnippet($projectId: ID!, $id: ID!, $version: Int!) {
+    revertSnippet(projectId: $projectId, id: $id, version: $version) {
       id
       projectId
       textField1

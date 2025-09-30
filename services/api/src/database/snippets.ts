@@ -223,8 +223,14 @@ const buildSnippetUpdate = (
   timestamp: string,
   userId: string
 ) => {
-  const updateExpressions: string[] = []
-  const expressionAttributeNames: Record<string, string> = {}
+  const updateExpressions: string[] = [
+    '#updatedAt = :updatedAt',
+    '#version = :version'
+  ]
+  const expressionAttributeNames: Record<string, string> = {
+    '#updatedAt': 'updatedAt',
+    '#version': 'version'
+  }
   const expressionAttributeValues: Record<string, unknown> = {
     ':updatedAt': timestamp,
     ':userId': userId,
