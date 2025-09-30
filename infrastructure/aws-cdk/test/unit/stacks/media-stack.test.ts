@@ -1,9 +1,8 @@
 import * as cdk from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
-import { AuteuriumMediaStack } from '../../../lib/stacks/auteurium-media-stack';
-
-// Explicit Jest type imports to resolve TypeScript issues
 import { describe, test, beforeEach, expect } from '@jest/globals';
+
+import { AuteuriumMediaStack } from '../../../lib/stacks/auteurium-media-stack';
 
 describe('AuteuriumMediaStack', () => {
   let app: cdk.App;

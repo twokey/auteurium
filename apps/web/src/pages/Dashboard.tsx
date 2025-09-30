@@ -6,6 +6,8 @@ import { ProjectCard } from '../components/projects/ProjectCard'
 import { GET_PROJECTS } from '../graphql/queries'
 import { useAuth } from '../hooks/useAuth'
 
+import type { GraphQLError } from 'graphql'
+
 interface Project {
   id: string
   name: string
@@ -15,35 +17,40 @@ interface Project {
   lastModified: string
 }
 
+interface ProjectsQueryData {
+  projects: Project[] | null
+}
+
 export const Dashboard = () => {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const { user } = useAuth()
   
-  const { data, loading, error, refetch } = useQuery(GET_PROJECTS, {
+  const { data, loading, error, refetch } = useQuery<ProjectsQueryData>(GET_PROJECTS, {
     errorPolicy: 'all'
   })
 
-  const isNonBlockingProjectsError = error?.graphQLErrors?.some((graphQLError) => {
-    if (!graphQLError.path || graphQLError.path[0] !== 'projects') {
+  const isNonBlockingProjectsError = error?.graphQLErrors?.some((graphQLError: GraphQLError) => {
+    const [firstPathSegment] = graphQLError.path ?? []
+    if (firstPathSegment !== 'projects') {
       return false
     }
 
     return graphQLError.message.includes('type mismatch error')
   })
 
-  const projects: Project[] = isNonBlockingProjectsError ? [] : data?.projects || []
+  const projects: Project[] = isNonBlockingProjectsError ? [] : data?.projects ?? []
 
   const handleProjectCreated = () => {
-    refetch()
+    void refetch()
     setShowCreateModal(false)
   }
 
   const handleProjectDeleted = () => {
-    refetch()
+    void refetch()
   }
 
   const handleProjectUpdated = () => {
-    refetch()
+    void refetch()
   }
 
   if (loading) {
@@ -61,7 +68,9 @@ export const Dashboard = () => {
           <div className="text-red-500 text-lg font-medium mb-2">Error loading projects</div>
           <p className="text-gray-600 mb-4">{error.message}</p>
           <button
-            onClick={() => refetch()}
+            onClick={() => {
+              void refetch()
+            }}
             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
           >
             Try again

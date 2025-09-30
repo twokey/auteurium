@@ -1,16 +1,17 @@
 import { test as base, expect } from '@playwright/test';
-import { AuthPage } from '../page-objects/AuthPage';
-import { DashboardPage } from '../page-objects/DashboardPage';
+
 import { CanvasPage } from '../page-objects/CanvasPage';
+import { DashboardPage } from '../page-objects/DashboardPage';
+import { AuthPage } from '../page-objects/AuthPage';
 import { clearBrowserStorage, generateTestData } from '../utils/test-helpers';
 
-type AuthFixtures = {
+interface AuthFixtures {
   authPage: AuthPage;
   dashboardPage: DashboardPage;
   canvasPage: CanvasPage;
   authenticatedUser: { email: string; password: string };
   adminUser: { email: string; password: string };
-};
+}
 
 export const test = base.extend<AuthFixtures>({
   authPage: async ({ page }, use) => {
@@ -29,8 +30,8 @@ export const test = base.extend<AuthFixtures>({
     // Create or use existing test user
     const testData = generateTestData();
     const userCredentials = {
-      email: process.env.TEST_USER_EMAIL || testData.email,
-      password: process.env.TEST_USER_PASSWORD || testData.password
+      email: process.env.TEST_USER_EMAIL ?? testData.email,
+      password: process.env.TEST_USER_PASSWORD ?? testData.password
     };
 
     // Clear any existing session
@@ -42,7 +43,7 @@ export const test = base.extend<AuthFixtures>({
     try {
       // Try to login first (user might already exist)
       await authPage.login(userCredentials.email, userCredentials.password);
-    } catch (error) {
+    } catch (_error) {
       // If login fails, register new user
       await authPage.register(userCredentials.email, userCredentials.password);
 
@@ -62,15 +63,15 @@ export const test = base.extend<AuthFixtures>({
     try {
       const dashboardPage = new DashboardPage(page);
       await dashboardPage.logout();
-    } catch (error) {
+    } catch (_error) {
       // Ignore logout errors in cleanup
     }
   },
 
   adminUser: async ({ page, authPage }, use) => {
     const adminCredentials = {
-      email: process.env.TEST_ADMIN_EMAIL || 'admin@auteurium.test',
-      password: process.env.TEST_ADMIN_PASSWORD || 'AdminPassword123!'
+      email: process.env.TEST_ADMIN_EMAIL ?? 'admin@auteurium.test',
+      password: process.env.TEST_ADMIN_PASSWORD ?? 'AdminPassword123!'
     };
 
     await clearBrowserStorage(page);
@@ -91,7 +92,7 @@ export const test = base.extend<AuthFixtures>({
     try {
       const dashboardPage = new DashboardPage(page);
       await dashboardPage.logout();
-    } catch (error) {
+    } catch (_error) {
       // Ignore logout errors in cleanup
     }
   }

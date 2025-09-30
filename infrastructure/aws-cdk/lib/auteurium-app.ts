@@ -11,12 +11,15 @@ export class AuteuriumApp extends cdk.App {
   constructor() {
     super()
 
+    const coalesceEnv = (value: string | undefined, fallback: string) =>
+      typeof value === 'string' && value.trim() !== '' ? value : fallback
+
     const env = {
       account: process.env.CDK_DEFAULT_ACCOUNT,
-      region: process.env.CDK_DEFAULT_REGION || 'us-east-1'
+      region: coalesceEnv(process.env.CDK_DEFAULT_REGION, 'us-east-1')
     }
 
-    const stage = process.env.STAGE || 'dev'
+    const stage = coalesceEnv(process.env.STAGE, 'dev')
     
     // Authentication stack (Cognito)
     const authStack = new AuteuriumAuthStack(this, `Auteurium-Auth-${stage}`, {

@@ -36,7 +36,7 @@ export const EmailConfirmation = ({ email, onConfirmed, onBackToLogin }: EmailCo
     }
   }
 
-  const handleResendCode = async () => {
+  const handleResendCode = () => {
     // TODO: Implement resend confirmation code
     // This would require adding a resend method to the AuthService
     setError('')
@@ -54,7 +54,12 @@ export const EmailConfirmation = ({ email, onConfirmed, onBackToLogin }: EmailCo
         <p className="font-medium text-gray-900">{email}</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form
+        onSubmit={(event) => {
+          void handleSubmit(event)
+        }}
+        className="space-y-4"
+      >
         <div>
           <label htmlFor="code" className="block text-sm font-medium text-gray-700">
             Confirmation code

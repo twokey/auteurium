@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('Check Browser Console Errors', async ({ page }) => {
-  console.log('Checking for JavaScript errors...');
+  console.warn('Checking for JavaScript errors...');
 
   // Capture console messages
   const messages: string[] = [];
@@ -13,38 +13,38 @@ test('Check Browser Console Errors', async ({ page }) => {
     if (msg.type() === 'error') {
       errors.push(text);
     }
-    console.log(text);
+    console.warn(text);
   });
 
   page.on('pageerror', error => {
     const errorText = `[PAGE ERROR] ${error.message}`;
     errors.push(errorText);
-    console.log(errorText);
+    console.warn(errorText);
   });
 
   // Navigate to the app
-  await page.goto('http://localhost:3000', { waitUntil: 'networkidle' });
+  await page.goto('http://localhost:3000', { waitUntil: 'load' });
 
   // Wait for any async operations
-  await page.waitForTimeout(5000);
+  await page.waitForLoadState('domcontentloaded');
 
   // Check if React root has content
   const rootContent = await page.locator('#root').innerHTML();
-  console.log('Root content:', rootContent.substring(0, 200));
+  console.warn('Root content:', rootContent.substring(0, 200));
 
   // Check if main.tsx script loaded
   const scripts = await page.locator('script[src*="main.tsx"]').count();
-  console.log('Main script tags found:', scripts);
+  console.warn('Main script tags found:', scripts);
 
   // Summary
-  console.log('\n=== SUMMARY ===');
-  console.log('Console messages:', messages.length);
-  console.log('Console errors:', errors.length);
-  console.log('React root empty:', rootContent.trim() === '');
+  console.warn('\n=== SUMMARY ===');
+  console.warn('Console messages:', messages.length);
+  console.warn('Console errors:', errors.length);
+  console.warn('React root empty:', rootContent.trim() === '');
 
   if (errors.length > 0) {
-    console.log('\n=== ERRORS ===');
-    errors.forEach(error => console.log(error));
+    console.warn('\n=== ERRORS ===');
+    errors.forEach(error => console.warn(error));
   }
 
   // Test passes if we collected the debug info

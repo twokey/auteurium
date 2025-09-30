@@ -27,7 +27,7 @@ export const CreateProjectModal = ({ isOpen, onClose, onCreated }: CreateProject
     }
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     
     if (!name.trim()) {
@@ -36,11 +36,14 @@ export const CreateProjectModal = ({ isOpen, onClose, onCreated }: CreateProject
     }
 
     setError('')
-    createProject({
+    const trimmedDescription = description.trim()
+    const descriptionValue = trimmedDescription === '' ? undefined : trimmedDescription
+
+    void createProject({
       variables: {
         input: {
           name: name.trim(),
-          description: description.trim() || undefined
+          description: descriptionValue
         }
       }
     })

@@ -1,3 +1,5 @@
+import { z } from 'zod'
+
 import {
   validateInput,
   requireAuth,
@@ -9,10 +11,8 @@ import {
   idValidation,
   paginationValidation
 } from '../../middleware/validation'
-import { createMockUser, createMockAdminUser } from '../setup'
-import { UserRole } from '@auteurium/shared-types'
-import { z } from 'zod'
 import { AppError, ErrorCode } from '../../utils/errors'
+import { createMockUser, createMockAdminUser } from '../setup'
 
 describe('Validation Middleware', () => {
   describe('validateInput', () => {

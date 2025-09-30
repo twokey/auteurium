@@ -1,3 +1,10 @@
+import { DynamoDB } from 'aws-sdk'
+
+import {
+  createConnection,
+  queryConnections,
+  deleteSnippetConnections
+} from '../../database/connections'
 import {
   createProject,
   deleteProject,
@@ -9,13 +16,8 @@ import {
   deleteProjectSnippets,
   getProjectSnippets
 } from '../../database/snippets'
-import {
-  createConnection,
-  queryConnections,
-  deleteSnippetConnections
-} from '../../database/connections'
 import { createMockUser, createMockProject } from '../setup'
-import { DynamoDB } from 'aws-sdk'
+
 
 // Mock DynamoDB
 const mockPut = jest.fn().mockReturnValue({ promise: jest.fn() })

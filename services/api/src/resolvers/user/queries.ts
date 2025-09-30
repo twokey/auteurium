@@ -1,8 +1,10 @@
-import { GraphQLContext } from '../../types/context'
-import { User } from '@auteurium/shared-types'
+import { requireAdmin } from '../../middleware/validation'
+
+import type { GraphQLContext } from '../../types/context'
+import type { User } from '@auteurium/shared-types'
 
 export const userQueries = {
-  me: async (parent: any, args: any, context: GraphQLContext): Promise<User | null> => {
+  me: (_parent: unknown, _args: unknown, context: GraphQLContext): User | null => {
     const { user, logger } = context
     
     logger.info('Fetching current user profile')
@@ -14,16 +16,13 @@ export const userQueries = {
     return user
   },
 
-  users: async (parent: any, args: any, context: GraphQLContext): Promise<User[]> => {
-    const { isAdmin, logger } = context
-    
-    if (!isAdmin) {
-      throw new Error('Admin access required')
-    }
+  users: (_parent: unknown, _args: unknown, context: GraphQLContext): User[] => {
+    const { logger } = context
+    requireAdmin(context.user)
 
     logger.info('Fetching all users')
     
-    // TODO: Implement database query to fetch all users
-    throw new Error('Not implemented yet')
+    // Not yet implemented
+    throw new Error('Not implemented')
   }
 }

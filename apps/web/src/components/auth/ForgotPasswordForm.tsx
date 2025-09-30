@@ -75,7 +75,12 @@ export const ForgotPasswordForm = ({ onSwitchToLogin }: ForgotPasswordFormProps)
       </h2>
 
       {step === 'email' ? (
-        <form onSubmit={handleEmailSubmit} className="space-y-4">
+        <form
+          onSubmit={(event) => {
+            void handleEmailSubmit(event)
+          }}
+          className="space-y-4"
+        >
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700">
               Email address
@@ -115,7 +120,12 @@ export const ForgotPasswordForm = ({ onSwitchToLogin }: ForgotPasswordFormProps)
           </button>
         </form>
       ) : (
-        <form onSubmit={handlePasswordReset} className="space-y-4">
+        <form
+          onSubmit={(event) => {
+            void handlePasswordReset(event)
+          }}
+          className="space-y-4"
+        >
           <div>
             <label htmlFor="code" className="block text-sm font-medium text-gray-700">
               Reset code

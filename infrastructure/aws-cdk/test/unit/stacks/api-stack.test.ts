@@ -1,8 +1,9 @@
 import * as cdk from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
-import { AuteuriumApiStack } from '../../../lib/stacks/auteurium-api-stack';
 import { describe, test, beforeEach, expect } from '@jest/globals';
+
+import { AuteuriumApiStack } from '../../../lib/stacks/auteurium-api-stack';
 
 describe('AuteuriumApiStack', () => {
   let app: cdk.App;
@@ -65,7 +66,16 @@ describe('AuteuriumApiStack', () => {
       const schemas = template.findResources('AWS::AppSync::GraphQLSchema');
       expect(Object.keys(schemas)).toHaveLength(1);
 
-      const schema = Object.values(schemas)[0] as any;
+      interface SchemaProperties {
+        Properties: {
+          ApiId: {
+            'Fn::GetAtt': [string, string];
+          };
+          Definition: unknown;
+        };
+      }
+
+      const schema = Object.values(schemas)[0] as SchemaProperties;
       expect(schema.Properties.ApiId).toBeDefined();
       expect(schema.Properties.ApiId['Fn::GetAtt']).toHaveLength(2);
       expect(schema.Properties.ApiId['Fn::GetAtt'][1]).toBe('ApiId');

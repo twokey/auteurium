@@ -20,9 +20,13 @@ export interface Snippet {
 export interface SnippetVersion {
   id: string
   snippetId: string
+  projectId: string
   version: number
   textField1: string
   textField2: string
+  position?: Position
+  tags?: string[]
+  categories?: string[]
   userId: string
   createdAt: string
 }

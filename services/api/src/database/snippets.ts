@@ -1,151 +1,262 @@
-import { dynamodb, TABLES, generateId, getCurrentTimestamp } from './client'
-import { Snippet, SnippetInput, UpdateSnippetInput, SnippetVersion, Position } from '@auteurium/shared-types'
-import { createNotFoundError, createConflictError } from '../utils/errors'
 import { Logger } from '@aws-lambda-powertools/logger'
+
+import {
+  TABLES,
+  dynamodb,
+  generateId,
+  getCurrentTimestamp,
+  type DocumentClientType
+} from './client'
 import { deleteSnippetConnections } from './connections'
+import { createConflictError, createNotFoundError } from '../utils/errors'
+
+import type {
+  Position,
+  Snippet,
+  SnippetInput,
+  SnippetVersion,
+  UpdateSnippetInput
+} from '@auteurium/shared-types'
 
 const logger = new Logger({ serviceName: 'snippets-db' })
 
-// Create a new snippet
+const DEFAULT_QUERY_LIMIT = 100
+
+const isConditionalCheckFailed = (error: unknown): boolean =>
+  typeof error === 'object' &&
+  error !== null &&
+  'code' in error &&
+  (error as { code?: unknown }).code === 'ConditionalCheckFailedException'
+
+const toStringArray = (value: unknown): string[] | undefined => {
+  if (!Array.isArray(value)) {
+    return undefined
+  }
+
+  const items: string[] = []
+  for (const entry of value) {
+    if (typeof entry === 'string') {
+      items.push(entry)
+    }
+  }
+
+  return items
+}
+
+const toPosition = (value: unknown): Position | undefined => {
+  if (typeof value !== 'object' || value === null) {
+    return undefined
+  }
+
+  const candidate = value as Record<string, unknown>
+  return typeof candidate.x === 'number' && typeof candidate.y === 'number'
+    ? { x: candidate.x, y: candidate.y }
+    : undefined
+}
+
+const runQuery = async (
+  params: Parameters<DocumentClientType['query']>[0]
+): Promise<Snippet[]> => {
+  const result = await dynamodb.query(params).promise()
+  return (result.Items ?? []) as Snippet[]
+}
+
+const buildSnippet = (input: SnippetInput, userId: string, now: string): Snippet => ({
+  id: generateId(),
+  projectId: input.projectId,
+  userId,
+  textField1: input.textField1 ?? '',
+  textField2: input.textField2 ?? '',
+  position: input.position ?? { x: 0, y: 0 },
+  tags: input.tags ?? [],
+  categories: input.categories ?? [],
+  version: 1,
+  createdAt: now,
+  updatedAt: now
+})
+
+const createSnippetVersion = async (snippet: Snippet): Promise<void> => {
+  const params: Parameters<DocumentClientType['put']>[0] = {
+    TableName: TABLES.VERSIONS,
+    Item: {
+      id: generateId(),
+      snippetId: snippet.id,
+      projectId: snippet.projectId,
+      version: snippet.version,
+      textField1: snippet.textField1,
+      textField2: snippet.textField2,
+      userId: snippet.userId,
+      position: snippet.position,
+      tags: snippet.tags,
+      categories: snippet.categories,
+      createdAt: getCurrentTimestamp()
+    }
+  }
+
+  await dynamodb.put(params).promise()
+}
+
 export const createSnippet = async (
   snippetInput: SnippetInput,
   userId: string
 ): Promise<Snippet> => {
-  const snippetId = generateId()
   const timestamp = getCurrentTimestamp()
-
-  const snippet: Snippet = {
-    id: snippetId,
-    projectId: snippetInput.projectId,
-    userId,
-    textField1: snippetInput.textField1 || '',
-    textField2: snippetInput.textField2 || '',
-    position: snippetInput.position || { x: 0, y: 0 },
-    tags: snippetInput.tags || [],
-    categories: snippetInput.categories || [],
-    version: 1,
-    createdAt: timestamp,
-    updatedAt: timestamp
-  }
+  const snippet = buildSnippet(snippetInput, userId, timestamp)
 
   try {
-    await dynamodb.put({
+    const params: Parameters<DocumentClientType['put']>[0] = {
       TableName: TABLES.SNIPPETS,
       Item: snippet,
-      // Ensure snippet ID is unique within the project
       ConditionExpression: 'attribute_not_exists(id)'
-    }).promise()
+    }
 
-    // Create initial version record
+    await dynamodb.put(params).promise()
     await createSnippetVersion(snippet)
 
     logger.info('Snippet created', {
-      snippetId,
-      projectId: snippetInput.projectId,
+      snippetId: snippet.id,
+      projectId: snippet.projectId,
       userId
     })
 
     return snippet
-  } catch (error: any) {
-    if (error.code === 'ConditionalCheckFailedException') {
+  } catch (error) {
+    if (isConditionalCheckFailed(error)) {
       throw createConflictError('Snippet with this ID already exists')
     }
+
     logger.error('Failed to create snippet', { error, snippetInput, userId })
     throw error
   }
 }
 
-// Get snippet by ID
 export const getSnippet = async (
   projectId: string,
   snippetId: string,
   userId: string
 ): Promise<Snippet | null> => {
-  try {
-    const result = await dynamodb.get({
-      TableName: TABLES.SNIPPETS,
-      Key: {
-        projectId,
-        id: snippetId
-      }
-    }).promise()
-
-    if (!result.Item) {
-      return null
+  const params: Parameters<DocumentClientType['get']>[0] = {
+    TableName: TABLES.SNIPPETS,
+    Key: {
+      projectId,
+      id: snippetId
     }
+  }
 
-    const snippet = result.Item as Snippet
+  try {
+    const result = await dynamodb.get(params).promise()
+    const snippet = result.Item as Snippet | undefined
 
-    // Verify user ownership
-    if (snippet.userId !== userId) {
+    if (!snippet || snippet.userId !== userId) {
+      if (!snippet) {
+        return null
+      }
       throw createNotFoundError('Snippet')
     }
 
     return snippet
-  } catch (error: any) {
+  } catch (error) {
     logger.error('Failed to get snippet', { error, projectId, snippetId, userId })
     throw error
   }
 }
 
-// Get all snippets for a project
 export const getProjectSnippets = async (
   projectId: string,
   userId: string
 ): Promise<Snippet[]> => {
-  try {
-    const result = await dynamodb.query({
-      TableName: TABLES.SNIPPETS,
-      KeyConditionExpression: 'projectId = :projectId',
-      FilterExpression: 'userId = :userId',
-      ExpressionAttributeValues: {
-        ':projectId': projectId,
-        ':userId': userId
-      }
-    }).promise()
+  const params: Parameters<DocumentClientType['query']>[0] = {
+    TableName: TABLES.SNIPPETS,
+    KeyConditionExpression: 'projectId = :projectId',
+    FilterExpression: 'userId = :userId',
+    ExpressionAttributeValues: {
+      ':projectId': projectId,
+      ':userId': userId
+    }
+  }
 
-    return result.Items as Snippet[]
-  } catch (error: any) {
+  try {
+    return runQuery(params)
+  } catch (error) {
     logger.error('Failed to get project snippets', { error, projectId, userId })
     throw error
   }
 }
 
-// Get all snippets for a user
 export const getUserSnippets = async (
   userId: string,
-  limit: number = 100,
-  lastKey?: any
-): Promise<{ snippets: Snippet[], lastKey?: any }> => {
+  limit = DEFAULT_QUERY_LIMIT,
+  lastKey?: Record<string, unknown>
+): Promise<{ snippets: Snippet[]; lastKey?: Record<string, unknown> }> => {
+  const params: Parameters<DocumentClientType['query']>[0] = {
+    TableName: TABLES.SNIPPETS,
+    IndexName: 'UserIndex',
+    KeyConditionExpression: 'userId = :userId',
+    ExpressionAttributeValues: {
+      ':userId': userId
+    },
+    Limit: limit,
+    ScanIndexForward: false
+  }
+
+  if (lastKey) {
+    params.ExclusiveStartKey = lastKey
+  }
+
   try {
-    const params: any = {
-      TableName: TABLES.SNIPPETS,
-      IndexName: 'UserIndex',
-      KeyConditionExpression: 'userId = :userId',
-      ExpressionAttributeValues: {
-        ':userId': userId
-      },
-      Limit: limit,
-      ScanIndexForward: false // Most recent first
-    }
-
-    if (lastKey) {
-      params.ExclusiveStartKey = lastKey
-    }
-
     const result = await dynamodb.query(params).promise()
+    const snippets = (result.Items ?? []) as Snippet[]
 
     return {
-      snippets: result.Items as Snippet[],
-      lastKey: result.LastEvaluatedKey
+      snippets,
+      lastKey: result.LastEvaluatedKey as Record<string, unknown> | undefined
     }
-  } catch (error: any) {
+  } catch (error) {
     logger.error('Failed to get user snippets', { error, userId })
     throw error
   }
 }
 
-// Update snippet
+const buildSnippetUpdate = (
+  updates: UpdateSnippetInput,
+  currentSnippet: Snippet,
+  timestamp: string,
+  userId: string
+) => {
+  const updateExpressions: string[] = []
+  const expressionAttributeNames: Record<string, string> = {}
+  const expressionAttributeValues: Record<string, unknown> = {
+    ':updatedAt': timestamp,
+    ':userId': userId,
+    ':version': currentSnippet.version + 1
+  }
+
+  const assignField = <K extends keyof Snippet>(
+    key: K,
+    value: Snippet[K] | undefined
+  ) => {
+    if (value !== undefined) {
+      const placeholder = `#${key as string}`
+      const valuePlaceholder = `:${key as string}`
+      updateExpressions.push(`${placeholder} = ${valuePlaceholder}`)
+      expressionAttributeNames[placeholder] = key as string
+      expressionAttributeValues[valuePlaceholder] = value
+    }
+  }
+
+  assignField('textField1', updates.textField1)
+  assignField('textField2', updates.textField2)
+  assignField('position', updates.position)
+  assignField('tags', updates.tags)
+  assignField('categories', updates.categories)
+
+  return {
+    updateExpressions,
+    expressionAttributeNames,
+    expressionAttributeValues
+  }
+}
+
 export const updateSnippet = async (
   projectId: string,
   snippetId: string,
@@ -154,267 +265,152 @@ export const updateSnippet = async (
 ): Promise<Snippet> => {
   const timestamp = getCurrentTimestamp()
 
+  const currentSnippet = await getSnippet(projectId, snippetId, userId)
+  if (!currentSnippet) {
+    throw createNotFoundError('Snippet')
+  }
+
+  const {
+    updateExpressions,
+    expressionAttributeNames,
+    expressionAttributeValues
+  } = buildSnippetUpdate(updates, currentSnippet, timestamp, userId)
+
+  if (updateExpressions.length === 0) {
+    return currentSnippet
+  }
+
+  const params: Parameters<DocumentClientType['update']>[0] = {
+    TableName: TABLES.SNIPPETS,
+    Key: {
+      projectId,
+      id: snippetId
+    },
+    UpdateExpression: `SET ${updateExpressions.join(', ')}`,
+    ExpressionAttributeNames: expressionAttributeNames,
+    ExpressionAttributeValues: expressionAttributeValues,
+    ConditionExpression: 'userId = :userId',
+    ReturnValues: 'ALL_NEW'
+  }
+
   try {
-    // Get current snippet to create version
-    const currentSnippet = await getSnippet(projectId, snippetId, userId)
-    if (!currentSnippet) {
-      throw createNotFoundError('Snippet')
-    }
-
-    // Build update expression
-    const updateExpressions: string[] = []
-    const expressionAttributeNames: Record<string, string> = {}
-    const expressionAttributeValues: Record<string, any> = {
-      ':updatedAt': timestamp,
-      ':userId': userId,
-      ':version': currentSnippet.version + 1
-    }
-
-    if (updates.textField1 !== undefined) {
-      updateExpressions.push('#textField1 = :textField1')
-      expressionAttributeNames['#textField1'] = 'textField1'
-      expressionAttributeValues[':textField1'] = updates.textField1
-    }
-
-    if (updates.textField2 !== undefined) {
-      updateExpressions.push('#textField2 = :textField2')
-      expressionAttributeNames['#textField2'] = 'textField2'
-      expressionAttributeValues[':textField2'] = updates.textField2
-    }
-
-    if (updates.position !== undefined) {
-      updateExpressions.push('#position = :position')
-      expressionAttributeNames['#position'] = 'position'
-      expressionAttributeValues[':position'] = updates.position
-    }
-
-    if (updates.tags !== undefined) {
-      updateExpressions.push('#tags = :tags')
-      expressionAttributeNames['#tags'] = 'tags'
-      expressionAttributeValues[':tags'] = updates.tags
-    }
-
-    if (updates.categories !== undefined) {
-      updateExpressions.push('#categories = :categories')
-      expressionAttributeNames['#categories'] = 'categories'
-      expressionAttributeValues[':categories'] = updates.categories
-    }
-
-    updateExpressions.push('updatedAt = :updatedAt', '#version = :version')
-    expressionAttributeNames['#version'] = 'version'
-
-    const result = await dynamodb.update({
-      TableName: TABLES.SNIPPETS,
-      Key: {
-        projectId,
-        id: snippetId
-      },
-      UpdateExpression: `SET ${updateExpressions.join(', ')}`,
-      ExpressionAttributeNames: expressionAttributeNames,
-      ExpressionAttributeValues: expressionAttributeValues,
-      ConditionExpression: 'userId = :userId',
-      ReturnValues: 'ALL_NEW'
-    }).promise()
-
+    const result = await dynamodb.update(params).promise()
     const updatedSnippet = result.Attributes as Snippet
 
-    // Create version record for the update
-    await createSnippetVersion(updatedSnippet)
+    await createSnippetVersion({
+      ...updatedSnippet,
+      version: updatedSnippet.version
+    })
 
     logger.info('Snippet updated', {
       snippetId,
       projectId,
-      userId,
-      version: updatedSnippet.version
+      userId
     })
 
     return updatedSnippet
-  } catch (error: any) {
-    if (error.code === 'ConditionalCheckFailedException') {
-      throw createNotFoundError('Snippet')
-    }
-    logger.error('Failed to update snippet', { error, projectId, snippetId, updates, userId })
+  } catch (error) {
+    logger.error('Failed to update snippet', {
+      error,
+      projectId,
+      snippetId,
+      userId,
+      updates
+    })
     throw error
   }
 }
 
-// Delete snippet with cascade
 export const deleteSnippet = async (
   projectId: string,
   snippetId: string,
   userId: string
 ): Promise<void> => {
-  try {
-    // First, verify ownership and get the snippet
-    const snippet = await getSnippet(projectId, snippetId, userId)
-    if (!snippet) {
-      throw createNotFoundError('Snippet')
+  const params: Parameters<DocumentClientType['delete']>[0] = {
+    TableName: TABLES.SNIPPETS,
+    Key: {
+      projectId,
+      id: snippetId
+    },
+    ConditionExpression: 'userId = :userId',
+    ExpressionAttributeValues: {
+      ':userId': userId
     }
+  }
 
-    // Delete all connections involving this snippet
+  try {
+    await dynamodb.delete(params).promise()
     await deleteSnippetConnections(snippetId, userId)
 
-    // Delete all versions of this snippet
-    await deleteSnippetVersions(snippetId)
-
-    // Delete the snippet itself
-    await dynamodb.delete({
-      TableName: TABLES.SNIPPETS,
-      Key: {
-        projectId,
-        id: snippetId
-      },
-      ConditionExpression: 'userId = :userId',
-      ExpressionAttributeValues: {
-        ':userId': userId
-      }
-    }).promise()
-
-    logger.info('Snippet deleted with cascade', {
-      snippetId,
-      projectId,
-      userId
-    })
-  } catch (error: any) {
-    if (error.code === 'ConditionalCheckFailedException') {
+    logger.info('Snippet deleted', { snippetId, userId, projectId })
+  } catch (error) {
+    if (isConditionalCheckFailed(error)) {
       throw createNotFoundError('Snippet')
     }
+
     logger.error('Failed to delete snippet', { error, projectId, snippetId, userId })
     throw error
   }
 }
 
-// Delete all snippets for a project (used in project cascade delete)
-export const deleteProjectSnippets = async (
-  projectId: string,
-  userId: string
-): Promise<void> => {
-  try {
-    const snippets = await getProjectSnippets(projectId, userId)
-
-    for (const snippet of snippets) {
-      await deleteSnippet(projectId, snippet.id, userId)
-    }
-
-    logger.info('All project snippets deleted', {
-      projectId,
-      snippetsCount: snippets.length,
-      userId
-    })
-  } catch (error: any) {
-    logger.error('Failed to delete project snippets', { error, projectId, userId })
-    throw error
-  }
-}
-
-// Version management functions
-const createSnippetVersion = async (snippet: Snippet): Promise<void> => {
-  const version: SnippetVersion = {
-    id: generateId(),
-    snippetId: snippet.id,
-    version: snippet.version,
-    textField1: snippet.textField1,
-    textField2: snippet.textField2,
-    userId: snippet.userId,
-    createdAt: snippet.updatedAt
-  }
-
-  await dynamodb.put({
-    TableName: TABLES.VERSIONS,
-    Item: version
-  }).promise()
-}
-
-const deleteSnippetVersions = async (snippetId: string): Promise<void> => {
-  const result = await dynamodb.query({
+export const getSnippetVersions = async (
+  snippetId: string,
+  limit = DEFAULT_QUERY_LIMIT
+): Promise<SnippetVersion[]> => {
+  const params: Parameters<DocumentClientType['query']>[0] = {
     TableName: TABLES.VERSIONS,
     KeyConditionExpression: 'snippetId = :snippetId',
     ExpressionAttributeValues: {
       ':snippetId': snippetId
-    }
-  }).promise()
-
-  for (const version of result.Items || []) {
-    await dynamodb.delete({
-      TableName: TABLES.VERSIONS,
-      Key: {
-        snippetId,
-        version: version.version
-      }
-    }).promise()
+    },
+    Limit: limit,
+    ScanIndexForward: false
   }
+
+  const result = await dynamodb.query(params).promise()
+  return (result.Items ?? []) as SnippetVersion[]
 }
 
-// Get snippet versions
-export const getSnippetVersions = async (
-  snippetId: string,
-  userId: string
-): Promise<SnippetVersion[]> => {
-  try {
-    const result = await dynamodb.query({
-      TableName: TABLES.VERSIONS,
-      KeyConditionExpression: 'snippetId = :snippetId',
-      FilterExpression: 'userId = :userId',
-      ExpressionAttributeValues: {
-        ':snippetId': snippetId,
-        ':userId': userId
-      },
-      ScanIndexForward: false // Latest versions first
-    }).promise()
-
-    return result.Items as SnippetVersion[]
-  } catch (error: any) {
-    logger.error('Failed to get snippet versions', { error, snippetId, userId })
-    throw error
-  }
-}
-
-// Revert snippet to a specific version
 export const revertSnippetToVersion = async (
   projectId: string,
   snippetId: string,
   targetVersion: number,
   userId: string
 ): Promise<Snippet> => {
-  try {
-    // Get the target version
-    const versionResult = await dynamodb.get({
-      TableName: TABLES.VERSIONS,
-      Key: {
-        snippetId,
-        version: targetVersion
-      }
-    }).promise()
-
-    if (!versionResult.Item) {
-      throw createNotFoundError('Snippet version')
-    }
-
-    const targetVersionData = versionResult.Item as SnippetVersion
-
-    // Verify user ownership
-    if (targetVersionData.userId !== userId) {
-      throw createNotFoundError('Snippet version')
-    }
-
-    // Update the snippet with the version data
-    const updateInput: UpdateSnippetInput = {
-      textField1: targetVersionData.textField1,
-      textField2: targetVersionData.textField2
-    }
-
-    const revertedSnippet = await updateSnippet(projectId, snippetId, updateInput, userId)
-
-    logger.info('Snippet reverted to version', {
-      snippetId,
-      targetVersion,
-      newVersion: revertedSnippet.version,
-      userId
-    })
-
-    return revertedSnippet
-  } catch (error: any) {
-    logger.error('Failed to revert snippet', { error, projectId, snippetId, targetVersion, userId })
-    throw error
+  const versionParams: Parameters<DocumentClientType['query']>[0] = {
+    TableName: TABLES.VERSIONS,
+    KeyConditionExpression: 'snippetId = :snippetId AND version = :version',
+    ExpressionAttributeValues: {
+      ':snippetId': snippetId,
+      ':version': targetVersion
+    },
+    Limit: 1
   }
+
+  const versionResult = await dynamodb.query(versionParams).promise()
+  const [rawVersion] = versionResult.Items ?? []
+
+  if (!rawVersion) {
+    throw createNotFoundError('Snippet version')
+  }
+
+  const version = rawVersion as Record<string, unknown>
+  const textField1 = typeof version.textField1 === 'string' ? version.textField1 : ''
+  const textField2 = typeof version.textField2 === 'string' ? version.textField2 : ''
+  const position = toPosition(version.position)
+  const tags = toStringArray(version.tags)
+  const categories = toStringArray(version.categories)
+
+  return updateSnippet(
+    projectId,
+    snippetId,
+    {
+      textField1,
+      textField2,
+      position,
+      tags,
+      categories
+    },
+    userId
+  )
 }

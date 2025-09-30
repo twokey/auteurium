@@ -45,11 +45,23 @@ export class AuthService {
       // Extract user info from JWT payload
       const payload = idToken.payload
 
+      const tokenEmail = typeof payload.email === 'string' && payload.email.trim() !== ''
+        ? payload.email
+        : undefined
+      const tokenName = typeof payload.name === 'string' && payload.name.trim() !== ''
+        ? payload.name
+        : undefined
+      const tokenRole = payload['custom:role']
+      const role =
+        typeof tokenRole === 'string' && Object.values(UserRole).includes(tokenRole as UserRole)
+          ? (tokenRole as UserRole)
+          : UserRole.STANDARD
+
       return {
         id: userId,
-        email: payload.email as string || username,
-        name: payload.name as string || payload.email as string || username,
-        role: (payload['custom:role'] as UserRole) || UserRole.STANDARD,
+        email: tokenEmail ?? username,
+        name: tokenName ?? tokenEmail ?? username,
+        role,
         createdAt: new Date(payload.iat! * 1000).toISOString(),
         updatedAt: new Date().toISOString()
       }
@@ -136,7 +148,7 @@ export class AuthService {
   static async getAccessToken(): Promise<string | null> {
     try {
       const session = await fetchAuthSession()
-      return session.tokens?.accessToken?.toString() || null
+      return session.tokens?.accessToken?.toString() ?? null
     } catch (_error) {
       return null
     }

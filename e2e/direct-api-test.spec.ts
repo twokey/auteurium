@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('Direct API Registration Test', async ({ page }) => {
-  console.log('Testing user registration via direct API calls...');
+  console.warn('Testing user registration via direct API calls...');
 
   // Navigate to the app to ensure it's loaded
   await page.goto('http://localhost:3000');
@@ -17,8 +17,6 @@ test('Direct API Registration Test', async ({ page }) => {
       const amplifyModule = await import('aws-amplify/auth');
       const { signUp } = amplifyModule;
 
-      console.log('Starting registration for:', testEmail);
-
       // Attempt registration
       const result = await signUp({
         username: testEmail,
@@ -31,8 +29,6 @@ test('Direct API Registration Test', async ({ page }) => {
         }
       });
 
-      console.log('Registration result:', result);
-
       return {
         success: true,
         message: 'Registration successful',
@@ -40,25 +36,24 @@ test('Direct API Registration Test', async ({ page }) => {
         nextStep: result.nextStep
       };
 
-    } catch (error: any) {
-      console.log('Registration error:', error);
+    } catch (error) {
       return {
         success: false,
-        message: error.message || error.toString(),
+        message: error instanceof Error ? error.message : String(error),
         error: error
       };
     }
   });
 
-  console.log('Test result:', testResult);
+  console.warn('Test result:', testResult);
 
   // Log the result for manual verification
   if (testResult.success) {
-    console.log('✅ Registration successful!');
-    console.log('User ID:', testResult.userId);
-    console.log('Next step:', testResult.nextStep);
+    console.warn('✅ Registration successful!');
+    console.warn('User ID:', testResult.userId);
+    console.warn('Next step:', testResult.nextStep);
   } else {
-    console.log('❌ Registration failed:', testResult.message);
+    console.warn('❌ Registration failed:', testResult.message);
   }
 
   // The test should at least be able to attempt the operation

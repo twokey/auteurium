@@ -1,11 +1,13 @@
-import { validateToken, createContext } from '../../middleware/auth'
-import { CognitoJwtVerifier } from 'aws-jwt-verify'
 import { UserRole } from '@auteurium/shared-types'
+import { CognitoJwtVerifier } from 'aws-jwt-verify'
+
+import { validateToken, createContext } from '../../middleware/auth'
 
 // Mock the JWT verifier
 const mockVerify = jest.fn()
-const mockCreate = CognitoJwtVerifier.create as jest.MockedFunction<typeof CognitoJwtVerifier.create>
-mockCreate.mockReturnValue({ verify: mockVerify } as any)
+jest.mock('aws-jwt-verify')
+const mockCognitoJwtVerifier = CognitoJwtVerifier as jest.Mocked<typeof CognitoJwtVerifier>
+mockCognitoJwtVerifier.create = jest.fn().mockReturnValue({ verify: mockVerify } as unknown as ReturnType<typeof CognitoJwtVerifier.create>)
 
 describe('Auth Middleware', () => {
   beforeEach(() => {

@@ -1,14 +1,15 @@
-import { GraphQLContext } from '../../types/context'
-import { Connection, ConnectionType, GraphTraversalResult } from '@auteurium/shared-types'
+import { ConnectionType, type Connection, type GraphNode, type GraphTraversalResult } from '@auteurium/shared-types'
+import { z } from 'zod'
+
 import {
   queryConnections,
   traverseGraph,
-  ConnectionQueryOptions,
-  GraphTraversalOptions
+  type ConnectionQueryOptions,
+  type GraphTraversalOptions
 } from '../../database/connections'
-import { requireAuth, enforceContentPrivacy } from '../../middleware/validation'
-import { validateInput } from '../../middleware/validation'
-import { z } from 'zod'
+import { requireAuth, validateInput } from '../../middleware/validation'
+
+import type { GraphQLContext } from '../../types/context'
 
 // Validation schemas
 const projectConnectionsSchema = z.object({
@@ -38,8 +39,8 @@ const graphTraversalSchema = z.object({
 export const connectionQueries = {
   // Get all connections for a project
   projectConnections: async (
-    _parent: any,
-    args: any,
+    _parent: unknown,
+    args: unknown,
     context: GraphQLContext
   ): Promise<Connection[]> => {
     const { projectId, limit } = validateInput(projectConnectionsSchema, args)
@@ -64,8 +65,8 @@ export const connectionQueries = {
 
   // Get connections for a specific snippet
   snippetConnections: async (
-    _parent: any,
-    args: any,
+    _parent: unknown,
+    args: unknown,
     context: GraphQLContext
   ): Promise<Connection[]> => {
     const { snippetId, direction, limit } = validateInput(snippetConnectionsSchema, args)
@@ -106,8 +107,8 @@ export const connectionQueries = {
 
   // Get connections by type
   connectionsByType: async (
-    _parent: any,
-    args: any,
+    _parent: unknown,
+    args: unknown,
     context: GraphQLContext
   ): Promise<Connection[]> => {
     const { projectId, connectionType, limit } = validateInput(connectionsByTypeSchema, args)
@@ -134,8 +135,8 @@ export const connectionQueries = {
 
   // Perform graph traversal to find related snippets
   exploreGraph: async (
-    _parent: any,
-    args: any,
+    _parent: unknown,
+    args: unknown,
     context: GraphQLContext
   ): Promise<GraphTraversalResult> => {
     const { snippetId, direction, maxDepth, connectionTypes } = validateInput(graphTraversalSchema, args)
@@ -151,7 +152,7 @@ export const connectionQueries = {
 
     const options: GraphTraversalOptions = {
       snippetId,
-      direction: direction || 'both',
+      direction: direction ?? 'both',
       maxDepth,
       connectionTypes
     }
@@ -162,7 +163,7 @@ export const connectionQueries = {
     const userConnections = result.connections.filter(conn => conn.userId === user.id)
 
     // Group connections by snippet for nodes
-    const nodeMap = new Map<string, any>()
+    const nodeMap = new Map<string, GraphNode>()
 
     for (const connection of userConnections) {
       const sourceId = connection.sourceSnippetId
@@ -176,7 +177,7 @@ export const connectionQueries = {
           depth: 0 // We'll calculate proper depth in a real implementation
         })
       }
-      nodeMap.get(sourceId).connections.push(connection)
+      nodeMap.get(sourceId)!.connections.push(connection)
 
       // Add target node
       if (!nodeMap.has(targetId)) {
@@ -192,14 +193,14 @@ export const connectionQueries = {
       nodes: Array.from(nodeMap.values()),
       connections: userConnections,
       totalNodes: nodeMap.size,
-      maxDepthReached: maxDepth || 3
+      maxDepthReached: maxDepth ?? 3
     }
   },
 
   // Get connection statistics for a project
   connectionStats: async (
-    _parent: any,
-    args: any,
+    _parent: unknown,
+    args: unknown,
     context: GraphQLContext
   ): Promise<{
     totalConnections: number
@@ -220,7 +221,7 @@ export const connectionQueries = {
     // Count connections by type
     const typeMap = new Map<ConnectionType, number>()
     for (const conn of userConnections) {
-      typeMap.set(conn.connectionType, (typeMap.get(conn.connectionType) || 0) + 1)
+      typeMap.set(conn.connectionType, (typeMap.get(conn.connectionType) ?? 0) + 1)
     }
 
     // Count connections per snippet
@@ -228,11 +229,11 @@ export const connectionQueries = {
     for (const conn of userConnections) {
       snippetConnectionMap.set(
         conn.sourceSnippetId,
-        (snippetConnectionMap.get(conn.sourceSnippetId) || 0) + 1
+        (snippetConnectionMap.get(conn.sourceSnippetId) ?? 0) + 1
       )
       snippetConnectionMap.set(
         conn.targetSnippetId,
-        (snippetConnectionMap.get(conn.targetSnippetId) || 0) + 1
+        (snippetConnectionMap.get(conn.targetSnippetId) ?? 0) + 1
       )
     }
 

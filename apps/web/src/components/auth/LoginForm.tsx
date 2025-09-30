@@ -65,7 +65,13 @@ export const LoginForm = ({ onSwitchToRegister, onSwitchToForgotPassword }: Logi
         Sign in to Auteurium
       </h2>
       
-      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+      <form
+        onSubmit={(event) => {
+          void handleSubmit(event)
+        }}
+        noValidate
+        className="space-y-4"
+      >
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700">
             Email address

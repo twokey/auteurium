@@ -66,9 +66,7 @@ export const RegisterForm = ({ onSwitchToLogin, onRegistrationSuccess }: Registe
       const result = await signUp(email, password, name)
 
       // Check if the result indicates email confirmation is needed
-      if (result && result.nextStep && result.nextStep.signUpStep === 'CONFIRM_SIGN_UP') {
-        onRegistrationSuccess(email)
-      } else if (result && result.isSignUpComplete) {
+      if (result?.nextStep?.signUpStep === 'CONFIRM_SIGN_UP' || result?.isSignUpComplete) {
         onRegistrationSuccess(email)
       } else {
         onRegistrationSuccess(email)
@@ -115,7 +113,13 @@ export const RegisterForm = ({ onSwitchToLogin, onRegistrationSuccess }: Registe
         Create your account
       </h2>
       
-      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+      <form
+        onSubmit={(event) => {
+          void handleSubmit(event)
+        }}
+        noValidate
+        className="space-y-4"
+      >
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-gray-700">
             Full name

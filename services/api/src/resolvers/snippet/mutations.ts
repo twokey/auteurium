@@ -1,15 +1,17 @@
-import { GraphQLContext } from '../../types/context'
-import { Snippet, SnippetInput, UpdateSnippetInput } from '@auteurium/shared-types'
+import { type Snippet } from '@auteurium/shared-types'
+import { z } from 'zod'
+
+import { getProjectById } from '../../database/projects'
 import {
   createSnippet,
-  updateSnippet,
   deleteSnippet,
-  revertSnippetToVersion
+  revertSnippetToVersion,
+  updateSnippet
 } from '../../database/snippets'
-import { getProject } from '../../database/projects'
-import { requireAuth, requireOwnership, enforceContentPrivacy } from '../../middleware/validation'
-import { validateInput } from '../../middleware/validation'
-import { z } from 'zod'
+import { requireAuth, requireOwnership, validateInput } from '../../middleware/validation'
+import { createNotFoundError } from '../../utils/errors'
+
+import type { GraphQLContext } from '../../types/context'
 
 // Validation schemas
 const createSnippetSchema = z.object({
@@ -55,8 +57,8 @@ const revertSnippetSchema = z.object({
 export const snippetMutations = {
   // Create a new snippet
   createSnippet: async (
-    _parent: any,
-    args: any,
+    _parent: unknown,
+    args: unknown,
     context: GraphQLContext
   ): Promise<Snippet> => {
     const { input } = validateInput(createSnippetSchema, args)
@@ -68,9 +70,9 @@ export const snippetMutations = {
     })
 
     // Verify the user owns the project
-    const project = await getProject(input.projectId, user.id)
+    const project = await getProjectById(user.id, input.projectId)
     if (!project) {
-      throw new Error('Project not found or access denied')
+      throw createNotFoundError('Project')
     }
 
     // Ensure project ownership
@@ -81,8 +83,8 @@ export const snippetMutations = {
 
   // Update an existing snippet
   updateSnippet: async (
-    _parent: any,
-    args: any,
+    _parent: unknown,
+    args: unknown,
     context: GraphQLContext
   ): Promise<Snippet> => {
     const { projectId, snippetId, input } = validateInput(updateSnippetSchema, args)
@@ -100,8 +102,8 @@ export const snippetMutations = {
 
   // Delete a snippet (with cascade delete of connections and versions)
   deleteSnippet: async (
-    _parent: any,
-    args: any,
+    _parent: unknown,
+    args: unknown,
     context: GraphQLContext
   ): Promise<boolean> => {
     const { projectId, snippetId } = validateInput(deleteSnippetSchema, args)
@@ -126,8 +128,8 @@ export const snippetMutations = {
 
   // Revert snippet to a previous version
   revertSnippetToVersion: async (
-    _parent: any,
-    args: any,
+    _parent: unknown,
+    args: unknown,
     context: GraphQLContext
   ): Promise<Snippet> => {
     const { projectId, snippetId, version } = validateInput(revertSnippetSchema, args)
@@ -145,8 +147,8 @@ export const snippetMutations = {
 
   // Bulk update snippet positions (for canvas drag operations)
   updateSnippetPositions: async (
-    _parent: any,
-    args: any,
+    _parent: unknown,
+    args: unknown,
     context: GraphQLContext
   ): Promise<Snippet[]> => {
     const user = requireAuth(context.user)

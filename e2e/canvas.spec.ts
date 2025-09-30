@@ -1,10 +1,8 @@
 import { test, expect } from './fixtures/auth';
-import { test as dbTest } from './fixtures/database';
-import { generateTestData, waitForGraphQLOperation } from './utils/test-helpers';
+import { generateTestData } from './utils/test-helpers';
 
 test.describe('Canvas Functionality', () => {
   test('should display canvas interface', async ({
-    authenticatedUser,
     canvasPage
   }) => {
     // Create a test project first
@@ -26,7 +24,6 @@ test.describe('Canvas Functionality', () => {
   });
 
   test('should create new snippet', async ({
-    authenticatedUser,
     canvasPage,
     page
   }) => {
@@ -50,7 +47,6 @@ test.describe('Canvas Functionality', () => {
   });
 
   test('should edit existing snippet', async ({
-    authenticatedUser,
     canvasPage,
     page
   }) => {
@@ -74,11 +70,10 @@ test.describe('Canvas Functionality', () => {
 
     // Verify changes
     await canvasPage.expectSnippetExists(updatedTitle);
-    await expect(canvasPage.getSnippetByTitle(testData.snippetTitle)).not.toBeVisible();
+    await expect(canvasPage.getSnippetByTitle(testData.snippetTitle)).toBeHidden();
   });
 
   test('should delete snippet', async ({
-    authenticatedUser,
     canvasPage,
     page
   }) => {
@@ -104,7 +99,6 @@ test.describe('Canvas Functionality', () => {
   });
 
   test('should drag and position snippets', async ({
-    authenticatedUser,
     canvasPage,
     page
   }) => {
@@ -136,7 +130,6 @@ test.describe('Canvas Functionality', () => {
   });
 
   test('should create connections between snippets', async ({
-    authenticatedUser,
     canvasPage,
     page
   }) => {
@@ -164,7 +157,6 @@ test.describe('Canvas Functionality', () => {
   });
 
   test('should handle canvas zoom and pan', async ({
-    authenticatedUser,
     canvasPage,
     page
   }) => {
@@ -191,7 +183,6 @@ test.describe('Canvas Functionality', () => {
   });
 
   test('should navigate back to dashboard', async ({
-    authenticatedUser,
     canvasPage,
     page
   }) => {
@@ -213,7 +204,6 @@ test.describe('Canvas Functionality', () => {
   });
 
   test('should persist snippet changes', async ({
-    authenticatedUser,
     canvasPage,
     page
   }) => {
@@ -240,7 +230,6 @@ test.describe('Canvas Functionality', () => {
   });
 
   test('should handle large snippets with minimize/expand', async ({
-    authenticatedUser,
     canvasPage,
     page
   }) => {

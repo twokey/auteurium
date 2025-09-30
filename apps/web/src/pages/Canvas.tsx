@@ -50,6 +50,14 @@ interface Project {
   snippets?: Snippet[]
 }
 
+interface ProjectWithSnippetsQueryData {
+  project: Project | null
+}
+
+interface ProjectWithSnippetsQueryVariables {
+  projectId: string
+}
+
 const EMPTY_SNIPPET_LIST: Snippet[] = []
 const initialNodes: Node[] = []
 const initialEdges: Edge[] = []
@@ -63,8 +71,13 @@ export const Canvas = () => {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const [isLoading, setIsLoading] = useState(false)
 
-  const { data, loading, error } = useQuery(GET_PROJECT_WITH_SNIPPETS, {
-    variables: { projectId },
+  const queryVariables = projectId ? { projectId } : undefined
+
+  const { data, loading, error } = useQuery<
+    ProjectWithSnippetsQueryData,
+    ProjectWithSnippetsQueryVariables
+  >(GET_PROJECT_WITH_SNIPPETS, {
+    variables: queryVariables,
     skip: !projectId,
     errorPolicy: 'all'
   })
@@ -76,6 +89,7 @@ export const Canvas = () => {
   const flowNodes = useMemo(() => {
     return snippets.map((snippet) => {
       const position = snippet.position ?? { x: 0, y: 0 }
+      const snippetTitle = snippet.textField1?.trim() ? snippet.textField1 : 'Untitled snippet'
 
       return {
         id: snippet.id,
@@ -93,9 +107,9 @@ export const Canvas = () => {
                 <span className="font-mono text-[11px] text-gray-400">#{snippet.id}</span>
               </div>
               <div className="font-medium text-sm mb-1 text-gray-900">
-                {snippet.textField1 || 'Untitled snippet'}
+                {snippetTitle}
               </div>
-              {snippet.textField2 && (
+            {snippet.textField2 && (
                 <div className="text-xs text-gray-600 max-w-48 truncate">
                   {snippet.textField2}
                 </div>
@@ -146,7 +160,10 @@ export const Canvas = () => {
           return
         }
 
-        const edgeId = connection.id || `${connection.sourceSnippetId}-${connection.targetSnippetId}`
+        const edgeId =
+          connection.id && connection.id.trim() !== ''
+            ? connection.id
+            : `${connection.sourceSnippetId}-${connection.targetSnippetId}`
 
         if (!edgesMap.has(edgeId)) {
           edgesMap.set(edgeId, {
@@ -183,7 +200,10 @@ export const Canvas = () => {
       id: project.id,
       name: project.name,
       description: project.description,
-      lastModified: project.lastModified || project.updatedAt || project.createdAt || new Date().toISOString()
+      lastModified:
+        [project.lastModified, project.updatedAt, project.createdAt].find(
+          (value): value is string => typeof value === 'string' && value.trim() !== ''
+        ) ?? new Date().toISOString()
     }
     : null
 

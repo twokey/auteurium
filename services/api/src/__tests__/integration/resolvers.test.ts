@@ -1,6 +1,7 @@
+import { UserRole, ConnectionType } from '@auteurium/shared-types'
+
 import { handler } from '../../index'
 import { createMockUser, createMockAdminUser, createMockGraphQLContext } from '../setup'
-import { UserRole, ConnectionType } from '@auteurium/shared-types'
 
 // Mock DynamoDB operations
 const mockDynamoDBOperations = {

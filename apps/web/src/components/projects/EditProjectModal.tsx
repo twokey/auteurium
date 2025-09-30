@@ -38,12 +38,12 @@ export const EditProjectModal = ({ isOpen, project, onClose, onUpdated }: EditPr
   useEffect(() => {
     if (project) {
       setName(project.name)
-      setDescription(project.description || '')
+      setDescription(project.description ?? '')
       setError('')
     }
   }, [project])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     
     if (!name.trim()) {
@@ -54,12 +54,15 @@ export const EditProjectModal = ({ isOpen, project, onClose, onUpdated }: EditPr
     if (!project) return
 
     setError('')
-    updateProject({
+    const trimmedDescription = description.trim()
+    const descriptionValue = trimmedDescription === '' ? undefined : trimmedDescription
+
+    void updateProject({
       variables: {
         id: project.id,
         input: {
           name: name.trim(),
-          description: description.trim() || undefined
+          description: descriptionValue
         }
       }
     })

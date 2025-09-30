@@ -49,7 +49,7 @@ export const ProjectCard = ({ project, onDeleted, onUpdated }: ProjectCardProps)
   }
 
   const handleDeleteProject = () => {
-    deleteProject({
+    void deleteProject({
       variables: { id: project.id }
     })
   }

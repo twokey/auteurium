@@ -1,11 +1,11 @@
-import { LambdaClient, GetFunctionCommand, ListFunctionsCommand } from '@aws-sdk/client-lambda';
-import { DynamoDBClient, ListTablesCommand, DescribeTableCommand } from '@aws-sdk/client-dynamodb';
-import { CognitoIdentityProviderClient, ListUserPoolsCommand, DescribeUserPoolCommand } from '@aws-sdk/client-cognito-identity-provider';
-import { AppSyncClient, ListGraphqlApisCommand, GetGraphqlApiCommand } from '@aws-sdk/client-appsync';
+import { AppSyncClient, GetGraphqlApiCommand, ListGraphqlApisCommand } from '@aws-sdk/client-appsync'
+import { CognitoIdentityProviderClient, DescribeUserPoolCommand, ListUserPoolsCommand } from '@aws-sdk/client-cognito-identity-provider'
+import { DescribeTableCommand, DynamoDBClient, ListTablesCommand } from '@aws-sdk/client-dynamodb'
+import { GetFunctionCommand, LambdaClient, ListFunctionsCommand } from '@aws-sdk/client-lambda'
 
 describe('Deployed Infrastructure Validation', () => {
-  const stage = process.env.STAGE || 'test';
-  const region = process.env.AWS_REGION || 'us-west-2';
+  const stage = process.env.STAGE ?? 'test'
+  const region = process.env.AWS_REGION ?? 'us-west-2'
 
   const lambdaClient = new LambdaClient({ region });
   const dynamoClient = new DynamoDBClient({ region });
@@ -18,7 +18,7 @@ describe('Deployed Infrastructure Validation', () => {
   describe('Lambda Function Validation', () => {
     test('should have all Lambda functions with correct runtime', async () => {
       if (!shouldRunDeploymentTests) {
-        console.log('Skipping deployment tests - set RUN_DEPLOYMENT_TESTS=true to enable');
+        console.warn('Skipping deployment tests - set RUN_DEPLOYMENT_TESTS=true to enable')
         return;
       }
 
@@ -34,11 +34,12 @@ describe('Deployed Infrastructure Validation', () => {
             new GetFunctionCommand({ FunctionName: functionName })
           );
 
-          expect(response.Configuration).toBeDefined();
-          expect(response.Configuration!.Runtime).toBe('nodejs22.x');
-          expect(response.Configuration!.FunctionName).toBe(functionName);
+          expect(response.Configuration).toBeDefined()
+          const config = response.Configuration
+          expect(config?.Runtime).toBe('nodejs22.x')
+          expect(config?.FunctionName).toBe(functionName)
 
-          console.log(`✅ ${functionName}: ${response.Configuration!.Runtime}`);
+          console.warn(`✅ ${functionName}: ${config?.Runtime ?? 'unknown'}`)
         } catch (error) {
           console.error(`❌ Failed to validate ${functionName}:`, error);
           throw error;
@@ -56,17 +57,17 @@ describe('Deployed Infrastructure Validation', () => {
           new GetFunctionCommand({ FunctionName: functionName })
         );
 
-        const envVars = response.Configuration!.Environment!.Variables!;
+        const envVars = response.Configuration?.Environment?.Variables ?? {}
 
-        expect(envVars.STAGE).toBe(stage);
-        expect(envVars.USERS_TABLE).toBe(`auteurium-users-${stage}`);
-        expect(envVars.PROJECTS_TABLE).toBe(`auteurium-projects-${stage}`);
-        expect(envVars.SNIPPETS_TABLE).toBe(`auteurium-snippets-${stage}`);
-        expect(envVars.CONNECTIONS_TABLE).toBe(`auteurium-connections-${stage}`);
-        expect(envVars.VERSIONS_TABLE).toBe(`auteurium-versions-${stage}`);
-        expect(envVars.USER_POOL_ID).toMatch(/^[\w-]+_[\w]+$/);
+        expect(envVars.STAGE).toBe(stage)
+        expect(envVars.USERS_TABLE).toBe(`auteurium-users-${stage}`)
+        expect(envVars.PROJECTS_TABLE).toBe(`auteurium-projects-${stage}`)
+        expect(envVars.SNIPPETS_TABLE).toBe(`auteurium-snippets-${stage}`)
+        expect(envVars.CONNECTIONS_TABLE).toBe(`auteurium-connections-${stage}`)
+        expect(envVars.VERSIONS_TABLE).toBe(`auteurium-versions-${stage}`)
+        expect(envVars.USER_POOL_ID).toMatch(/^[\w-]+_[\w]+$/)
 
-        console.log('✅ API Lambda environment variables validated');
+        console.warn('✅ API Lambda environment variables validated')
       } catch (error) {
         console.error('❌ Failed to validate API Lambda environment variables:', error);
         throw error;
@@ -84,19 +85,21 @@ describe('Deployed Infrastructure Validation', () => {
       ];
 
       try {
-        const response = await lambdaClient.send(new ListFunctionsCommand({}));
-        const auteuriumFunctions = response.Functions!.filter(func =>
-          func.FunctionName!.includes('auteurium')
-        );
+        const response = await lambdaClient.send(new ListFunctionsCommand({}))
+        const allFunctions = response.Functions ?? []
+        const auteuriumFunctions = allFunctions.filter(func =>
+          func.FunctionName?.includes('auteurium') ?? false
+        )
 
         for (const func of auteuriumFunctions) {
-          if (func.Runtime && func.Runtime.startsWith('nodejs')) {
-            expect(deprecatedRuntimes).not.toContain(func.Runtime);
-            expect(func.Runtime).toBe('nodejs22.x');
+          const runtime = func.Runtime
+          if (runtime?.startsWith('nodejs')) {
+            expect(deprecatedRuntimes).not.toContain(runtime)
+            expect(runtime).toBe('nodejs22.x')
           }
         }
 
-        console.log(`✅ Validated ${auteuriumFunctions.length} Auteurium Lambda functions`);
+        console.warn(`✅ Validated ${auteuriumFunctions.length} Auteurium Lambda functions`)
       } catch (error) {
         console.error('❌ Failed to validate Lambda runtimes:', error);
         throw error;
@@ -117,22 +120,22 @@ describe('Deployed Infrastructure Validation', () => {
       ];
 
       try {
-        const response = await dynamoClient.send(new ListTablesCommand({}));
-        const tableNames = response.TableNames!;
+        const response = await dynamoClient.send(new ListTablesCommand({}))
+        const tableNames = response.TableNames ?? []
 
         for (const expectedTable of expectedTables) {
-          expect(tableNames).toContain(expectedTable);
+          expect(tableNames).toContain(expectedTable)
 
           // Verify table configuration
           const tableResponse = await dynamoClient.send(
             new DescribeTableCommand({ TableName: expectedTable })
-          );
+          )
 
-          expect(tableResponse.Table!.BillingModeSummary!.BillingMode).toBe('PAY_PER_REQUEST');
-          expect(tableResponse.Table!.TableStatus).toBe('ACTIVE');
+          expect(tableResponse.Table?.BillingModeSummary?.BillingMode).toBe('PAY_PER_REQUEST')
+          expect(tableResponse.Table?.TableStatus).toBe('ACTIVE')
         }
 
-        console.log(`✅ Validated ${expectedTables.length} DynamoDB tables`);
+        console.warn(`✅ Validated ${expectedTables.length} DynamoDB tables`)
       } catch (error) {
         console.error('❌ Failed to validate DynamoDB tables:', error);
         throw error;
@@ -157,16 +160,17 @@ describe('Deployed Infrastructure Validation', () => {
         for (const [tableName, expectedGSIs] of Object.entries(tableGSIs)) {
           const response = await dynamoClient.send(
             new DescribeTableCommand({ TableName: tableName })
-          );
+          )
 
-          const gsiNames = response.Table!.GlobalSecondaryIndexes!.map(gsi => gsi.IndexName!);
+          const gsis = response.Table?.GlobalSecondaryIndexes ?? []
+          const gsiNames = gsis.map(gsi => gsi.IndexName).filter((name): name is string => name !== undefined)
 
           for (const expectedGSI of expectedGSIs) {
-            expect(gsiNames).toContain(expectedGSI);
+            expect(gsiNames).toContain(expectedGSI)
           }
         }
 
-        console.log('✅ Validated DynamoDB Global Secondary Indexes');
+        console.warn('✅ Validated DynamoDB Global Secondary Indexes')
       } catch (error) {
         console.error('❌ Failed to validate GSIs:', error);
         throw error;
@@ -181,25 +185,27 @@ describe('Deployed Infrastructure Validation', () => {
       try {
         const listResponse = await cognitoClient.send(new ListUserPoolsCommand({
           MaxResults: 50,
-        }));
+        }))
 
-        const auteuriumPool = listResponse.UserPools!.find(pool =>
+        const userPools = listResponse.UserPools ?? []
+        const auteuriumPool = userPools.find(pool =>
           pool.Name === `auteurium-users-${stage}`
-        );
+        )
 
-        expect(auteuriumPool).toBeDefined();
+        expect(auteuriumPool).toBeDefined()
 
         const poolResponse = await cognitoClient.send(
-          new DescribeUserPoolCommand({ UserPoolId: auteuriumPool!.Id! })
-        );
+          new DescribeUserPoolCommand({ UserPoolId: auteuriumPool?.Id ?? '' })
+        )
 
-        expect(poolResponse.UserPool!.Policies!.PasswordPolicy!.MinimumLength).toBe(8);
-        expect(poolResponse.UserPool!.Policies!.PasswordPolicy!.RequireLowercase).toBe(true);
-        expect(poolResponse.UserPool!.Policies!.PasswordPolicy!.RequireNumbers).toBe(true);
-        expect(poolResponse.UserPool!.Policies!.PasswordPolicy!.RequireUppercase).toBe(true);
-        expect(poolResponse.UserPool!.Policies!.PasswordPolicy!.RequireSymbols).toBe(false);
+        const passwordPolicy = poolResponse.UserPool?.Policies?.PasswordPolicy
+        expect(passwordPolicy?.MinimumLength).toBe(8)
+        expect(passwordPolicy?.RequireLowercase).toBe(true)
+        expect(passwordPolicy?.RequireNumbers).toBe(true)
+        expect(passwordPolicy?.RequireUppercase).toBe(true)
+        expect(passwordPolicy?.RequireSymbols).toBe(false)
 
-        console.log('✅ Validated Cognito User Pool configuration');
+        console.warn('✅ Validated Cognito User Pool configuration')
       } catch (error) {
         console.error('❌ Failed to validate Cognito:', error);
         throw error;
@@ -212,21 +218,22 @@ describe('Deployed Infrastructure Validation', () => {
       if (!shouldRunDeploymentTests) return;
 
       try {
-        const listResponse = await appSyncClient.send(new ListGraphqlApisCommand({}));
-        const auteuriumApi = listResponse.graphqlApis!.find(api =>
+        const listResponse = await appSyncClient.send(new ListGraphqlApisCommand({}))
+        const apis = listResponse.graphqlApis ?? []
+        const auteuriumApi = apis.find(api =>
           api.name === `auteurium-api-${stage}`
-        );
+        )
 
-        expect(auteuriumApi).toBeDefined();
+        expect(auteuriumApi).toBeDefined()
 
         const apiResponse = await appSyncClient.send(
-          new GetGraphqlApiCommand({ apiId: auteuriumApi!.apiId! })
-        );
+          new GetGraphqlApiCommand({ apiId: auteuriumApi?.apiId ?? '' })
+        )
 
-        expect(apiResponse.graphqlApi!.authenticationType).toBe('AMAZON_COGNITO_USER_POOLS');
-        expect(apiResponse.graphqlApi!.userPoolConfig).toBeDefined();
+        expect(apiResponse.graphqlApi?.authenticationType).toBe('AMAZON_COGNITO_USER_POOLS')
+        expect(apiResponse.graphqlApi?.userPoolConfig).toBeDefined()
 
-        console.log('✅ Validated AppSync API configuration');
+        console.warn('✅ Validated AppSync API configuration')
       } catch (error) {
         console.error('❌ Failed to validate AppSync API:', error);
         throw error;
@@ -247,10 +254,11 @@ describe('Deployed Infrastructure Validation', () => {
           new GetFunctionCommand({ FunctionName: functionName })
         );
 
-        expect(response.Configuration!.Environment!.Variables!.USERS_TABLE).toBeTruthy();
-        expect(response.Configuration!.Role).toMatch(/.*role.*/);
+        const config = response.Configuration
+        expect(config?.Environment?.Variables?.USERS_TABLE).toBeTruthy()
+        expect(config?.Role).toMatch(/.*role.*/)
 
-        console.log('✅ API Lambda has DynamoDB configuration');
+        console.warn('✅ API Lambda has DynamoDB configuration')
       } catch (error) {
         console.error('❌ Failed to validate Lambda-DynamoDB integration:', error);
         throw error;
@@ -263,17 +271,18 @@ describe('Deployed Infrastructure Validation', () => {
       if (!shouldRunDeploymentTests) return;
 
       try {
-        const response = await lambdaClient.send(new ListFunctionsCommand({}));
-        const auteuriumFunctions = response.Functions!.filter(func =>
-          func.FunctionName!.includes('auteurium')
-        );
+        const response = await lambdaClient.send(new ListFunctionsCommand({}))
+        const allFunctions = response.Functions ?? []
+        const auteuriumFunctions = allFunctions.filter(func =>
+          func.FunctionName?.includes('auteurium') ?? false
+        )
 
         for (const func of auteuriumFunctions) {
           // This is a basic check - in a real scenario you'd check IAM policies
-          expect(func.FunctionName).toMatch(/auteurium-.+-${stage}/);
+          expect(func.FunctionName).toMatch(/auteurium-.+-${stage}/)
         }
 
-        console.log('✅ Validated Lambda function security');
+        console.warn('✅ Validated Lambda function security')
       } catch (error) {
         console.error('❌ Failed to validate Lambda security:', error);
         throw error;

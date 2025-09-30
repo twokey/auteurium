@@ -1,14 +1,15 @@
-import { GraphQLContext } from '../../types/context'
-import { Connection, ConnectionInput, UpdateConnectionInput, ConnectionType } from '@auteurium/shared-types'
+import { ConnectionType, type Connection } from '@auteurium/shared-types'
+import { z } from 'zod'
+
 import {
   createConnection,
   deleteConnection,
   queryConnections
 } from '../../database/connections'
 import { getSnippet } from '../../database/snippets'
-import { requireAuth, enforceContentPrivacy } from '../../middleware/validation'
-import { validateInput } from '../../middleware/validation'
-import { z } from 'zod'
+import { enforceContentPrivacy, requireAuth, validateInput } from '../../middleware/validation'
+
+import type { GraphQLContext } from '../../types/context'
 
 // Validation schemas
 const createConnectionSchema = z.object({
@@ -54,8 +55,8 @@ const bulkCreateConnectionsSchema = z.object({
 export const connectionMutations = {
   // Create a new connection between snippets
   createConnection: async (
-    _parent: any,
-    args: any,
+    _parent: unknown,
+    args: unknown,
     context: GraphQLContext
   ): Promise<Connection> => {
     const { input } = validateInput(createConnectionSchema, args)
@@ -93,8 +94,8 @@ export const connectionMutations = {
 
   // Update an existing connection
   updateConnection: async (
-    _parent: any,
-    args: any,
+    _parent: unknown,
+    args: unknown,
     context: GraphQLContext
   ): Promise<Connection> => {
     const { projectId, connectionId, input } = validateInput(updateConnectionSchema, args)
@@ -118,7 +119,7 @@ export const connectionMutations = {
     const timestamp = new Date().toISOString()
     const updateExpressions: string[] = []
     const expressionAttributeNames: Record<string, string> = {}
-    const expressionAttributeValues: Record<string, any> = {
+    const expressionAttributeValues: Record<string, unknown> = {
       ':updatedAt': timestamp,
       ':userId': user.id
     }
@@ -165,7 +166,7 @@ export const connectionMutations = {
       ReturnValues: 'ALL_NEW'
     }).promise()
 
-    const updatedConnection = result.Attributes as Connection
+    const updatedConnection = result.Attributes as unknown as Connection
 
     context.logger.info('Connection updated', {
       connectionId,
@@ -177,8 +178,8 @@ export const connectionMutations = {
 
   // Delete a connection
   deleteConnection: async (
-    _parent: any,
-    args: any,
+    _parent: unknown,
+    args: unknown,
     context: GraphQLContext
   ): Promise<boolean> => {
     const { projectId, connectionId } = validateInput(deleteConnectionSchema, args)
@@ -202,8 +203,8 @@ export const connectionMutations = {
 
   // Bulk create multiple connections
   bulkCreateConnections: async (
-    _parent: any,
-    args: any,
+    _parent: unknown,
+    args: unknown,
     context: GraphQLContext
   ): Promise<Connection[]> => {
     const { connections } = validateInput(bulkCreateConnectionsSchema, args)
@@ -241,8 +242,9 @@ export const connectionMutations = {
           continue
         }
 
-      } catch (error: any) {
-        errors.push(`Validation failed for connection: ${error?.message || 'Unknown error'}`)
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        errors.push(`Validation failed for connection: ${message}`)
       }
     }
 
@@ -256,9 +258,9 @@ export const connectionMutations = {
       try {
         const connection = await createConnection(connInput, user.id)
         createdConnections.push(connection)
-      } catch (error: any) {
+      } catch (error: unknown) {
         context.logger.warn('Failed to create individual connection in bulk operation', {
-          error: error?.message || 'Unknown error',
+          error: error instanceof Error ? error.message : 'Unknown error',
           sourceSnippetId: connInput.sourceSnippetId,
           targetSnippetId: connInput.targetSnippetId
         })
@@ -277,8 +279,8 @@ export const connectionMutations = {
 
   // Delete all connections between two specific snippets
   removeConnectionsBetweenSnippets: async (
-    _parent: any,
-    args: any,
+    _parent: unknown,
+    args: unknown,
     context: GraphQLContext
   ): Promise<number> => {
     const schema = z.object({

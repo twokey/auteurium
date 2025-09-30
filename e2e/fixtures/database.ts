@@ -1,17 +1,17 @@
 import { test as base } from '@playwright/test';
 
-type DatabaseFixtures = {
+interface DatabaseFixtures {
   cleanDatabase: void;
   testProject: { id: string; name: string };
-};
+}
 
 export const test = base.extend<DatabaseFixtures>({
-  cleanDatabase: [async ({ page }, use) => {
+  cleanDatabase: [async ({ page: _page }, use) => {
     // Setup: Clean database state before test
     if (process.env.RESET_DB_BEFORE_TESTS === 'true') {
       // This would typically call your backend API to clean test data
       // For now, we'll rely on user-specific data isolation
-      console.log('Database cleanup not implemented - relying on user isolation');
+      console.warn('Database cleanup not implemented - relying on user isolation');
     }
 
     await use();
@@ -20,7 +20,7 @@ export const test = base.extend<DatabaseFixtures>({
     // You might want to delete test projects/snippets created during the test
   }, { auto: true }],
 
-  testProject: async ({ page, authenticatedUser }, use) => {
+  testProject: async ({ page }, use) => {
     // Create a test project that will be available during the test
     const projectName = `Test Project ${Date.now()}`;
 

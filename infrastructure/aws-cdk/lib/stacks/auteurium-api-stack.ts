@@ -139,7 +139,7 @@ export class AuteuriumApiStack extends cdk.Stack {
     })
 
     new cdk.CfnOutput(this, 'GraphQLApiKey', {
-      value: this.graphqlApi.apiKey || 'No API Key (using Cognito)',
+      value: this.graphqlApi.apiKey ?? 'No API Key (using Cognito)',
       exportName: `Auteurium-GraphQLApiKey-${stage}`
     })
   }

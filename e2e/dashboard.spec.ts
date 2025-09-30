@@ -5,7 +5,6 @@ test.describe('Dashboard', () => {
   test.use({ storageState: 'auth.json' }); // Persist auth state between tests
 
   test('should display dashboard for authenticated user', async ({
-    authenticatedUser,
     dashboardPage
   }) => {
     await dashboardPage.goto();
@@ -16,7 +15,6 @@ test.describe('Dashboard', () => {
   });
 
   test('should create new project', async ({
-    authenticatedUser,
     dashboardPage
   }) => {
     const testData = generateTestData();
@@ -38,7 +36,6 @@ test.describe('Dashboard', () => {
   });
 
   test('should edit existing project', async ({
-    authenticatedUser,
     dashboardPage
   }) => {
     const testData = generateTestData();
@@ -61,14 +58,13 @@ test.describe('Dashboard', () => {
     await dashboardPage.expectProjectExists(updatedName);
     await expect(
       dashboardPage.page.locator(`[data-testid="project-card"]`, { hasText: testData.projectName })
-    ).not.toBeVisible();
+    ).toBeHidden();
 
     // Cleanup
     await dashboardPage.deleteProject(updatedName);
   });
 
   test('should delete project', async ({
-    authenticatedUser,
     dashboardPage
   }) => {
     const testData = generateTestData();
@@ -89,11 +85,10 @@ test.describe('Dashboard', () => {
     await dashboardPage.expectProjectCount(initialProjects);
     await expect(
       dashboardPage.page.locator(`[data-testid="project-card"]`, { hasText: testData.projectName })
-    ).not.toBeVisible();
+    ).toBeHidden();
   });
 
   test('should open project canvas', async ({
-    authenticatedUser,
     dashboardPage,
     page
   }) => {
@@ -117,7 +112,6 @@ test.describe('Dashboard', () => {
   });
 
   test('should handle empty project state', async ({
-    authenticatedUser,
     dashboardPage
   }) => {
     await dashboardPage.goto();
@@ -133,7 +127,6 @@ test.describe('Dashboard', () => {
   });
 
   test('should search/filter projects', async ({
-    authenticatedUser,
     dashboardPage,
     page
   }) => {
@@ -154,7 +147,7 @@ test.describe('Dashboard', () => {
       await dashboardPage.expectProjectExists(testData1.projectName);
       await expect(
         page.locator(`[data-testid="project-card"]`, { hasText: testData2.projectName })
-      ).not.toBeVisible();
+      ).toBeHidden();
 
       // Clear search
       await searchInput.clear();
@@ -168,7 +161,6 @@ test.describe('Dashboard', () => {
   });
 
   test('should display project metadata', async ({
-    authenticatedUser,
     dashboardPage
   }) => {
     const testData = generateTestData();

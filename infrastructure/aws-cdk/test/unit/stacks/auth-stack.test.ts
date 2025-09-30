@@ -1,7 +1,8 @@
 import * as cdk from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
-import { AuteuriumAuthStack } from '../../../lib/stacks/auteurium-auth-stack';
 import { describe, test, beforeEach, expect } from '@jest/globals';
+
+import { AuteuriumAuthStack } from '../../../lib/stacks/auteurium-auth-stack';
 
 describe('AuteuriumAuthStack', () => {
   let app: cdk.App;

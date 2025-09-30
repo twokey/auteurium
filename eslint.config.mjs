@@ -2,15 +2,31 @@ import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import js from '@eslint/js'
-import tseslint from 'typescript-eslint'
+import testingLibraryPlugin from 'eslint-plugin-testing-library'
+import jestPlugin from 'eslint-plugin-jest'
 import importPlugin from 'eslint-plugin-import'
+import jsxA11yPlugin from 'eslint-plugin-jsx-a11y'
+import playwrightPlugin from 'eslint-plugin-playwright'
+import nodePlugin from 'eslint-plugin-n'
 import reactPlugin from 'eslint-plugin-react'
 import reactHooksPlugin from 'eslint-plugin-react-hooks'
 import reactRefreshPlugin from 'eslint-plugin-react-refresh'
-import jsxA11yPlugin from 'eslint-plugin-jsx-a11y'
-import testingLibraryPlugin from 'eslint-plugin-testing-library'
-import playwrightPlugin from 'eslint-plugin-playwright'
 import globals from 'globals'
+import tseslint from 'typescript-eslint'
+
+const PROJECT_ROOT = dirname(fileURLToPath(import.meta.url))
+const TYPESCRIPT_GLOBS = ['**/*.ts', '**/*.tsx', '**/*.cts', '**/*.mts']
+const JAVASCRIPT_GLOBS = ['**/*.js', '**/*.jsx', '**/*.mjs', '**/*.cjs']
+const REACT_TEST_GLOBS = ['apps/web/**/*.{test,spec}.{ts,tsx,js,jsx}']
+const PLAYWRIGHT_GLOBS = [
+  'e2e/**/*.{ts,tsx}',
+  'tests/e2e/**/*.{ts,tsx}',
+  'tests-examples/**/*.{ts,tsx}'
+]
+const JEST_TEST_GLOBS = [
+  '**/__tests__/**/*.{ts,tsx,js,jsx}',
+  '**/*.{test,spec}.{ts,tsx,js,jsx}'
+]
 
 const IGNORE_PATTERNS = [
   '**/dist/**',
@@ -21,10 +37,53 @@ const IGNORE_PATTERNS = [
   'playwright-report/**',
   'test-results/**',
   '**/*.d.ts',
-  'node_modules/**'
+  'node_modules/**',
+  '**/.serverless/**',
+  '**/.webpack/**'
 ]
 
-const TS_CONFIG_ROOT = dirname(fileURLToPath(import.meta.url))
+const importRecommendedRules = importPlugin.flatConfigs.recommended.rules ?? {}
+const importTypeScriptRules = importPlugin.flatConfigs.typescript.rules ?? {}
+
+const sharedImportRuleConfig = {
+  'import/order': [
+    'error',
+    {
+      groups: [
+        'builtin',
+        'external',
+        'internal',
+        ['parent', 'sibling', 'index'],
+        'object',
+        'type'
+      ],
+      alphabetize: { order: 'asc', caseInsensitive: true },
+      'newlines-between': 'always',
+      pathGroups: [
+        { pattern: '@/**', group: 'internal' },
+        { pattern: '@shared/**', group: 'internal' }
+      ],
+      pathGroupsExcludedImportTypes: ['builtin']
+    }
+  ],
+  'import/newline-after-import': ['error', { count: 1 }],
+  'import/no-default-export': 'error',
+  'import/no-extraneous-dependencies': [
+    'error',
+    {
+      devDependencies: [
+        '**/*.test.*',
+        '**/*.spec.*',
+        '**/__tests__/**/*',
+        'tests/**/*',
+        'e2e/**/*',
+        '**/*.config.*',
+        '**/vite-env.d.ts',
+        'playwright.config.ts'
+      ]
+    }
+  ]
+}
 
 export default tseslint.config(
   {
@@ -32,18 +91,30 @@ export default tseslint.config(
     ignores: IGNORE_PATTERNS
   },
   {
-    name: 'base',
-    files: ['**/*.{ts,tsx,js,jsx,cjs,mjs}'],
+    name: 'import-resolver',
+    settings: {
+      'import/resolver': {
+        typescript: {
+          project: true
+        },
+        node: {
+          extensions: ['.js', '.jsx', '.ts', '.tsx', '.d.ts', '.mjs', '.cjs']
+        }
+      }
+    }
+  },
+  {
+    name: 'typescript-typechecked',
+    files: TYPESCRIPT_GLOBS,
     extends: [
-      js.configs.recommended,
-      ...tseslint.configs.recommended,
-      importPlugin.flatConfigs.recommended,
-      importPlugin.flatConfigs.typescript
+      ...tseslint.configs.recommendedTypeChecked,
+      ...tseslint.configs.stylisticTypeChecked
     ],
     languageOptions: {
       parser: tseslint.parser,
       parserOptions: {
-        tsconfigRootDir: TS_CONFIG_ROOT
+        projectService: true,
+        tsconfigRootDir: PROJECT_ROOT
       },
       sourceType: 'module',
       ecmaVersion: 'latest',
@@ -51,45 +122,14 @@ export default tseslint.config(
         ...globals.es2024
       }
     },
+    plugins: {
+      import: importPlugin
+    },
     rules: {
+      ...importRecommendedRules,
+      ...importTypeScriptRules,
+      ...sharedImportRuleConfig,
       'no-console': ['warn', { allow: ['warn', 'error'] }],
-      'import/order': [
-        'error',
-        {
-          groups: [
-            'builtin',
-            'external',
-            'internal',
-            ['parent', 'sibling', 'index'],
-            'object',
-            'type'
-          ],
-          alphabetize: { order: 'asc', caseInsensitive: true },
-          'newlines-between': 'always',
-          pathGroups: [
-            { pattern: '@/**', group: 'internal' },
-            { pattern: '@shared/**', group: 'internal' }
-          ],
-          pathGroupsExcludedImportTypes: ['builtin']
-        }
-      ],
-      'import/newline-after-import': ['error', { count: 1 }],
-      'import/no-default-export': 'error',
-      'import/no-extraneous-dependencies': [
-        'error',
-        {
-          devDependencies: [
-            '**/*.test.*',
-            '**/*.spec.*',
-            '**/tests/**/*',
-            '**/__tests__/**/*',
-            'e2e/**/*',
-            '**/*.config.*',
-            '**/vite-env.d.ts',
-            'playwright.config.ts'
-          ]
-        }
-      ],
       '@typescript-eslint/consistent-type-imports': [
         'error',
         { prefer: 'type-imports', fixStyle: 'inline-type-imports' }
@@ -108,8 +148,28 @@ export default tseslint.config(
     }
   },
   {
+    name: 'javascript',
+    files: JAVASCRIPT_GLOBS,
+    extends: [js.configs.recommended],
+    languageOptions: {
+      sourceType: 'module',
+      ecmaVersion: 'latest',
+      globals: {
+        ...globals.es2024
+      }
+    },
+    plugins: {
+      import: importPlugin
+    },
+    rules: {
+      ...importRecommendedRules,
+      ...sharedImportRuleConfig,
+      'no-console': ['warn', { allow: ['warn', 'error'] }]
+    }
+  },
+  {
     name: 'react-app',
-    files: ['apps/web/**/*.{ts,tsx,jsx}'],
+    files: ['apps/web/**/*.{ts,tsx,js,jsx}'],
     languageOptions: {
       parserOptions: {
         ecmaFeatures: { jsx: true }
@@ -152,15 +212,15 @@ export default tseslint.config(
   {
     name: 'node-workspaces',
     files: [
-      'services/**/*.{ts,tsx,js}',
-      'packages/**/*.{ts,tsx,js}',
-      'infrastructure/**/*.{ts,tsx,js}',
-      'tools/**/*.{ts,tsx,js}'
+      'services/**/*.{ts,tsx,js,jsx}',
+      'packages/**/*.{ts,tsx,js,jsx}',
+      'infrastructure/**/*.{ts,tsx,js,jsx}',
+      'tools/**/*.{ts,tsx,js,jsx}'
     ],
-    languageOptions: {
-      globals: {
-        ...globals.node,
-        ...globals.es2024
+    extends: [nodePlugin.configs['flat/recommended-module']],
+    settings: {
+      n: {
+        tryExtensions: ['.js', '.jsx', '.ts', '.tsx', '.d.ts', '.mjs', '.cjs']
       }
     },
     rules: {
@@ -168,17 +228,27 @@ export default tseslint.config(
     }
   },
   {
-    name: 'tests',
-    files: [
-      '**/*.test.{ts,tsx,js}',
-      '**/*.spec.{ts,tsx,js}',
-      'tests/**/*.{ts,tsx,js}',
-      'e2e/**/*.{ts,tsx}'
-    ],
-    extends: [
-      testingLibraryPlugin.configs['flat/react'],
-      playwrightPlugin.configs['flat/recommended']
-    ],
+    name: 'jest-tests',
+    files: JEST_TEST_GLOBS,
+    ignores: PLAYWRIGHT_GLOBS,
+    extends: [jestPlugin.configs['flat/recommended']],
+    languageOptions: {
+      globals: {
+        ...globals.jest,
+        ...globals.node,
+        ...globals.es2024
+      }
+    }
+  },
+  {
+    name: 'react-testing-library',
+    files: REACT_TEST_GLOBS,
+    extends: [testingLibraryPlugin.configs['flat/react']]
+  },
+  {
+    name: 'playwright-tests',
+    files: PLAYWRIGHT_GLOBS,
+    extends: [playwrightPlugin.configs['flat/recommended']],
     languageOptions: {
       globals: {
         ...globals.browser,

@@ -1,140 +1,178 @@
-import { GraphQLContext } from '../types/context'
+import { UserRole, type User } from '@auteurium/shared-types'
 import { Logger } from '@aws-lambda-powertools/logger'
 import { CognitoJwtVerifier } from 'aws-jwt-verify'
-import { User, UserRole } from '@auteurium/shared-types'
-import { getUserById, createUser } from '../database/users'
+
+import { createUser, getUserById } from '../database/users'
+import { createAuthError } from '../utils/errors'
+
+import type { GraphQLContext } from '../types/context'
+import type { AppSyncIdentityCognito, AppSyncResolverEvent } from 'aws-lambda'
 
 const logger = new Logger({ serviceName: 'auteurium-api' })
 
-// Create Cognito JWT verifier instance (used as a fallback when identity isn't populated)
 const verifier = CognitoJwtVerifier.create({
-  userPoolId: process.env.USER_POOL_ID!,
+  userPoolId: process.env.USER_POOL_ID ?? '',
   tokenUse: 'access',
-  clientId: process.env.USER_POOL_CLIENT_ID!
+  clientId: process.env.USER_POOL_CLIENT_ID ?? ''
 })
 
-const buildRole = (rawRole?: unknown): UserRole => {
-  if (rawRole === UserRole.ADMIN || rawRole === 'admin') {
-    return UserRole.ADMIN
-  }
-  return UserRole.STANDARD
-}
+const buildRole = (rawRole: unknown): UserRole =>
+  rawRole === UserRole.ADMIN || rawRole === 'admin' ? UserRole.ADMIN : UserRole.STANDARD
 
-const ensureUserRecord = async (userId: string, email: string, name: string, role: UserRole): Promise<User> => {
-  let user: User | null = null
-
+const ensureUserRecord = async (
+  userId: string,
+  email: string,
+  name: string,
+  role: UserRole
+): Promise<User> => {
   try {
-    user = await getUserById(userId)
-  } catch (dbLookupError) {
-    logger.error('Failed to fetch user from database', {
+    const existingUser = await getUserById(userId)
+    if (existingUser) {
+      return existingUser
+    }
+  } catch (lookupError) {
+    logger.warn('User lookup failed, continuing with fallback user', {
       userId,
-      error: dbLookupError instanceof Error ? dbLookupError.message : dbLookupError
+      error: lookupError instanceof Error ? lookupError.message : lookupError
     })
   }
 
-  if (!user) {
-    try {
-      user = await createUser({ id: userId, email, name, role })
-      logger.info('Created new user in database', { userId: user.id, email: user.email, role: user.role })
-    } catch (createUserError) {
-      logger.error('Failed to create user in database', {
-        userId,
-        email,
-        error: createUserError instanceof Error ? createUserError.message : createUserError
-      })
-    }
-  }
-
-  if (!user) {
-    const fallbackTimestamp = new Date().toISOString()
-    user = {
-      id: userId,
+  try {
+    const createdUser = await createUser({ id: userId, email, name, role })
+    logger.info('Created user during authentication', {
+      userId: createdUser.id,
+      email: createdUser.email,
+      role: createdUser.role
+    })
+    return createdUser
+  } catch (createError) {
+    logger.error('Failed to persist authenticated user, using fallback object', {
+      userId,
       email,
-      name,
-      role,
-      createdAt: fallbackTimestamp,
-      updatedAt: fallbackTimestamp
-    }
+      error: createError instanceof Error ? createError.message : createError
+    })
   }
 
-  return user
+  const fallbackTimestamp = new Date().toISOString()
+  return {
+    id: userId,
+    email,
+    name,
+    role,
+    createdAt: fallbackTimestamp,
+    updatedAt: fallbackTimestamp
+  }
 }
 
-export async function validateToken(token: string): Promise<User | undefined> {
+const extractUserFromIdentity = async (
+  identity: AppSyncIdentityCognito,
+  requestId: string
+): Promise<User | undefined> => {
+  const claims = (identity.claims ?? {}) as Record<string, unknown>
+  const userId = String(identity.sub)
+  const email = typeof claims.email === 'string' ? claims.email : String(identity.username ?? '')
+  const rawName =
+    typeof claims.name === 'string'
+      ? claims.name
+      : typeof claims.email === 'string'
+        ? claims.email
+        : typeof identity.username === 'string'
+          ? identity.username
+          : 'Unknown User'
+  const name = rawName.trim() === '' ? 'Unknown User' : rawName
+  const role = buildRole(claims['custom:role'])
+
   try {
-    // Verify and decode the JWT token - auto-create users in DB
-    const payload = await verifier.verify(token)
-
-    const userId = String(payload.sub || '')
-    const email = String(payload.email || payload.username || '')
-    const name = String(payload.name || payload.email || payload.username || 'Unknown User')
-    const role = buildRole(payload['custom:role'])
-
-    const user = await ensureUserRecord(userId, email, name, role)
-
-    logger.info('Token validated successfully', {
-      userId: user.id,
-      email: user.email,
-      role: user.role
-    })
-
-    return user
+    return await ensureUserRecord(userId, email, name, role)
   } catch (error) {
-    logger.error('Token validation failed', {
-      error: error instanceof Error ? error.message : 'Unknown error'
+    logger.error('Failed to build user from identity claims', {
+      requestId,
+      error: error instanceof Error ? error.message : error
     })
     return undefined
   }
 }
 
-export async function createContext(event: any): Promise<GraphQLContext> {
-  const requestId = event.requestContext?.requestId || 'unknown'
-  
+const getAuthorizationHeader = (event: AppSyncEvent): string | undefined => {
+  const headers = {
+    ...event.request?.headers,
+    ...('headers' in event ? (event as { headers?: Record<string, string | undefined> }).headers : undefined)
+  }
+
+  return headers?.Authorization ?? headers?.authorization
+}
+
+export const validateToken = async (token: string): Promise<User | undefined> => {
   try {
-    // Preferred path: leverage AppSync identity (already verified by Cognito User Pool auth)
+    const payload = await verifier.verify(token)
+
+    const userId = String(payload.sub ?? '')
+    const emailValue = typeof payload.email === 'string' ? payload.email : (typeof payload.username === 'string' ? payload.username : '')
+    const email = String(emailValue)
+    const nameValue = typeof payload.name === 'string' ? payload.name : (typeof payload.email === 'string' ? payload.email : (typeof payload.username === 'string' ? payload.username : 'Unknown User'))
+    const rawName = String(nameValue)
+    const name = rawName.trim() === '' ? 'Unknown User' : rawName
+    const role = buildRole(payload['custom:role'])
+
+    return await ensureUserRecord(userId, email, name, role)
+  } catch (error) {
+    logger.error('Token validation failed', {
+      error: error instanceof Error ? error.message : error
+    })
+    return undefined
+  }
+}
+
+export type AppSyncEvent = AppSyncResolverEvent<Record<string, unknown>, GraphQLContext>
+
+export const createContext = async (event: AppSyncEvent): Promise<GraphQLContext> => {
+  const ctx = event.requestContext as { requestId?: string } | undefined
+  const requestId = (ctx && typeof ctx.requestId === 'string') ? ctx.requestId : 'unknown'
+
+  try {
     const identity = event.identity
 
-    if (identity?.sub) {
-      const claims = identity.claims || {}
-      const userId = String(identity.sub)
-      const email = String(claims.email || identity.username || '')
-      const name = String(claims.name || claims.email || identity.username || 'Unknown User')
-      const role = buildRole(claims['custom:role'])
+    if (identity && 'sub' in identity && typeof identity.sub === 'string') {
+      const cognitoIdentity = identity as AppSyncIdentityCognito
+      const user = await extractUserFromIdentity(cognitoIdentity, requestId)
 
-      const user = await ensureUserRecord(userId, email, name, role)
+      if (!user) {
+        throw createAuthError('Unable to derive user from identity claims')
+      }
 
       return {
         user,
-        isAdmin: user.role === UserRole.ADMIN,
+        isAdmin: user.role === (UserRole.ADMIN as string),
         requestId,
         logger
       }
     }
 
-    const authHeader = event.headers?.Authorization || event.headers?.authorization
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return {
-        requestId,
-        isAdmin: false,
-        logger
-      }
-    }
+    const authHeader = getAuthorizationHeader(event)
 
-    const token = authHeader.substring(7)
+  if (!authHeader?.startsWith('Bearer ')) {
+    return {
+      requestId,
+      isAdmin: false,
+      logger
+    }
+  }
+
+    const token = authHeader.slice('Bearer '.length)
     const user = await validateToken(token)
-    
+
     return {
       user,
-      isAdmin: user?.role === UserRole.ADMIN,
+      isAdmin: (user?.role ?? UserRole.STANDARD) === UserRole.ADMIN,
       requestId,
       logger
     }
   } catch (error) {
     logger.error('Authentication error', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      requestId
+      requestId,
+      error: error instanceof Error ? error.message : error
     })
+
     return {
       requestId,
       isAdmin: false,

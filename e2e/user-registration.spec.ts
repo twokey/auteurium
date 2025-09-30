@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+
 import { generateTestData, clearBrowserStorage, waitForAppLoad } from './utils/test-helpers';
 
 test.describe('User Registration with Deployed Backend', () => {

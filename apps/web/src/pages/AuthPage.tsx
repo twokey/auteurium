@@ -12,7 +12,7 @@ export const AuthPage = () => {
     // Try to restore view from sessionStorage
     try {
       const saved = sessionStorage.getItem('authPageView')
-      return (saved as AuthView) || 'login'
+      return (saved as AuthView | null) ?? 'login'
     } catch {
       return 'login'
     }
@@ -21,7 +21,7 @@ export const AuthPage = () => {
   const [pendingEmail, setPendingEmail] = useState(() => {
     // Try to restore email from sessionStorage
     try {
-      return sessionStorage.getItem('authPageEmail') || ''
+      return sessionStorage.getItem('authPageEmail') ?? ''
     } catch {
       return ''
     }

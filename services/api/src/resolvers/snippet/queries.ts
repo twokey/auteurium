@@ -1,14 +1,15 @@
-import { GraphQLContext } from '../../types/context'
-import { Snippet, SnippetVersion } from '@auteurium/shared-types'
-import {
-  getSnippet,
-  getProjectSnippets,
-  getUserSnippets,
-  getSnippetVersions
-} from '../../database/snippets'
-import { requireAuth, requireOwnership, enforceContentPrivacy } from '../../middleware/validation'
-import { validateInput, idValidation, paginationValidation } from '../../middleware/validation'
+import { type Snippet, type SnippetVersion } from '@auteurium/shared-types'
 import { z } from 'zod'
+
+import {
+  getProjectSnippets,
+  getSnippet,
+  getSnippetVersions,
+  getUserSnippets
+} from '../../database/snippets'
+import { enforceContentPrivacy, paginationValidation, requireAuth, validateInput } from '../../middleware/validation'
+
+import type { GraphQLContext } from '../../types/context'
 
 // Validation schemas
 const getSnippetSchema = z.object({
@@ -32,8 +33,8 @@ const getSnippetVersionsSchema = z.object({
 export const snippetQueries = {
   // Get a single snippet by ID
   snippet: async (
-    _parent: any,
-    args: any,
+    _parent: unknown,
+    args: unknown,
     context: GraphQLContext
   ): Promise<Snippet | null> => {
     const { projectId, snippetId } = validateInput(getSnippetSchema, args)
@@ -53,8 +54,8 @@ export const snippetQueries = {
 
   // Get all snippets for a project
   projectSnippets: async (
-    _parent: any,
-    args: any,
+    _parent: unknown,
+    args: unknown,
     context: GraphQLContext
   ): Promise<Snippet[]> => {
     const { projectId } = validateInput(getProjectSnippetsSchema, args)
@@ -68,8 +69,8 @@ export const snippetQueries = {
 
   // Get all snippets for the authenticated user
   mySnippets: async (
-    _parent: any,
-    args: any,
+    _parent: unknown,
+    args: unknown,
     context: GraphQLContext
   ): Promise<{ snippets: Snippet[], lastKey?: string }> => {
     const { limit = 20, offset = 0, lastKey } = validateInput(getUserSnippetsSchema, args)
@@ -87,8 +88,8 @@ export const snippetQueries = {
 
   // Get versions for a snippet
   snippetVersions: async (
-    _parent: any,
-    args: any,
+    _parent: unknown,
+    args: unknown,
     context: GraphQLContext
   ): Promise<SnippetVersion[]> => {
     const { snippetId } = validateInput(getSnippetVersionsSchema, args)

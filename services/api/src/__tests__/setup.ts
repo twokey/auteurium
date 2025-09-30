@@ -1,5 +1,3 @@
-import { DynamoDB } from 'aws-sdk'
-
 // Mock AWS SDK for tests
 jest.mock('aws-sdk', () => ({
   DynamoDB: {

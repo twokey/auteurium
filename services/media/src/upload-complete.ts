@@ -1,9 +1,10 @@
-import { S3Handler } from 'aws-lambda'
 import { Logger } from '@aws-lambda-powertools/logger'
+
+import type { S3Handler } from 'aws-lambda'
 
 const logger = new Logger({ serviceName: 'auteurium-media' })
 
-export const handler: S3Handler = async (event) => {
+export const handler: S3Handler = (event) => {
   try {
     for (const record of event.Records) {
       const bucketName = record.s3.bucket.name

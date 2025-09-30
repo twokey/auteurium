@@ -1,45 +1,46 @@
 import { test, expect } from '@playwright/test';
+
 import { getReusableCredentials, saveTestCredential, updateCredentialStatus } from './utils/test-helpers';
 import { CredentialManager } from './utils/credential-manager';
 
 test('Registration Debug Test with Credential Management', async ({ page }) => {
-  console.log('🎯 Starting registration debug test with enhanced logging and credential management');
+  console.warn('🎯 Starting registration debug test with enhanced logging and credential management');
 
   // Print existing credential summary
   CredentialManager.printCredentialSummary();
 
   // Get or create credentials
   const testData = getReusableCredentials();
-  console.log(`📧 Using email: ${testData.email}, reused: ${testData.isReused}`);
+  console.warn(`📧 Using email: ${testData.email}, reused: ${testData.isReused}`);
 
   // Capture console messages and errors
   const consoleMessages: string[] = [];
   page.on('console', msg => {
     const text = `[${msg.type()}] ${msg.text()}`;
     consoleMessages.push(text);
-    console.log(`🖥️ Browser: ${text}`);
+    console.warn(`🖥️ Browser: ${text}`);
   });
 
   page.on('pageerror', error => {
-    console.log(`💥 Page Error: ${error.message}`);
+    console.warn(`💥 Page Error: ${error.message}`);
   });
 
   // Navigate to app
   await page.goto('http://localhost:3000');
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
 
   // Verify auth page loads
   await expect(page.locator('h1', { hasText: 'Auteurium' })).toBeVisible();
-  console.log('✅ Auth page loaded successfully');
+  console.warn('✅ Auth page loaded successfully');
 
   // Switch to registration if needed (start with login by default)
   const signUpLink = page.locator('text=Sign up');
   if (await signUpLink.isVisible()) {
     await signUpLink.click();
-    await page.waitForTimeout(1000);
-    console.log('🔄 Switched to registration form');
+    await page.waitForLoadState('domcontentloaded');
+    console.warn('🔄 Switched to registration form');
   } else {
-    console.log('❌ Sign up link not found');
+    console.warn('❌ Sign up link not found');
     await page.screenshot({ path: `no-signup-link-${Date.now()}.png`, fullPage: true });
   }
 
@@ -49,21 +50,23 @@ test('Registration Debug Test with Credential Management', async ({ page }) => {
   await page.locator('input[id="password"]').fill(testData.password);
   await page.locator('input[id="confirmPassword"]').fill(testData.password);
 
-  console.log('📝 Registration form filled');
+  console.warn('📝 Registration form filled');
 
   // Submit registration
   await page.locator('button[type="submit"]', { hasText: 'Create account' }).click();
-  console.log('🚀 Registration form submitted');
+  console.warn('🚀 Registration form submitted');
 
   // Wait for response and capture everything
-  await page.waitForTimeout(8000);
+  await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {
+    console.warn('Timeout waiting for network idle');
+  });
 
   // Check for different possible outcomes
   const currentUrl = page.url();
   const bodyText = await page.textContent('body');
 
-  console.log('\n📊 REGISTRATION RESULTS:');
-  console.log('Current URL:', currentUrl);
+  console.warn('\n📊 REGISTRATION RESULTS:');
+  console.warn('Current URL:', currentUrl);
 
   // Check for confirmation page
   const hasConfirmationText = bodyText?.toLowerCase().includes('confirm') ||
@@ -80,7 +83,7 @@ test('Registration Debug Test with Credential Management', async ({ page }) => {
                          bodyText?.toLowerCase().includes('welcome');
 
   if (hasConfirmationText) {
-    console.log('✅ Registration successful - Email confirmation required');
+    console.warn('✅ Registration successful - Email confirmation required');
     if (!testData.isReused) {
       saveTestCredential(testData.email, testData.password, testData.name, 'registered', 'Awaiting email confirmation');
     } else if (testData.status === 'new') {
@@ -90,12 +93,12 @@ test('Registration Debug Test with Credential Management', async ({ page }) => {
     // Check if there's a confirmation code input field
     const codeInput = page.locator('input[id="code"]');
     if (await codeInput.isVisible()) {
-      console.log('🔐 Confirmation code input is visible');
-      console.log('⚠️ Manual step required: Check email for confirmation code and enter it');
+      console.warn('🔐 Confirmation code input is visible');
+      console.warn('⚠️ Manual step required: Check email for confirmation code and enter it');
     }
 
   } else if (hasErrorText) {
-    console.log('❌ Registration failed with error');
+    console.warn('❌ Registration failed with error');
     if (!testData.isReused) {
       saveTestCredential(testData.email, testData.password, testData.name, 'failed', 'Registration error: ' + bodyText?.substring(0, 200));
     } else {
@@ -103,7 +106,7 @@ test('Registration Debug Test with Credential Management', async ({ page }) => {
     }
 
   } else if (hasSuccessText) {
-    console.log('🎉 Registration completed successfully - User logged in');
+    console.warn('🎉 Registration completed successfully - User logged in');
     if (!testData.isReused) {
       saveTestCredential(testData.email, testData.password, testData.name, 'confirmed', 'Registration completed without email verification');
     } else {
@@ -111,24 +114,24 @@ test('Registration Debug Test with Credential Management', async ({ page }) => {
     }
 
   } else {
-    console.log('❓ Unclear registration state');
-    console.log('Body text snippet:', bodyText?.substring(0, 300));
+    console.warn('❓ Unclear registration state');
+    console.warn('Body text snippet:', bodyText?.substring(0, 300));
   }
 
   // Print console messages for debugging
-  console.log('\n📋 CONSOLE MESSAGES:');
-  consoleMessages.slice(-10).forEach(msg => console.log(`  ${msg}`));
+  console.warn('\n📋 CONSOLE MESSAGES:');
+  consoleMessages.slice(-10).forEach(msg => console.warn(`  ${msg}`));
 
   // Take screenshot for manual verification
   await page.screenshot({ path: `registration-debug-${Date.now()}.png`, fullPage: true });
 
   // Print updated credential summary
-  console.log('\n📊 UPDATED CREDENTIAL SUMMARY:');
+  console.warn('\n📊 UPDATED CREDENTIAL SUMMARY:');
   CredentialManager.printCredentialSummary();
 
   // Test passes if we got a meaningful response
   expect(bodyText).toBeDefined();
   expect(currentUrl).toContain('localhost:3000');
 
-  console.log('✅ Registration debug test completed');
+  console.warn('✅ Registration debug test completed');
 });

@@ -1,11 +1,13 @@
-import { Page, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect } from '@playwright/test';
+
 import { CredentialManager } from './credential-manager';
 
 /**
  * Wait for the application to be fully loaded
  */
 export async function waitForAppLoad(page: Page) {
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
   await expect(page.locator('body')).toBeVisible();
 }
 
@@ -31,9 +33,9 @@ export async function clearBrowserStorage(page: Page) {
         sessionStorage.clear();
       }
     });
-  } catch (error) {
+  } catch (_error) {
     // Ignore localStorage errors on initial page load
-    console.log('Could not clear storage:', error);
+    console.warn('Could not clear storage');
   }
 }
 
@@ -50,10 +52,10 @@ export async function takeScreenshot(page: Page, name: string) {
 /**
  * Mock GraphQL responses for testing
  */
-export async function mockGraphQLResponse(page: Page, operation: string, response: any) {
+export async function mockGraphQLResponse(page: Page, operation: string, response: unknown) {
   await page.route('**/graphql', async (route) => {
     const request = route.request();
-    const body = request.postDataJSON();
+    const body = request.postDataJSON() as { operationName?: string } | null;
 
     if (body?.operationName === operation) {
       await route.fulfill({
@@ -71,10 +73,10 @@ export async function mockGraphQLResponse(page: Page, operation: string, respons
  * Wait for GraphQL operation to complete
  */
 export async function waitForGraphQLOperation(page: Page, operationName: string) {
-  await page.waitForResponse(response =>
-    response.url().includes('/graphql') &&
-    response.request().postDataJSON()?.operationName === operationName
-  );
+  await page.waitForResponse(response => {
+    const body = response.request().postDataJSON() as { operationName?: string } | null;
+    return response.url().includes('/graphql') && body?.operationName === operationName;
+  });
 }
 
 /**
@@ -120,7 +122,7 @@ export const getReusableCredentials = () => {
   const confirmedCreds = CredentialManager.getConfirmedCredentials()
   if (confirmedCreds.length > 0) {
     const cred = confirmedCreds[0]
-    console.log(`♻️ Reusing confirmed credential: ${cred.email}`)
+    console.warn(`♻️ Reusing confirmed credential: ${cred.email}`)
     return {
       email: cred.email,
       password: cred.password,
@@ -134,7 +136,7 @@ export const getReusableCredentials = () => {
   const registeredCreds = CredentialManager.getRegisteredCredentials()
   if (registeredCreds.length > 0) {
     const cred = registeredCreds[0]
-    console.log(`♻️ Reusing registered credential (may need confirmation): ${cred.email}`)
+    console.warn(`♻️ Reusing registered credential (may need confirmation): ${cred.email}`)
     return {
       email: cred.email,
       password: cred.password,
@@ -146,7 +148,7 @@ export const getReusableCredentials = () => {
 
   // Generate new credentials
   const newCreds = generateTestData()
-  console.log(`🆕 Generated new test credentials: ${newCreds.email}`)
+  console.warn(`🆕 Generated new test credentials: ${newCreds.email}`)
   return {
     email: newCreds.email,
     password: newCreds.password,

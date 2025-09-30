@@ -1,13 +1,16 @@
-import { APIGatewayProxyHandler } from 'aws-lambda'
-import { S3 } from 'aws-sdk'
 import { Logger } from '@aws-lambda-powertools/logger'
+import { S3 } from 'aws-sdk'
+
+import type { APIGatewayProxyHandler } from 'aws-lambda'
 
 const logger = new Logger({ serviceName: 'auteurium-media' })
 const s3 = new S3()
 
 export const handler: APIGatewayProxyHandler = async (event) => {
   try {
-    const { key, contentType } = JSON.parse(event.body || '{}')
+    const bodyStr = event.body ?? '{}'
+    const parsedBody = JSON.parse(bodyStr) as { key?: string; contentType?: string }
+    const { key, contentType } = parsedBody
     
     if (!key || !contentType) {
       return {
@@ -16,7 +19,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       }
     }
 
-    const bucketName = process.env.MEDIA_BUCKET!
+    const bucketName = process.env.MEDIA_BUCKET ?? ''
     
     // Generate presigned URL for upload
     const presignedUrl = await s3.getSignedUrlPromise('putObject', {

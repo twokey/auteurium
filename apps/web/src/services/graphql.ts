@@ -6,41 +6,58 @@ import { AuthService } from './auth'
 
 // Create HTTP link
 const httpLink = createHttpLink({
-  uri: import.meta.env.VITE_GRAPHQL_ENDPOINT || ''
+  uri: import.meta.env.VITE_GRAPHQL_ENDPOINT ?? ''
 })
 
 // Auth link to add JWT token to requests
-const authLink = setContext(async (_, { headers }) => {
+interface AuthLinkContext {
+  headers?: Record<string, string>
+}
+
+const authLink = setContext(async (_operation, context: AuthLinkContext) => {
+  const existingHeaders: Record<string, string> = context.headers
+    ? { ...context.headers }
+    : {}
+
   try {
     const token = await AuthService.getAccessToken()
 
     return {
       headers: {
-        ...headers,
+        ...existingHeaders,
         authorization: token ? `Bearer ${token}` : ''
       }
     }
   } catch (error) {
     console.error('Error getting auth token:', error)
-    return { headers }
+    return { headers: existingHeaders }
   }
 })
 
 // Error link for handling GraphQL errors
 const errorLink = onError(({ graphQLErrors, networkError }) => {
   if (graphQLErrors) {
-    graphQLErrors.forEach(({ message, locations, path }) => {
-      console.error(
-        `GraphQL error: Message: ${message}, Location: ${locations}, Path: ${path}`
-      )
+    graphQLErrors.forEach((graphQLError) => {
+      const { message, locations, path } = graphQLError
+      const formattedLocations = locations
+        ?.map(({ line, column }) => `${line}:${column}`)
+        .join(', ') ?? 'unknown'
+      const formattedPath = path?.join(' > ') ?? 'unknown'
+
+      console.error('GraphQL error', {
+        message,
+        locations: formattedLocations,
+        path: formattedPath
+      })
     })
   }
 
   if (networkError) {
     console.error('Network error:', networkError)
-    
+
     // Handle authentication errors
-    if (networkError.message.includes('401') || networkError.message.includes('Unauthorized')) {
+    const message = 'message' in networkError ? networkError.message : undefined
+    if (message && (message.includes('401') || message.includes('Unauthorized'))) {
       // TODO: Redirect to login or refresh token
       console.error('Authentication error - user may need to login again')
     }
@@ -55,7 +72,7 @@ export const apolloClient = new ApolloClient({
       Project: {
         fields: {
           snippets: {
-            merge(_existing = [], incoming) {
+            merge(_existing: unknown[] = [], incoming: unknown[]) {
               return incoming
             }
           }
@@ -64,12 +81,12 @@ export const apolloClient = new ApolloClient({
       Snippet: {
         fields: {
           connections: {
-            merge(_existing = [], incoming) {
+            merge(_existing: unknown[] = [], incoming: unknown[]) {
               return incoming
             }
           },
           versions: {
-            merge(_existing = [], incoming) {
+            merge(_existing: unknown[] = [], incoming: unknown[]) {
               return incoming
             }
           }

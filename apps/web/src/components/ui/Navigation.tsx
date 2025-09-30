@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../../hooks/useAuth'
+import { UserRole } from '../../services/auth'
 
 interface NavigationProps {
   currentProject?: {
@@ -26,6 +27,9 @@ export const Navigation = ({ currentProject }: NavigationProps) => {
   }
 
   const isOnCanvas = location.pathname.startsWith('/project/')
+  const userInitial = user?.name?.charAt(0)?.toUpperCase() ?? ''
+  const displayInitial = userInitial.trim() !== '' ? userInitial : 'U'
+  const displayName = user?.name && user.name.trim() !== '' ? user.name : 'User'
 
   return (
     <nav className="bg-white shadow-sm border-b border-gray-200">
@@ -67,10 +71,10 @@ export const Navigation = ({ currentProject }: NavigationProps) => {
               >
                 <div className="flex items-center">
                   <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
-                    {user?.name?.charAt(0).toUpperCase() || 'U'}
+                    {displayInitial}
                   </div>
                   <span className="ml-3 text-sm font-medium">
-                    {user?.name || 'User'}
+                    {displayName}
                   </span>
                   <svg
                     className="ml-2 h-4 w-4"
@@ -105,7 +109,7 @@ export const Navigation = ({ currentProject }: NavigationProps) => {
                     Dashboard
                   </button>
                   
-                  {user?.role === 'admin' && (
+                  {user?.role === UserRole.ADMIN && (
                     <button
                       onClick={() => {
                         navigate('/admin')
@@ -121,7 +125,7 @@ export const Navigation = ({ currentProject }: NavigationProps) => {
                   
                   <button
                     onClick={() => {
-                      handleSignOut()
+                      void handleSignOut()
                       setShowUserMenu(false)
                     }}
                     disabled={isLoading}

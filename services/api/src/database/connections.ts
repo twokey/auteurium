@@ -1,13 +1,41 @@
-import { dynamodb, TABLES, generateId, getCurrentTimestamp } from './client'
-import { Connection, ConnectionInput, ConnectionType } from '@auteurium/shared-types'
-import { createNotFoundError, createConflictError } from '../utils/errors'
+import { ConnectionType } from '@auteurium/shared-types'
 import { Logger } from '@aws-lambda-powertools/logger'
+
+import {
+  TABLES,
+  dynamodb,
+  generateId,
+  getCurrentTimestamp,
+  type DocumentClientType
+} from './client'
+import { createConflictError, createNotFoundError } from '../utils/errors'
+
+import type { Connection, ConnectionInput } from '@auteurium/shared-types'
 
 const logger = new Logger({ serviceName: 'connections-db' })
 
-// Connection patterns designed for Neptune transition
+const DEFAULT_QUERY_LIMIT = 100
+const DEFAULT_TRAVERSAL_DEPTH = 3
+
+interface ConditionalError {
+  code?: unknown
+}
+
+const isConditionalCheckFailed = (error: unknown): boolean =>
+  typeof error === 'object' &&
+  error !== null &&
+  'code' in error &&
+  (error as ConditionalError).code === 'ConditionalCheckFailedException'
+
+const runQuery = async (
+  params: Parameters<DocumentClientType['query']>[0]
+): Promise<Connection[]> => {
+  const result = await dynamodb.query(params).promise()
+  return (result.Items ?? []) as Connection[]
+}
+
 export interface ConnectionQueryOptions {
-  projectId: string
+  projectId?: string
   sourceSnippetId?: string
   targetSnippetId?: string
   connectionType?: ConnectionType
@@ -17,24 +45,22 @@ export interface ConnectionQueryOptions {
 export interface GraphTraversalOptions {
   snippetId: string
   direction: 'outgoing' | 'incoming' | 'both'
+  projectId?: string
   maxDepth?: number
   connectionTypes?: ConnectionType[]
 }
 
-// Create a connection between snippets
 export const createConnection = async (
   connection: ConnectionInput,
   userId: string
 ): Promise<Connection> => {
-  const connectionId = generateId()
   const timestamp = getCurrentTimestamp()
-
   const connectionRecord: Connection = {
-    id: connectionId,
+    id: generateId(),
     projectId: connection.projectId,
     sourceSnippetId: connection.sourceSnippetId,
     targetSnippetId: connection.targetSnippetId,
-    connectionType: connection.connectionType || ConnectionType.RELATED,
+    connectionType: connection.connectionType ?? ConnectionType.RELATED,
     label: connection.label,
     description: connection.description,
     metadata: connection.metadata,
@@ -44,7 +70,6 @@ export const createConnection = async (
   }
 
   try {
-    // Ensure no duplicate connections exist
     const existingConnections = await queryConnections({
       projectId: connection.projectId,
       sourceSnippetId: connection.sourceSnippetId,
@@ -55,13 +80,15 @@ export const createConnection = async (
       throw createConflictError('Connection already exists between these snippets')
     }
 
-    await dynamodb.put({
+    const params: Parameters<DocumentClientType['put']>[0] = {
       TableName: TABLES.CONNECTIONS,
       Item: connectionRecord
-    }).promise()
+    }
+
+    await dynamodb.put(params).promise()
 
     logger.info('Connection created', {
-      connectionId,
+      connectionId: connectionRecord.id,
       sourceSnippetId: connection.sourceSnippetId,
       targetSnippetId: connection.targetSnippetId,
       userId
@@ -74,119 +101,121 @@ export const createConnection = async (
   }
 }
 
-// Query connections with flexible filtering (Neptune-ready patterns)
 export const queryConnections = async (options: ConnectionQueryOptions): Promise<Connection[]> => {
+  const limit = options.limit ?? DEFAULT_QUERY_LIMIT
+
   try {
-    // If querying by source snippet, use GSI
     if (options.sourceSnippetId) {
-      const result = await dynamodb.query({
+      const params: Parameters<DocumentClientType['query']>[0] = {
         TableName: TABLES.CONNECTIONS,
         IndexName: 'SourceSnippetIndex',
         KeyConditionExpression: 'sourceSnippetId = :sourceId',
         ExpressionAttributeValues: {
           ':sourceId': options.sourceSnippetId
         },
-        Limit: options.limit || 100
-      }).promise()
+        Limit: limit
+      }
 
-      return result.Items as Connection[]
+      return runQuery(params)
     }
 
-    // If querying by target snippet, use GSI
     if (options.targetSnippetId) {
-      const result = await dynamodb.query({
+      const params: Parameters<DocumentClientType['query']>[0] = {
         TableName: TABLES.CONNECTIONS,
         IndexName: 'TargetSnippetIndex',
         KeyConditionExpression: 'targetSnippetId = :targetId',
         ExpressionAttributeValues: {
           ':targetId': options.targetSnippetId
         },
-        Limit: options.limit || 100
-      }).promise()
+        Limit: limit
+      }
 
-      return result.Items as Connection[]
+      return runQuery(params)
     }
 
-    // If querying by connection type, use GSI
     if (options.connectionType) {
-      const result = await dynamodb.query({
+      const params: Parameters<DocumentClientType['query']>[0] = {
         TableName: TABLES.CONNECTIONS,
         IndexName: 'ConnectionTypeIndex',
         KeyConditionExpression: 'connectionType = :type',
         ExpressionAttributeValues: {
           ':type': options.connectionType
         },
-        Limit: options.limit || 100
-      }).promise()
+        Limit: limit
+      }
 
-      return result.Items as Connection[]
+      return runQuery(params)
     }
 
-    // Default: query by project
-    const result = await dynamodb.query({
+    if (!options.projectId) {
+      throw new Error('projectId is required when no snippet or type filter is provided')
+    }
+
+    const params: Parameters<DocumentClientType['query']>[0] = {
       TableName: TABLES.CONNECTIONS,
       KeyConditionExpression: 'projectId = :projectId',
       ExpressionAttributeValues: {
         ':projectId': options.projectId
       },
-      Limit: options.limit || 100
-    }).promise()
+      Limit: limit
+    }
 
-    return result.Items as Connection[]
+    return runQuery(params)
   } catch (error) {
     logger.error('Failed to query connections', { error, options })
     throw error
   }
 }
 
-// Graph traversal patterns (emulating Neptune capabilities in DynamoDB)
 export const traverseGraph = async (options: GraphTraversalOptions): Promise<{
   connections: Connection[]
   relatedSnippets: string[]
 }> => {
   const visited = new Set<string>()
-  const connections: Connection[] = []
+  const discoveredConnections: Connection[] = []
   const relatedSnippets = new Set<string>()
+  const maxDepth = options.maxDepth ?? DEFAULT_TRAVERSAL_DEPTH
 
-  const traverse = async (currentSnippetId: string, currentDepth: number) => {
-    if (currentDepth >= (options.maxDepth || 3) || visited.has(currentSnippetId)) {
+  const shouldIncludeConnection = (connection: Connection) =>
+    !options.connectionTypes || options.connectionTypes.includes(connection.connectionType)
+
+  const traverse = async (currentSnippetId: string, currentDepth: number): Promise<void> => {
+    if (currentDepth >= maxDepth || visited.has(currentSnippetId)) {
       return
     }
 
     visited.add(currentSnippetId)
 
-    // Get outgoing connections
     if (options.direction === 'outgoing' || options.direction === 'both') {
-      const outgoingConnections = await queryConnections({
-        projectId: '', // We'll need to pass this properly
+      const outgoing = await queryConnections({
+        projectId: options.projectId,
         sourceSnippetId: currentSnippetId
       })
 
-      for (const connection of outgoingConnections) {
-        if (!options.connectionTypes || options.connectionTypes.includes(connection.connectionType)) {
-          connections.push(connection)
+      for (const connection of outgoing) {
+        if (shouldIncludeConnection(connection)) {
+          discoveredConnections.push(connection)
           relatedSnippets.add(connection.targetSnippetId)
 
-          if (currentDepth < (options.maxDepth || 3) - 1) {
+          if (currentDepth < maxDepth - 1) {
             await traverse(connection.targetSnippetId, currentDepth + 1)
           }
         }
       }
     }
 
-    // Get incoming connections
     if (options.direction === 'incoming' || options.direction === 'both') {
-      const incomingConnections = await queryConnections({
-        projectId: '', // We'll need to pass this properly
+      const incoming = await queryConnections({
+        projectId: options.projectId,
         targetSnippetId: currentSnippetId
       })
 
-      for (const connection of incomingConnections) {
-        if (!options.connectionTypes || options.connectionTypes.includes(connection.connectionType)) {
-          connections.push(connection)
+      for (const connection of incoming) {
+        if (shouldIncludeConnection(connection)) {
+          discoveredConnections.push(connection)
           relatedSnippets.add(connection.sourceSnippetId)
 
-          if (currentDepth < (options.maxDepth || 3) - 1) {
+          if (currentDepth < maxDepth - 1) {
             await traverse(connection.sourceSnippetId, currentDepth + 1)
           }
         }
@@ -197,68 +226,62 @@ export const traverseGraph = async (options: GraphTraversalOptions): Promise<{
   await traverse(options.snippetId, 0)
 
   return {
-    connections,
+    connections: discoveredConnections,
     relatedSnippets: Array.from(relatedSnippets)
   }
 }
 
-// Delete connection
 export const deleteConnection = async (
   projectId: string,
   connectionId: string,
   userId: string
 ): Promise<void> => {
+  const params: Parameters<DocumentClientType['delete']>[0] = {
+    TableName: TABLES.CONNECTIONS,
+    Key: {
+      projectId,
+      id: connectionId
+    },
+    ConditionExpression: 'userId = :userId',
+    ExpressionAttributeValues: {
+      ':userId': userId
+    }
+  }
+
   try {
-    await dynamodb.delete({
-      TableName: TABLES.CONNECTIONS,
-      Key: {
-        projectId,
-        id: connectionId
-      },
-      ConditionExpression: 'userId = :userId',
-      ExpressionAttributeValues: {
-        ':userId': userId
-      }
-    }).promise()
+    await dynamodb.delete(params).promise()
 
     logger.info('Connection deleted', { connectionId, userId })
-  } catch (error: any) {
-    if (error.code === 'ConditionalCheckFailedException') {
+  } catch (error) {
+    if (isConditionalCheckFailed(error)) {
       throw createNotFoundError('Connection')
     }
+
     logger.error('Failed to delete connection', { error, connectionId, userId })
     throw error
   }
 }
 
-// Delete all connections for a snippet (used in cascade deletes)
 export const deleteSnippetConnections = async (
   snippetId: string,
   userId: string
 ): Promise<void> => {
   try {
-    // Get all connections where this snippet is the source
-    const sourceConnections = await queryConnections({
-      projectId: '', // We'll pass the actual project ID
-      sourceSnippetId: snippetId
-    })
+    const sourceConnections = await queryConnections({ sourceSnippetId: snippetId })
+    const targetConnections = await queryConnections({ targetSnippetId: snippetId })
 
-    // Get all connections where this snippet is the target
-    const targetConnections = await queryConnections({
-      projectId: '', // We'll pass the actual project ID
-      targetSnippetId: snippetId
-    })
+    const uniqueConnections = new Map<string, Connection>()
+    for (const connection of [...sourceConnections, ...targetConnections]) {
+      uniqueConnections.set(connection.id, connection)
+    }
 
-    const allConnections = [...sourceConnections, ...targetConnections]
-
-    // Delete all connections
-    for (const connection of allConnections) {
+    for (const connection of uniqueConnections.values()) {
       await deleteConnection(connection.projectId, connection.id, userId)
     }
 
-    logger.info('All snippet connections deleted', {
+    logger.info('Snippet connections deleted', {
       snippetId,
-      connectionsCount: allConnections.length,
+      connectionsCount: uniqueConnections.size,
       userId
     })
   } catch (error) {
@@ -267,26 +290,24 @@ export const deleteSnippetConnections = async (
   }
 }
 
-// Future Neptune migration helpers
 export const exportConnectionsForNeptune = async (projectId: string) => {
   const connections = await queryConnections({ projectId })
 
-  // Convert to Neptune-compatible format
   const vertices = new Set<string>()
-  const edges = connections.map(conn => {
-    vertices.add(conn.sourceSnippetId)
-    vertices.add(conn.targetSnippetId)
+  const edges = connections.map((connection) => {
+    vertices.add(connection.sourceSnippetId)
+    vertices.add(connection.targetSnippetId)
 
     return {
-      id: conn.id,
-      label: conn.connectionType,
-      from: conn.sourceSnippetId,
-      to: conn.targetSnippetId,
+      id: connection.id,
+      label: connection.connectionType,
+      from: connection.sourceSnippetId,
+      to: connection.targetSnippetId,
       properties: {
-        label: conn.label,
-        description: conn.description,
-        metadata: conn.metadata,
-        createdAt: conn.createdAt
+        label: connection.label,
+        description: connection.description,
+        metadata: connection.metadata,
+        createdAt: connection.createdAt
       }
     }
   })

@@ -66,8 +66,8 @@ test.describe('Authentication', () => {
     // You might need to create one first or use the fixture
 
     const credentials = {
-      email: process.env.TEST_USER_EMAIL || 'test@auteurium.test',
-      password: process.env.TEST_USER_PASSWORD || 'TestPassword123!'
+      email: process.env.TEST_USER_EMAIL ?? 'test@auteurium.test',
+      password: process.env.TEST_USER_PASSWORD ?? 'TestPassword123!'
     };
 
     await authPage.goto();
@@ -75,7 +75,7 @@ test.describe('Authentication', () => {
     try {
       await authPage.login(credentials.email, credentials.password);
       await authPage.expectSuccessfulLogin();
-    } catch (error) {
+    } catch (_error) {
       // If login fails, the user might not exist yet
       console.warn('Login failed - user might need to be created first');
     }
@@ -91,7 +91,7 @@ test.describe('Authentication', () => {
     await expect(authPage.errorMessage).toBeVisible();
   });
 
-  test('should logout successfully', async ({ authenticatedUser, dashboardPage, page }) => {
+  test('should logout successfully', async ({ dashboardPage, page }) => {
     // This test uses the authenticatedUser fixture
     await dashboardPage.goto();
     await expect(page).toHaveURL('/');
@@ -108,7 +108,7 @@ test.describe('Authentication', () => {
     await expect(page).toHaveURL('/auth');
   });
 
-  test('should remember user session across page reloads', async ({ authenticatedUser, page }) => {
+  test('should remember user session across page reloads', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveURL('/');
 

@@ -2,23 +2,36 @@ import { Hub } from '@aws-amplify/core'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import { AuthContext, type AuthContextType } from './auth-context'
-import { AuthService, type AuthState, UserRole, type User } from '../services/auth'
+import {
+  AuthService,
+  type AuthState,
+  type SignUpResult,
+  UserRole,
+  type User
+} from '../services/auth'
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const shouldBypassAuth = import.meta.env.VITE_BYPASS_AUTH === 'true'
 
-  const bypassUser = useMemo<User>(() => ({
-    id: import.meta.env.VITE_BYPASS_AUTH_USER_ID || 'test-user',
-    email: import.meta.env.VITE_BYPASS_AUTH_EMAIL || 'tester@auteurium.dev',
-    name: import.meta.env.VITE_BYPASS_AUTH_NAME || 'Playwright Tester',
-    role: (import.meta.env.VITE_BYPASS_AUTH_ROLE as UserRole) || UserRole.STANDARD,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  }), [])
+  const bypassUser = useMemo<User>(() => {
+    const desiredRole = import.meta.env.VITE_BYPASS_AUTH_ROLE
+    const role = desiredRole && Object.values(UserRole).includes(desiredRole as UserRole)
+      ? (desiredRole as UserRole)
+      : UserRole.STANDARD
+
+    return {
+      id: import.meta.env.VITE_BYPASS_AUTH_USER_ID ?? 'test-user',
+      email: import.meta.env.VITE_BYPASS_AUTH_EMAIL ?? 'tester@auteurium.dev',
+      name: import.meta.env.VITE_BYPASS_AUTH_NAME ?? 'Playwright Tester',
+      role,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+  }, [])
 
   const [authState, setAuthState] = useState<AuthState>({
     user: shouldBypassAuth ? bypassUser : null,
-    isLoading: shouldBypassAuth ? false : true,
+    isLoading: !shouldBypassAuth,
     isAuthenticated: shouldBypassAuth,
     hasCheckedAuth: shouldBypassAuth
   })
@@ -57,14 +70,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return
     }
 
-    checkAuthState()
+    void checkAuthState()
 
     // Listen to auth events
     const unsubscribe = Hub.listen('auth', ({ payload: { event } }) => {
       switch (event) {
         case 'signIn':
         case 'cognitoHostedUI':
-          checkAuthState()
+          void checkAuthState()
           break
         case 'signOut':
           updateAuthState({
@@ -82,7 +95,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     })
 
-    return unsubscribe
+    return () => {
+      unsubscribe()
+    }
   }, [checkAuthState, shouldBypassAuth, updateAuthState])
 
   const signIn = useCallback(async (email: string, password: string) => {
@@ -105,9 +120,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isLoading: false,
         hasCheckedAuth: true
       })
-    } catch (error) {
+    } catch (error: unknown) {
       updateAuthState({ isLoading: false })
-      throw error
+      throw error instanceof Error ? error : new Error('Failed to sign in')
     }
   }, [bypassUser, shouldBypassAuth, updateAuthState])
 
@@ -131,9 +146,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         hasCheckedAuth: true
       })
       return result
-    } catch (error) {
+    } catch (error: unknown) {
       updateAuthState({ isLoading: false })
-      throw error
+      throw error instanceof Error ? error : new Error('Failed to sign up')
     }
   }, [bypassUser, shouldBypassAuth, updateAuthState])
 
@@ -156,13 +171,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isLoading: false,
         hasCheckedAuth: true
       })
-    } catch (error) {
+    } catch (error: unknown) {
       updateAuthState({
         user: null,
         isLoading: false,
         hasCheckedAuth: true
       })
-      throw error
+      throw error instanceof Error ? error : new Error('Failed to sign out')
     }
   }, [shouldBypassAuth, updateAuthState])
 
