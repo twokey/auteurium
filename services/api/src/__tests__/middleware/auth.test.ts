@@ -33,8 +33,8 @@ describe('Auth Middleware', () => {
         email: 'test@example.com',
         name: 'Test User',
         role: UserRole.STANDARD,
-        createdAt: expect.any(String),
-        updatedAt: expect.any(String)
+        createdAt: expect.any(String) as string,
+        updatedAt: expect.any(String) as string
       })
 
       expect(mockVerify).toHaveBeenCalledWith('valid-token')

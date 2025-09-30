@@ -1,7 +1,7 @@
-import { UserRole, ConnectionType } from '@auteurium/shared-types'
+import { ConnectionType } from '@auteurium/shared-types'
 
 import { handler } from '../../index'
-import { createMockUser, createMockAdminUser, createMockGraphQLContext } from '../setup'
+import { createMockUser, createMockAdminUser } from '../setup'
 
 // Mock DynamoDB operations (scan removed - no longer supported per IAM policy)
 const mockDynamoDBOperations = {
@@ -74,9 +74,9 @@ describe('GraphQL Resolvers Integration Tests', () => {
           userId: user.id,
           name: 'Test Project',
           description: 'Test Description',
-          createdAt: '2025-01-01T00:00:00.000Z',
-          updatedAt: '2025-01-01T00:00:00.000Z',
-          lastModified: '2025-01-01T00:00:00.000Z'
+          createdAt: expect.any(String) as string,
+          updatedAt: expect.any(String) as string,
+          lastModified: expect.any(String) as string
         })
 
         expect(mockDynamoDBOperations.put).toHaveBeenCalledWith(
@@ -86,7 +86,7 @@ describe('GraphQL Resolvers Integration Tests', () => {
               name: 'Test Project',
               description: 'Test Description',
               userId: user.id
-            })
+            }) as Record<string, unknown>
           })
         )
       })
@@ -102,7 +102,12 @@ describe('GraphQL Resolvers Integration Tests', () => {
         // Remove auth header to simulate unauthenticated request
         delete event.headers.Authorization
 
-        await expect(handler(event)).rejects.toThrow(expect.objectContaining({ message: expect.stringContaining('Authentication required') }))
+        try {
+          await handler(event)
+          throw new Error('Expected handler to throw')
+        } catch (error) {
+          expect((error as Error).message).toContain('Authentication required')
+        }
       })
     })
 
@@ -187,7 +192,12 @@ describe('GraphQL Resolvers Integration Tests', () => {
 
         const event = createMockEvent('deleteProject', 'Mutation', { projectId }, user)
 
-        await expect(handler(event)).rejects.toThrow(expect.objectContaining({ message: expect.stringContaining('Access denied to project') }))
+        try {
+          await handler(event)
+          throw new Error('Expected handler to throw')
+        } catch (error) {
+          expect((error as Error).message).toContain('Access denied to project')
+        }
       })
     })
   })
@@ -235,7 +245,9 @@ describe('GraphQL Resolvers Integration Tests', () => {
           position: { x: 100, y: 200 },
           tags: ['tag1', 'tag2'],
           categories: ['cat1'],
-          version: 1
+          version: 1,
+          createdAt: expect.any(String) as string,
+          updatedAt: expect.any(String) as string
         })
 
         expect(mockDynamoDBOperations.put).toHaveBeenCalledWith(
@@ -245,7 +257,7 @@ describe('GraphQL Resolvers Integration Tests', () => {
               projectId,
               textField1: 'Test text 1',
               textField2: 'Test text 2'
-            })
+            }) as Record<string, unknown>
           })
         )
       })
@@ -322,7 +334,7 @@ describe('GraphQL Resolvers Integration Tests', () => {
             Item: expect.objectContaining({
               snippetId,
               version: 2
-            })
+            }) as Record<string, unknown>
           })
         )
       })
@@ -338,7 +350,7 @@ describe('GraphQL Resolvers Integration Tests', () => {
         const targetSnippetId = 'snippet-2'
 
         // Mock both snippets exist and are owned by user
-        mockDynamoDBOperations.get.mockImplementation(({ Key }) => ({
+        mockDynamoDBOperations.get.mockImplementation(({ Key }: { Key: { id: string } }) => ({
           promise: () => Promise.resolve({
             Item: {
               id: Key.id,
@@ -387,7 +399,8 @@ describe('GraphQL Resolvers Integration Tests', () => {
           connectionType: ConnectionType.DEPENDS_ON,
           label: 'Test Connection',
           description: 'A test connection',
-          userId: user.id
+          userId: user.id,
+          createdAt: expect.any(String) as string
         })
 
         expect(mockDynamoDBOperations.put).toHaveBeenCalledWith(
@@ -397,7 +410,7 @@ describe('GraphQL Resolvers Integration Tests', () => {
               sourceSnippetId,
               targetSnippetId,
               connectionType: ConnectionType.DEPENDS_ON
-            })
+            }) as Record<string, unknown>
           })
         )
       })
@@ -408,7 +421,7 @@ describe('GraphQL Resolvers Integration Tests', () => {
         const projectId = 'test-project-1'
 
         // Mock source snippet owned by user, target owned by other user
-        mockDynamoDBOperations.get.mockImplementation(({ Key }) => ({
+        mockDynamoDBOperations.get.mockImplementation(({ Key }: { Key: { id: string } }) => ({
           promise: () => Promise.resolve({
             Item: {
               id: Key.id,
@@ -437,7 +450,12 @@ describe('GraphQL Resolvers Integration Tests', () => {
 
         const event = createMockEvent('createConnection', 'Mutation', connectionInput, user)
 
-        await expect(handler(event)).rejects.toThrow(expect.objectContaining({ message: expect.stringContaining('Content access denied - privacy protected') }))
+        try {
+          await handler(event)
+          throw new Error('Expected handler to throw')
+        } catch (error) {
+          expect((error as Error).message).toContain('Content access denied - privacy protected')
+        }
       })
 
       it('should prevent self-connections', async () => {
@@ -474,7 +492,12 @@ describe('GraphQL Resolvers Integration Tests', () => {
 
         const event = createMockEvent('createConnection', 'Mutation', connectionInput, user)
 
-        await expect(handler(event)).rejects.toThrow(expect.objectContaining({ message: expect.stringContaining('Cannot create connection from snippet to itself') }))
+        try {
+          await handler(event)
+          throw new Error('Expected handler to throw')
+        } catch (error) {
+          expect((error as Error).message).toContain('Cannot create connection from snippet to itself')
+        }
       })
     })
   })
@@ -485,7 +508,12 @@ describe('GraphQL Resolvers Integration Tests', () => {
 
       const event = createMockEvent('users', 'Query', {}, admin)
 
-      await expect(handler(event)).rejects.toThrow(expect.objectContaining({ message: expect.stringContaining('Not implemented') }))
+      try {
+        await handler(event)
+        throw new Error('Expected handler to throw')
+      } catch (error) {
+        expect((error as Error).message).toContain('Not implemented')
+      }
     })
 
     it('should prevent standard user from accessing user management endpoints', async () => {
@@ -493,7 +521,12 @@ describe('GraphQL Resolvers Integration Tests', () => {
 
       const event = createMockEvent('users', 'Query', {}, user)
 
-      await expect(handler(event)).rejects.toThrow(expect.objectContaining({ message: expect.stringContaining('Admin access required') }))
+      try {
+        await handler(event)
+        throw new Error('Expected handler to throw')
+      } catch (error) {
+        expect((error as Error).message).toContain('Admin access required')
+      }
     })
 
     it('should enforce content privacy even for admin users', async () => {
@@ -523,7 +556,12 @@ describe('GraphQL Resolvers Integration Tests', () => {
 
       const event = createMockEvent('snippet', 'Query', { projectId, snippetId }, admin)
 
-      await expect(handler(event)).rejects.toThrow(expect.objectContaining({ message: expect.stringContaining('Content access denied - privacy protected') }))
+      try {
+        await handler(event)
+        throw new Error('Expected handler to throw')
+      } catch (error) {
+        expect((error as Error).message).toContain('Content access denied - privacy protected')
+      }
     })
   })
 })

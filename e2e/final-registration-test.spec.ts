@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test'
+
 import { generateTestData } from './utils/test-helpers';
 
 test('Final User Registration Test', async ({ page }) => {

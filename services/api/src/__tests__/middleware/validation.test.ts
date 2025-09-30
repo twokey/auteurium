@@ -37,9 +37,12 @@ describe('Validation Middleware', () => {
       const invalidInput = { name: 'Test', age: 'not-a-number' }
 
       expect(() => validateInput(schema, invalidInput)).toThrow(AppError)
-      expect(() => validateInput(schema, invalidInput)).toThrow(expect.objectContaining({
-        code: ErrorCode.VALIDATION_ERROR
-      }))
+      try {
+        validateInput(schema, invalidInput)
+      } catch (error) {
+        expect(error).toBeInstanceOf(AppError)
+        expect((error as AppError).code).toBe(ErrorCode.VALIDATION_ERROR)
+      }
     })
   })
 
@@ -53,9 +56,12 @@ describe('Validation Middleware', () => {
 
     it('should throw auth error when not authenticated', () => {
       expect(() => requireAuth(undefined)).toThrow(AppError)
-      expect(() => requireAuth(undefined)).toThrow(expect.objectContaining({
-        code: ErrorCode.AUTHENTICATION_REQUIRED
-      }))
+      try {
+        requireAuth(undefined)
+      } catch (error) {
+        expect(error).toBeInstanceOf(AppError)
+        expect((error as AppError).code).toBe(ErrorCode.AUTHENTICATION_REQUIRED)
+      }
     })
   })
 
@@ -68,18 +74,24 @@ describe('Validation Middleware', () => {
 
     it('should throw auth error for unauthenticated user', () => {
       expect(() => requireAdmin(undefined)).toThrow(AppError)
-      expect(() => requireAdmin(undefined)).toThrow(expect.objectContaining({
-        code: ErrorCode.AUTHENTICATION_REQUIRED
-      }))
+      try {
+        requireAdmin(undefined)
+      } catch (error) {
+        expect(error).toBeInstanceOf(AppError)
+        expect((error as AppError).code).toBe(ErrorCode.AUTHENTICATION_REQUIRED)
+      }
     })
 
     it('should throw forbidden error for non-admin user', () => {
       const mockUser = createMockUser()
 
       expect(() => requireAdmin(mockUser)).toThrow(AppError)
-      expect(() => requireAdmin(mockUser)).toThrow(expect.objectContaining({
-        code: ErrorCode.FORBIDDEN
-      }))
+      try {
+        requireAdmin(mockUser)
+      } catch (error) {
+        expect(error).toBeInstanceOf(AppError)
+        expect((error as AppError).code).toBe(ErrorCode.FORBIDDEN)
+      }
     })
   })
 
@@ -95,16 +107,22 @@ describe('Validation Middleware', () => {
       const mockUser = createMockUser()
 
       expect(() => requireOwnership(mockUser, 'different-user-id', 'project')).toThrow(AppError)
-      expect(() => requireOwnership(mockUser, 'different-user-id', 'project')).toThrow(expect.objectContaining({
-        code: ErrorCode.FORBIDDEN
-      }))
+      try {
+        requireOwnership(mockUser, 'different-user-id', 'project')
+      } catch (error) {
+        expect(error).toBeInstanceOf(AppError)
+        expect((error as AppError).code).toBe(ErrorCode.FORBIDDEN)
+      }
     })
 
     it('should throw auth error for unauthenticated user', () => {
       expect(() => requireOwnership(undefined, 'any-user-id', 'project')).toThrow(AppError)
-      expect(() => requireOwnership(undefined, 'any-user-id', 'project')).toThrow(expect.objectContaining({
-        code: ErrorCode.AUTHENTICATION_REQUIRED
-      }))
+      try {
+        requireOwnership(undefined, 'any-user-id', 'project')
+      } catch (error) {
+        expect(error).toBeInstanceOf(AppError)
+        expect((error as AppError).code).toBe(ErrorCode.AUTHENTICATION_REQUIRED)
+      }
     })
   })
 
@@ -120,17 +138,23 @@ describe('Validation Middleware', () => {
       const mockAdmin = createMockAdminUser()
 
       expect(() => enforceContentPrivacy(mockAdmin, 'different-user-id')).toThrow(AppError)
-      expect(() => enforceContentPrivacy(mockAdmin, 'different-user-id')).toThrow(expect.objectContaining({
-        code: ErrorCode.FORBIDDEN,
-        message: 'Content access denied - privacy protected'
-      }))
+      try {
+        enforceContentPrivacy(mockAdmin, 'different-user-id')
+      } catch (error) {
+        expect(error).toBeInstanceOf(AppError)
+        expect((error as AppError).code).toBe(ErrorCode.FORBIDDEN)
+        expect((error as AppError).message).toBe('Content access denied - privacy protected')
+      }
     })
 
     it('should throw auth error for unauthenticated user', () => {
       expect(() => enforceContentPrivacy(undefined, 'any-user-id')).toThrow(AppError)
-      expect(() => enforceContentPrivacy(undefined, 'any-user-id')).toThrow(expect.objectContaining({
-        code: ErrorCode.AUTHENTICATION_REQUIRED
-      }))
+      try {
+        enforceContentPrivacy(undefined, 'any-user-id')
+      } catch (error) {
+        expect(error).toBeInstanceOf(AppError)
+        expect((error as AppError).code).toBe(ErrorCode.AUTHENTICATION_REQUIRED)
+      }
     })
   })
 
@@ -141,10 +165,13 @@ describe('Validation Middleware', () => {
 
     it('should throw forbidden error when user does not own resource', () => {
       expect(() => validateUserOwnership('user-id', 'different-user-id', 'project')).toThrow(AppError)
-      expect(() => validateUserOwnership('user-id', 'different-user-id', 'project')).toThrow(expect.objectContaining({
-        code: ErrorCode.FORBIDDEN,
-        message: 'Access denied to project'
-      }))
+      try {
+        validateUserOwnership('user-id', 'different-user-id', 'project')
+      } catch (error) {
+        expect(error).toBeInstanceOf(AppError)
+        expect((error as AppError).code).toBe(ErrorCode.FORBIDDEN)
+        expect((error as AppError).message).toBe('Access denied to project')
+      }
     })
   })
 
