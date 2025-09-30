@@ -102,12 +102,3 @@ export const deleteUser = async (id: string): Promise<boolean> => {
     throw error
   }
 }
-
-export const getAllUsers = async (): Promise<User[]> => {
-  const params = {
-    TableName: TABLES.USERS
-  } satisfies Parameters<DocumentClientType['scan']>[0]
-
-  const result = await dynamodb.scan(params).promise()
-  return (result.Items ?? []) as User[]
-}

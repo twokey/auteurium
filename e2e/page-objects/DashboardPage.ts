@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
 import { expect } from '@playwright/test';
+import type { Page, Locator } from '@playwright/test';
 
 export class DashboardPage {
   readonly page: Page;
@@ -37,7 +37,7 @@ export class DashboardPage {
     }
 
     await modalContent.locator('[data-testid="create-project-submit"]').click();
-    await expect(this.createProjectModal).not.toBeVisible();
+    await expect(this.createProjectModal).toBeHidden();
   }
 
   async openProject(projectName: string) {
@@ -64,7 +64,7 @@ export class DashboardPage {
     await this.page.locator('button', { hasText: 'Delete' }).click();
 
     // Verify project is removed
-    await expect(projectCard).not.toBeVisible();
+    await expect(projectCard).toBeHidden();
   }
 
   async editProject(currentName: string, newName: string, newDescription?: string) {
@@ -88,7 +88,7 @@ export class DashboardPage {
     }
 
     await editModalContent.locator('[data-testid="edit-project-submit"]').click();
-    await expect(editModal).not.toBeVisible();
+    await expect(editModal).toBeHidden();
   }
 
   async expectProjectExists(projectName: string) {

@@ -1,7 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
-import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
-import { Construct } from 'constructs';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import type { Construct } from 'constructs';
 interface AuteuriumWebStackProps extends cdk.StackProps {
     stage: string;
 }

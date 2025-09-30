@@ -17,10 +17,6 @@ const getSnippetSchema = z.object({
   snippetId: z.string()
 })
 
-const getProjectSnippetsSchema = z.object({
-  projectId: z.string()
-})
-
 const getUserSnippetsSchema = z.object({
   ...paginationValidation.shape,
   lastKey: z.string().optional()

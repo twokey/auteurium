@@ -1,12 +1,13 @@
+import * as path from 'path'
+
 import * as cdk from 'aws-cdk-lib'
 import * as appsync from 'aws-cdk-lib/aws-appsync'
-import * as lambda from 'aws-cdk-lib/aws-lambda'
-import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs'
-import * as cognito from 'aws-cdk-lib/aws-cognito'
+import type * as cognito from 'aws-cdk-lib/aws-cognito'
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb'
 import * as iam from 'aws-cdk-lib/aws-iam'
-import { Construct } from 'constructs'
-import * as path from 'path'
+import * as lambda from 'aws-cdk-lib/aws-lambda'
+import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs'
+import type { Construct } from 'constructs'
 
 interface AuteuriumApiStackProps extends cdk.StackProps {
   stage: string
@@ -81,16 +82,17 @@ export class AuteuriumApiStack extends cdk.Stack {
     connectionsTable.grantReadWriteData(apiFunction)
     versionsTable.grantReadWriteData(apiFunction)
 
-    // Grant permissions to query GSIs
+    // Grant permissions to query GSIs (Query only, Scan removed for security and cost)
     apiFunction.addToRolePolicy(new iam.PolicyStatement({
       actions: [
-        'dynamodb:Query',
-        'dynamodb:Scan'
+        'dynamodb:Query'
       ],
       resources: [
         `${connectionsTable.tableArn}/index/*`,
         `${snippetsTable.tableArn}/index/*`,
-        `${versionsTable.tableArn}/index/*`
+        `${versionsTable.tableArn}/index/*`,
+        `${usersTable.tableArn}/index/*`,
+        `${projectsTable.tableArn}/index/*`
       ]
     }))
 

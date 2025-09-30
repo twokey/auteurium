@@ -69,7 +69,7 @@ export class CredentialManager {
     store.credentials.push(fullCredential)
 
     this.saveStore(store)
-    console.log(`💾 Saved credential for ${credential.email} with status: ${credential.status}`)
+    console.warn(`💾 Saved credential for ${credential.email} with status: ${credential.status}`)
   }
 
   static updateCredentialStatus(email: string, status: TestCredential['status'], notes?: string): void {
@@ -86,7 +86,7 @@ export class CredentialManager {
       }
 
       this.saveStore(store)
-      console.log(`📝 Updated credential ${email} status to: ${status}`)
+      console.warn(`📝 Updated credential ${email} status to: ${status}`)
     } else {
       console.warn(`⚠️ Credential not found for email: ${email}`)
     }
@@ -118,23 +118,23 @@ export class CredentialManager {
       lastUpdated: new Date().toISOString()
     }
     this.saveStore(store)
-    console.log('🗑️ Cleared all test credentials')
+    console.warn('🗑️ Cleared all test credentials')
   }
 
   static printCredentialSummary(): void {
     const store = this.loadStore()
-    console.log('\n📊 Test Credential Summary:')
-    console.log(`Total credentials: ${store.credentials.length}`)
-    console.log(`Confirmed: ${store.credentials.filter(c => c.status === 'confirmed').length}`)
-    console.log(`Registered (pending): ${store.credentials.filter(c => c.status === 'registered').length}`)
-    console.log(`Failed: ${store.credentials.filter(c => c.status === 'failed').length}`)
+    console.warn('\n📊 Test Credential Summary:')
+    console.warn(`Total credentials: ${store.credentials.length}`)
+    console.warn(`Confirmed: ${store.credentials.filter(c => c.status === 'confirmed').length}`)
+    console.warn(`Registered (pending): ${store.credentials.filter(c => c.status === 'registered').length}`)
+    console.warn(`Failed: ${store.credentials.filter(c => c.status === 'failed').length}`)
 
     if (store.credentials.length > 0) {
-      console.log('\nCredentials:')
+      console.warn('\nCredentials:')
       store.credentials.forEach(c => {
-        console.log(`  ${c.email} - ${c.status} (created: ${new Date(c.createdAt).toLocaleString()})`)
+        console.warn(`  ${c.email} - ${c.status} (created: ${new Date(c.createdAt).toLocaleString()})`)
       })
     }
-    console.log('')
+    console.warn('')
   }
 }

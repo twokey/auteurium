@@ -86,11 +86,7 @@ export const Canvas = () => {
   })
 
   useEffect(() => {
-    console.log('Query data updated:', {
-      loading,
-      hasProject: !!data?.project,
-      snippetCount: data?.project?.snippets?.length ?? 0
-    })
+    // Query data updated
   }, [data, loading])
 
   const [createSnippetMutation] = useMutation(CREATE_SNIPPET, {
@@ -101,8 +97,8 @@ export const Canvas = () => {
       }
     ],
     awaitRefetchQueries: true,
-    onCompleted: (data) => {
-      console.log('Snippet created successfully:', data)
+    onCompleted: () => {
+      // Snippet created successfully
     },
     onError: (error) => {
       console.error('Error creating snippet:', error)
@@ -117,15 +113,12 @@ export const Canvas = () => {
   const rawSnippets = project?.snippets
   const snippets = useMemo<Snippet[]>(() => {
     const result = rawSnippets ?? EMPTY_SNIPPET_LIST
-    console.log('Snippets from query:', result)
     return result
   }, [rawSnippets])
 
   const flowNodes = useMemo(() => {
-    console.log('Creating flow nodes from snippets:', snippets.length)
     return snippets.map((snippet) => {
       const position = snippet.position ?? { x: 0, y: 0 }
-      console.log('Creating node for snippet:', snippet.id, position)
       const snippetTitle = snippet.textField1?.trim() ? snippet.textField1 : 'Untitled snippet'
 
       return {
@@ -250,38 +243,34 @@ export const Canvas = () => {
     ? { id: normalisedProject.id, name: normalisedProject.name }
     : undefined
 
-  const handleCreateSnippet = useCallback(async (position: { x: number; y: number }) => {
+  const handleCreateSnippet = useCallback((position: { x: number; y: number }) => {
     if (!projectId) {
       console.error('Cannot create snippet: no project ID')
       return
     }
 
-    console.log('Creating snippet at position:', position, 'for project:', projectId)
-
     setIsLoading(true)
-    try {
-      const variables = {
-        input: {
-          projectId,
-          textField1: 'New Snippet',
-          textField2: 'Click to edit...',
-          position: {
-            x: position.x,
-            y: position.y
-          },
-          tags: [],
-          categories: []
-        }
+    const variables = {
+      input: {
+        projectId,
+        textField1: 'New Snippet',
+        textField2: 'Click to edit...',
+        position: {
+          x: position.x,
+          y: position.y
+        },
+        tags: [],
+        categories: []
       }
-      console.log('Mutation variables:', JSON.stringify(variables, null, 2))
-
-      const result = await createSnippetMutation({ variables })
-      console.log('Mutation result:', result)
-    } catch (error) {
-      console.error('Failed to create snippet (caught in handler):', error)
-    } finally {
-      setIsLoading(false)
     }
+
+    createSnippetMutation({ variables })
+      .catch((error) => {
+        console.error('Failed to create snippet (caught in handler):', error)
+      })
+      .finally(() => {
+        setIsLoading(false)
+      })
   }, [projectId, createSnippetMutation])
 
   const handleSaveCanvas = useCallback(() => {

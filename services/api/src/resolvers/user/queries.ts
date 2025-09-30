@@ -4,7 +4,11 @@ import type { GraphQLContext } from '../../types/context'
 import type { User } from '@auteurium/shared-types'
 
 export const userQueries = {
-  me: async (_parent: unknown, _args: unknown, context: GraphQLContext): Promise<User | null> => {
+  me: async (
+    _parent: unknown,
+    _args: unknown,
+    context: GraphQLContext
+  ): Promise<User | null> => {
     const { user, logger } = context
 
     logger.info('Fetching current user profile')
@@ -16,7 +20,11 @@ export const userQueries = {
     return user
   },
 
-  users: async (_parent: unknown, _args: unknown, context: GraphQLContext): Promise<User[]> => {
+  users: async (
+    _parent: unknown,
+    _args: unknown,
+    context: GraphQLContext
+  ): Promise<User[]> => {
     const { logger } = context
     requireAdmin(context.user)
 

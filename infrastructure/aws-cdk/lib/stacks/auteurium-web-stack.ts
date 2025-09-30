@@ -1,10 +1,11 @@
+import * as path from 'path'
+
 import * as cdk from 'aws-cdk-lib'
-import * as s3 from 'aws-cdk-lib/aws-s3'
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront'
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins'
+import * as s3 from 'aws-cdk-lib/aws-s3'
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment'
-import { Construct } from 'constructs'
-import * as path from 'path'
+import type { Construct } from 'constructs'
 
 interface AuteuriumWebStackProps extends cdk.StackProps {
   stage: string
@@ -87,9 +88,9 @@ export class AuteuriumWebStack extends cdk.Stack {
         distribution: this.distribution,
         distributionPaths: ['/*']
       })
-    } catch (error) {
+    } catch (_error) {
       // Dist folder doesn't exist yet, skip deployment
-      console.log(`Web dist folder not found at ${webAssetsPath}, skipping initial deployment`)
+      console.warn(`Web dist folder not found at ${webAssetsPath}, skipping initial deployment`)
     }
 
     // Export values

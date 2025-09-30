@@ -19,7 +19,6 @@ test.describe('User Registration with Deployed Backend', () => {
 
     // Look for register form or switch to register
     const registerButton = page.locator('text=Sign up');
-    const registerForm = page.locator('[data-testid="register-form"]');
 
     // If login form is shown, switch to register
     if (await registerButton.isVisible()) {
@@ -60,7 +59,7 @@ test.describe('User Registration with Deployed Backend', () => {
     for (const indicator of possibleSuccessIndicators) {
       if (await indicator.isVisible()) {
         registrationSuccessful = true;
-        console.log(`Registration successful - found: ${await indicator.textContent()}`);
+        console.warn(`Registration successful - found: ${await indicator.textContent()}`);
         break;
       }
     }
@@ -80,7 +79,7 @@ test.describe('User Registration with Deployed Backend', () => {
       const errorElement = page.locator(selector);
       if (await errorElement.isVisible()) {
         const errorText = await errorElement.textContent();
-        console.log(`Registration error: ${errorText}`);
+        console.warn(`Registration error: ${errorText}`);
         hasError = true;
         break;
       }
@@ -90,7 +89,7 @@ test.describe('User Registration with Deployed Backend', () => {
     if (hasError) {
       const errorText = await page.textContent('body');
       if (errorText?.includes('already exists') || errorText?.includes('UsernameExistsException')) {
-        console.log('User already exists - this confirms backend connectivity');
+        console.warn('User already exists - this confirms backend connectivity');
         registrationSuccessful = true;
       }
     }

@@ -108,3 +108,6 @@ screenshots/
 debug-*.png
 registration-*.png
 current-state.png
+
+# Analysis and review documents
+docs/aws-well-architecture-analysis-results.md

@@ -1,15 +1,16 @@
 import { test, expect } from '@playwright/test';
+
 import { generateTestData } from './utils/test-helpers';
 
 test('User Registration - Working Test', async ({ page }) => {
-  console.log('Testing user registration with fixed React app...');
+  console.warn('Testing user registration with fixed React app...');
 
   const testData = generateTestData();
-  console.log('Using test email:', testData.email);
+  console.warn('Using test email:', testData.email);
 
   // Navigate to the app
   await page.goto('http://localhost:3000');
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
 
   // Should see the auth page
   await expect(page.locator('h1', { hasText: 'Auteurium' })).toBeVisible();
@@ -43,7 +44,7 @@ test('User Registration - Working Test', async ({ page }) => {
   const submitButton = page.locator('button[type="submit"]');
   await expect(submitButton).toBeVisible();
 
-  console.log('Submitting registration form...');
+  console.warn('Submitting registration form...');
   await submitButton.click();
 
   // Wait for the registration response
@@ -51,7 +52,7 @@ test('User Registration - Working Test', async ({ page }) => {
 
   // Check for various success/error states
   const bodyText = await page.textContent('body');
-  console.log('Response received, checking results...');
+  console.warn('Response received, checking results...');
 
   // Look for success indicators
   const successIndicators = [
@@ -74,7 +75,7 @@ test('User Registration - Working Test', async ({ page }) => {
   for (const indicator of successIndicators) {
     if (bodyText?.toLowerCase().includes(indicator.toLowerCase())) {
       registrationResult = 'success';
-      console.log(`✅ Registration successful - found: ${indicator}`);
+      console.warn(`✅ Registration successful - found: ${indicator}`);
       break;
     }
   }
@@ -83,7 +84,7 @@ test('User Registration - Working Test', async ({ page }) => {
     for (const indicator of errorIndicators) {
       if (bodyText?.toLowerCase().includes(indicator.toLowerCase())) {
         registrationResult = 'error';
-        console.log(`ℹ️ Registration error (expected) - found: ${indicator}`);
+        console.warn(`ℹ️ Registration error (expected) - found: ${indicator}`);
         break;
       }
     }
@@ -95,8 +96,8 @@ test('User Registration - Working Test', async ({ page }) => {
     fullPage: true
   });
 
-  console.log('Final result:', registrationResult);
-  console.log('Body text snippet:', bodyText?.substring(0, 200));
+  console.warn('Final result:', registrationResult);
+  console.warn('Body text snippet:', bodyText?.substring(0, 200));
 
   // Test passes if we got any meaningful response (success or expected error)
   expect(['success', 'error']).toContain(registrationResult);

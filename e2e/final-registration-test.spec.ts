@@ -2,30 +2,30 @@ import { test, expect } from '@playwright/test';
 import { generateTestData } from './utils/test-helpers';
 
 test('Final User Registration Test', async ({ page }) => {
-  console.log('🎯 Final user registration test with full AWS Cognito integration');
+  console.warn('🎯 Final user registration test with full AWS Cognito integration');
 
   const testData = generateTestData();
-  console.log('Test user:', testData.email);
+  console.warn('Test user:', testData.email);
 
   // Capture console messages and errors
   const consoleMessages: string[] = [];
   page.on('console', msg => {
     const text = `[${msg.type()}] ${msg.text()}`;
     consoleMessages.push(text);
-    console.log(text);
+    console.warn(text);
   });
 
   page.on('pageerror', error => {
-    console.log(`[PAGE ERROR] ${error.message}`);
+    console.warn(`[PAGE ERROR] ${error.message}`);
   });
 
   // Navigate to app
   await page.goto('http://localhost:3000');
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
 
   // Verify auth page loads
   await expect(page.locator('h1', { hasText: 'Auteurium' })).toBeVisible();
-  console.log('✅ Auth page loaded');
+  console.warn('✅ Auth page loaded');
 
   // Switch to registration if needed
   const registerLink = page.locator('text=Create an account');
@@ -40,11 +40,11 @@ test('Final User Registration Test', async ({ page }) => {
   await page.locator('input[placeholder*="Create a password"]').fill(testData.password);
   await page.locator('input[placeholder*="Confirm"]').fill(testData.password);
 
-  console.log('✅ Registration form filled');
+  console.warn('✅ Registration form filled');
 
   // Submit registration
   await page.locator('button', { hasText: 'Create account' }).click();
-  console.log('🚀 Registration submitted');
+  console.warn('🚀 Registration submitted');
 
   // Wait for response
   await page.waitForTimeout(10000);
@@ -53,9 +53,9 @@ test('Final User Registration Test', async ({ page }) => {
   const finalUrl = page.url();
   const finalContent = await page.textContent('body');
 
-  console.log('📊 RESULTS:');
-  console.log('Final URL:', finalUrl);
-  console.log('Content keywords:',
+  console.warn('📊 RESULTS:');
+  console.warn('Final URL:', finalUrl);
+  console.warn('Content keywords:',
     finalContent?.toLowerCase().includes('email') ? '📧 Email' : '',
     finalContent?.toLowerCase().includes('confirm') ? '✅ Confirm' : '',
     finalContent?.toLowerCase().includes('error') ? '❌ Error' : '',
@@ -69,5 +69,5 @@ test('Final User Registration Test', async ({ page }) => {
   expect(finalContent).toBeDefined();
   expect(finalUrl).toContain('localhost:3000');
 
-  console.log('🎉 User registration test completed successfully!');
+  console.warn('🎉 User registration test completed successfully!');
 });

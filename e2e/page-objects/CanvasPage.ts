@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
 import { expect } from '@playwright/test';
+import type { Page, Locator } from '@playwright/test';
 
 export class CanvasPage {
   readonly page: Page;
@@ -46,7 +46,7 @@ export class CanvasPage {
     await this.snippetContentInput.fill(content);
     await this.saveSnippetButton.click();
 
-    await expect(this.snippetModal).not.toBeVisible();
+    await expect(this.snippetModal).toBeHidden();
 
     // If position specified, drag snippet to that position
     if (x !== undefined && y !== undefined) {
@@ -64,7 +64,7 @@ export class CanvasPage {
     await this.snippetContentInput.fill(newContent);
     await this.saveSnippetButton.click();
 
-    await expect(this.snippetModal).not.toBeVisible();
+    await expect(this.snippetModal).toBeHidden();
   }
 
   async deleteSnippet(title: string) {
@@ -79,7 +79,7 @@ export class CanvasPage {
     await this.page.locator('button', { hasText: 'Delete' }).click();
 
     // Verify snippet is removed
-    await expect(snippet).not.toBeVisible();
+    await expect(snippet).toBeHidden();
   }
 
   async connectSnippets(sourceTitle: string, targetTitle: string, connectionLabel?: string) {
@@ -102,7 +102,7 @@ export class CanvasPage {
     }
 
     await this.page.locator('button', { hasText: 'Create Connection' }).click();
-    await expect(connectionModal).not.toBeVisible();
+    await expect(connectionModal).toBeHidden();
   }
 
   async zoomIn() {

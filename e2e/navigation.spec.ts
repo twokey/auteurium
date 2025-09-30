@@ -3,7 +3,7 @@ import { generateTestData } from './utils/test-helpers';
 
 test.describe('Navigation', () => {
   test('should navigate between pages when authenticated', async ({
-    authenticatedUser,
+    authenticatedUser: _authenticatedUser,
     page
   }) => {
     // Start at dashboard
@@ -38,7 +38,7 @@ test.describe('Navigation', () => {
   });
 
   test('should handle direct project URLs', async ({
-    authenticatedUser,
+    authenticatedUser: _authenticatedUser,
     page
   }) => {
     const testData = generateTestData();
@@ -66,7 +66,7 @@ test.describe('Navigation', () => {
   });
 
   test('should handle invalid project URLs', async ({
-    authenticatedUser,
+    authenticatedUser: _authenticatedUser,
     page
   }) => {
     // Try to access non-existent project
@@ -82,7 +82,7 @@ test.describe('Navigation', () => {
   });
 
   test('should handle browser back/forward navigation', async ({
-    authenticatedUser,
+    authenticatedUser: _authenticatedUser,
     page
   }) => {
     const testData = generateTestData();
@@ -112,7 +112,7 @@ test.describe('Navigation', () => {
   });
 
   test('should display navigation menu correctly', async ({
-    authenticatedUser,
+    authenticatedUser: _authenticatedUser,
     page
   }) => {
     await page.goto('/');
@@ -141,7 +141,7 @@ test.describe('Navigation', () => {
   });
 
   test('should show active navigation state', async ({
-    authenticatedUser,
+    authenticatedUser: _authenticatedUser,
     page
   }) => {
     await page.goto('/');
@@ -166,7 +166,7 @@ test.describe('Navigation', () => {
   });
 
   test('should handle deep linking to canvas with state', async ({
-    authenticatedUser,
+    authenticatedUser: _authenticatedUser,
     page
   }) => {
     const testData = generateTestData();
@@ -213,8 +213,8 @@ test.describe('Navigation', () => {
     // After successful authentication, should redirect to original URL
     // This test would need valid credentials and depends on your auth flow
     const credentials = {
-      email: process.env.TEST_USER_EMAIL || 'test@auteurium.test',
-      password: process.env.TEST_USER_PASSWORD || 'TestPassword123!'
+      email: process.env.TEST_USER_EMAIL ?? 'test@auteurium.test',
+      password: process.env.TEST_USER_PASSWORD ?? 'TestPassword123!'
     };
 
     if (credentials.email && credentials.password) {

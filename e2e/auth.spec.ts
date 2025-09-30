@@ -44,7 +44,7 @@ test.describe('Authentication', () => {
     await authPage.loginButton.click();
   });
 
-  test('should register new user successfully', async ({ authPage, page }) => {
+  test('should register new user successfully', async ({ authPage, page: _page }) => {
     const testData = generateTestData();
 
     await authPage.goto();
@@ -61,7 +61,7 @@ test.describe('Authentication', () => {
     // await expect(page.locator('text=Check your email')).toBeVisible();
   });
 
-  test('should login with valid credentials', async ({ authPage, page }) => {
+  test('should login with valid credentials', async ({ authPage, page: _page }) => {
     // This test assumes you have a known test user
     // You might need to create one first or use the fixture
 

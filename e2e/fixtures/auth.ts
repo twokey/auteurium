@@ -1,8 +1,8 @@
 import { test as base, expect } from '@playwright/test';
 
+import { AuthPage } from '../page-objects/AuthPage';
 import { CanvasPage } from '../page-objects/CanvasPage';
 import { DashboardPage } from '../page-objects/DashboardPage';
-import { AuthPage } from '../page-objects/AuthPage';
 import { clearBrowserStorage, generateTestData } from '../utils/test-helpers';
 
 interface AuthFixtures {

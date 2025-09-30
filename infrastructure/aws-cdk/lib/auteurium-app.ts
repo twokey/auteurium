@@ -1,8 +1,8 @@
 import * as cdk from 'aws-cdk-lib'
-import { Construct } from 'constructs'
+
+import { AuteuriumApiStack } from './stacks/auteurium-api-stack'
 import { AuteuriumAuthStack } from './stacks/auteurium-auth-stack'
 import { AuteuriumDatabaseStack } from './stacks/auteurium-database-stack'
-import { AuteuriumApiStack } from './stacks/auteurium-api-stack'
 import { AuteuriumMediaStack } from './stacks/auteurium-media-stack'
 import { AuteuriumWebStack } from './stacks/auteurium-web-stack'
 // import { AuteuriumMonitoringStack } from './stacks/auteurium-monitoring-stack' // DISABLED - see auteurium-monitoring-stack.ts.disabled
@@ -42,13 +42,13 @@ export class AuteuriumApp extends cdk.App {
     })
 
     // Media storage stack (S3)
-    const mediaStack = new AuteuriumMediaStack(this, `Auteurium-Media-${stage}`, {
+    const _mediaStack = new AuteuriumMediaStack(this, `Auteurium-Media-${stage}`, {
       env,
       stage
     })
 
     // Web hosting stack (S3 + CloudFront)
-    const webStack = new AuteuriumWebStack(this, `Auteurium-Web-${stage}`, {
+    const _webStack = new AuteuriumWebStack(this, `Auteurium-Web-${stage}`, {
       env,
       stage
     })

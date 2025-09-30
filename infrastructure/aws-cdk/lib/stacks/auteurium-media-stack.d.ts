@@ -1,7 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
-import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
-import { Construct } from 'constructs';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import type { Construct } from 'constructs';
 interface AuteuriumMediaStackProps extends cdk.StackProps {
     stage: string;
 }

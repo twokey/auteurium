@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
-import { getReusableCredentials, saveTestCredential, updateCredentialStatus } from './utils/test-helpers';
 import { CredentialManager } from './utils/credential-manager';
+import { getReusableCredentials, saveTestCredential, updateCredentialStatus } from './utils/test-helpers';
 
 test('Registration Debug Test with Credential Management', async ({ page }) => {
   console.warn('🎯 Starting registration debug test with enhanced logging and credential management');

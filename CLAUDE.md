@@ -122,6 +122,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Validation Tests**: `test/validation/deployment/` - Runtime version and security validation
 - **Critical Protection**: Node.js 22.x runtime enforcement, IAM permissions, security compliance
 
+**Running Targeted Tests**:
+- `cd infrastructure/aws-cdk && npm test -- auth-stack.test.ts` - Test specific stack
+- `cd infrastructure/aws-cdk && npm test -- --testNamePattern="Node.js"` - Test with pattern matching
+- `cd infrastructure/aws-cdk && npm test -- --changedSince=origin/main` - Test only changed files
+
 ### Deployment
 **CDK Commands** (from infrastructure/aws-cdk/):
 - `npm run synth` - Synthesize CloudFormation templates
@@ -214,7 +219,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **TDD Approach**: The CDK infrastructure uses Test-Driven Development with comprehensive test coverage to prevent regressions and ensure consistency across all AWS stacks.
 
-**Key Testing Commands**:
+**Key Testing Commands** (from infrastructure/aws-cdk/):
 - `npm test -- auth-stack.test.ts` - Test specific stack
 - `npm test -- --testNamePattern="Node.js"` - Test with pattern matching
 - `npm test -- --changedSince=origin/main` - Test only changed files
@@ -225,6 +230,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Security Compliance**: IAM permissions, CORS configuration, authentication setup
 - **Resource Integrity**: Naming conventions, cross-stack references, environment variables
 - **Template Validation**: CDK Template assertions for all AWS resources
+
+**Test Configuration**: Tests use Jest with ts-jest preset, separate tsconfig in test/tsconfig.json
 
 ## Monitoring Configuration
 
@@ -240,3 +247,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Automated alerts for API errors (>5 errors) and high latency (>5 seconds)
 - SNS notifications for production issues
 - Centralized logging with configurable retention
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.

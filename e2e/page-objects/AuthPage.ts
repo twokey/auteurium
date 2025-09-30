@@ -1,5 +1,5 @@
-import type { Page, Locator } from '@playwright/test';
 import { expect } from '@playwright/test';
+import type { Page, Locator } from '@playwright/test';
 
 export class AuthPage {
   readonly page: Page;

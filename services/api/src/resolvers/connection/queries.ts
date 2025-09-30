@@ -17,12 +17,6 @@ const projectConnectionsSchema = z.object({
   limit: z.number().min(1).max(100).optional().default(50)
 })
 
-const snippetConnectionsSchema = z.object({
-  snippetId: z.string(),
-  direction: z.enum(['outgoing', 'incoming', 'both']).optional().default('both'),
-  limit: z.number().min(1).max(100).optional().default(50)
-})
-
 const connectionsByTypeSchema = z.object({
   projectId: z.string(),
   connectionType: z.nativeEnum(ConnectionType),

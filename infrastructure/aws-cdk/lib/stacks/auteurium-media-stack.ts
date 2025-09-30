@@ -1,10 +1,10 @@
-import * as cdk from 'aws-cdk-lib'
-import * as s3 from 'aws-cdk-lib/aws-s3'
-import * as iam from 'aws-cdk-lib/aws-iam'
-import * as lambda from 'aws-cdk-lib/aws-lambda'
-import * as s3Notifications from 'aws-cdk-lib/aws-s3-notifications'
-import { Construct } from 'constructs'
 import * as path from 'path'
+
+import * as cdk from 'aws-cdk-lib'
+import * as lambda from 'aws-cdk-lib/aws-lambda'
+import * as s3 from 'aws-cdk-lib/aws-s3'
+import * as s3Notifications from 'aws-cdk-lib/aws-s3-notifications'
+import type { Construct } from 'constructs'
 
 interface AuteuriumMediaStackProps extends cdk.StackProps {
   stage: string
@@ -32,7 +32,7 @@ export class AuteuriumMediaStack extends cdk.Stack {
             s3.HttpMethods.DELETE,
             s3.HttpMethods.HEAD
           ],
-          allowedOrigins: ['*'], // TODO: Restrict to actual domain in production
+          allowedOrigins: ['http://localhost:3000'],
           allowedHeaders: ['*'],
           maxAge: 3000
         }

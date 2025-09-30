@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures/auth';
 
 test.describe('Debug Snippet Creation', () => {
-  test('should create snippet and check for errors', async ({ page, authenticatedUser }) => {
+  test('should create snippet and check for errors', async ({ page, authenticatedUser: _authenticatedUser }) => {
     // Listen for console errors
     const consoleMessages: string[] = [];
     const consoleErrors: string[] = [];
@@ -24,7 +24,7 @@ test.describe('Debug Snippet Creation', () => {
 
     // Navigate to dashboard
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Create a test project
     const createButton = page.locator('text=Create New Project');
@@ -36,36 +36,36 @@ test.describe('Debug Snippet Creation', () => {
 
     // Wait for navigation to canvas
     await page.waitForURL(/\/project\/.+/);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
-    console.log('On canvas page');
+    console.warn('On canvas page');
 
     // Click create snippet button
     const createSnippetButton = page.locator('[data-testid="create-snippet"]');
     await expect(createSnippetButton).toBeVisible();
 
-    console.log('Clicking create snippet button');
+    console.warn('Clicking create snippet button');
     await createSnippetButton.click();
 
     // Wait a bit for the mutation to complete
     await page.waitForTimeout(3000);
 
     // Log all console messages and errors
-    console.log('\n=== Console Messages ===');
-    consoleMessages.forEach(msg => console.log(msg));
+    console.warn('\n=== Console Messages ===');
+    consoleMessages.forEach(msg => console.warn(msg));
 
-    console.log('\n=== Console Errors ===');
-    consoleErrors.forEach(err => console.log(err));
+    console.warn('\n=== Console Errors ===');
+    consoleErrors.forEach(err => console.warn(err));
 
-    console.log('\n=== Network Errors ===');
-    networkErrors.forEach(err => console.log(err));
+    console.warn('\n=== Network Errors ===');
+    networkErrors.forEach(err => console.warn(err));
 
     // Check if alert appeared
     const dialog = page.locator('text=Failed to create snippet');
     const hasError = await dialog.isVisible().catch(() => false);
 
     if (hasError) {
-      console.log('\n!!! ERROR ALERT APPEARED !!!');
+      console.warn('\n!!! ERROR ALERT APPEARED !!!');
     }
 
     // Take screenshot
@@ -74,11 +74,11 @@ test.describe('Debug Snippet Creation', () => {
     // Check for snippets on canvas
     const snippetNodes = page.locator('[data-testid="snippet-node"]');
     const count = await snippetNodes.count();
-    console.log(`\nSnippet nodes found: ${count}`);
+    console.warn(`\nSnippet nodes found: ${count}`);
 
     // If there are errors, fail the test
     if (consoleErrors.length > 0 || networkErrors.length > 0) {
-      console.log('\n!!! Test failed due to errors !!!');
+      console.warn('\n!!! Test failed due to errors !!!');
     }
   });
 });

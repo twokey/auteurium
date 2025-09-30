@@ -2,15 +2,15 @@ import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import js from '@eslint/js'
-import testingLibraryPlugin from 'eslint-plugin-testing-library'
-import jestPlugin from 'eslint-plugin-jest'
 import importPlugin from 'eslint-plugin-import'
+import jestPlugin from 'eslint-plugin-jest'
 import jsxA11yPlugin from 'eslint-plugin-jsx-a11y'
-import playwrightPlugin from 'eslint-plugin-playwright'
 import nodePlugin from 'eslint-plugin-n'
+import playwrightPlugin from 'eslint-plugin-playwright'
 import reactPlugin from 'eslint-plugin-react'
 import reactHooksPlugin from 'eslint-plugin-react-hooks'
 import reactRefreshPlugin from 'eslint-plugin-react-refresh'
+import testingLibraryPlugin from 'eslint-plugin-testing-library'
 import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
@@ -39,7 +39,10 @@ const IGNORE_PATTERNS = [
   '**/*.d.ts',
   'node_modules/**',
   '**/.serverless/**',
-  '**/.webpack/**'
+  '**/.webpack/**',
+  'infrastructure/aws-cdk/lib/**/*.js',
+  'infrastructure/aws-cdk/bin/**/*.js',
+  'tests-examples/**'
 ]
 
 const importRecommendedRules = importPlugin.flatConfigs.recommended.rules ?? {}
