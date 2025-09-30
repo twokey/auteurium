@@ -135,7 +135,7 @@ type Mutation {
   # Connection mutations
   createConnection(input: CreateConnectionInput!): Connection!
   updateConnection(id: ID!, input: UpdateConnectionInput!): Connection!
-  deleteConnection(id: ID!): Boolean!
+  deleteConnection(projectId: ID!, connectionId: ID!): Boolean!
   
   # Admin mutations
   createUser(email: String!, name: String!, temporaryPassword: String!): User!

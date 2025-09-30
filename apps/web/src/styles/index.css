@@ -1,3 +1,13 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* React Flow selected edge styling */
+.react-flow__edge.selected path {
+  stroke: #ef4444 !important;
+  stroke-width: 3 !important;
+}
+
+.react-flow__edge path {
+  cursor: pointer;
+}

@@ -36,6 +36,13 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
 
   const { snippet, onEdit, onDelete, onManageConnections, onViewVersions } = data
 
+  const handleSnippetClick = useCallback((e: React.MouseEvent) => {
+    // Only trigger edit on direct click, not on context menu or expand button
+    if (e.button === 0 && !showContextMenu) {
+      onEdit(snippet.id)
+    }
+  }, [snippet.id, onEdit, showContextMenu])
+
   const combinedText = `${snippet.textField1} ${snippet.textField2}`.trim()
   const wordCount = countWords(combinedText)
   const isLarge = wordCount > WORD_LIMIT
@@ -78,7 +85,8 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
     onViewVersions(snippet.id)
   }, [snippet.id, onViewVersions])
 
-  const handleExpandToggle = useCallback(() => {
+  const handleExpandToggle = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent triggering the snippet click handler
     if (isLarge) {
       onEdit(snippet.id)
     }
@@ -91,9 +99,9 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
       <Handle type="source" position={Position.Bottom} />
 
       <div
-        className="p-3 min-w-[200px] max-w-[300px]"
+        className="p-3 min-w-[200px] max-w-[300px] cursor-pointer hover:bg-gray-50 transition-colors"
         onContextMenu={handleContextMenu}
-        onClick={handleCloseContextMenu}
+        onClick={handleSnippetClick}
         data-testid="snippet-node"
         data-snippet-id={snippet.id}
       >
@@ -104,16 +112,14 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
         </div>
 
         {/* Title / Text Field 1 */}
-        <div className="font-medium text-sm mb-1 text-gray-900 break-words">
-          {displayText1 || 'Empty field 1'}
+        <div className="font-medium text-sm mb-2 text-gray-900 break-words">
+          {displayText1 || 'Input...'}
         </div>
 
-        {/* Text Field 2 */}
-        {snippet.textField2 && (
-          <div className="text-xs text-gray-600 break-words">
-            {displayText2}
-          </div>
-        )}
+        {/* Text Field 2 - Always visible */}
+        <div className="text-xs text-gray-600 break-words min-h-[16px]">
+          {displayText2 || 'Output...'}
+        </div>
 
         {/* Large snippet indicator and expand button */}
         {isLarge && (

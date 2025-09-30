@@ -21,7 +21,7 @@ import { ManageConnectionsModal } from '../components/modals/ManageConnectionsMo
 import { VersionHistoryModal } from '../components/modals/VersionHistoryModal'
 import { SnippetNode } from '../components/snippets/SnippetNode'
 import { Navigation } from '../components/ui/Navigation'
-import { CREATE_SNIPPET, UPDATE_SNIPPET } from '../graphql/mutations'
+import { CREATE_SNIPPET, UPDATE_SNIPPET, CREATE_CONNECTION, DELETE_CONNECTION } from '../graphql/mutations'
 import { GET_PROJECT_WITH_SNIPPETS } from '../graphql/queries'
 
 import type { Connection, Edge, Node, NodeTypes, ReactFlowInstance } from 'reactflow'
@@ -128,6 +128,34 @@ export const Canvas = () => {
     }
   })
 
+  const [createConnectionMutation] = useMutation(CREATE_CONNECTION, {
+    refetchQueries: [
+      {
+        query: GET_PROJECT_WITH_SNIPPETS,
+        variables: { projectId }
+      }
+    ],
+    awaitRefetchQueries: true,
+    onError: (error) => {
+      console.error('Error creating connection:', error)
+      alert(`Failed to create connection: ${error.message}`)
+    }
+  })
+
+  const [deleteConnectionMutation] = useMutation(DELETE_CONNECTION, {
+    refetchQueries: [
+      {
+        query: GET_PROJECT_WITH_SNIPPETS,
+        variables: { projectId }
+      }
+    ],
+    awaitRefetchQueries: true,
+    onError: (error) => {
+      console.error('Error deleting connection:', error)
+      alert(`Failed to delete connection: ${error.message}`)
+    }
+  })
+
   const project: Project | null = data?.project ?? null
   const rawSnippets = project?.snippets
   const snippets = useMemo<Snippet[]>(() => {
@@ -221,7 +249,8 @@ export const Canvas = () => {
             label: connection.label,
             type: 'default',
             style: { stroke: '#6366f1', strokeWidth: 2 },
-            labelStyle: { fill: '#374151', fontWeight: 500 }
+            labelStyle: { fill: '#374151', fontWeight: 500 },
+            data: { connectionId: connection.id }
           })
         }
       })
@@ -236,11 +265,28 @@ export const Canvas = () => {
 
   const onConnect = useCallback(
     (params: Connection) => {
-      // For now, just add the edge visually
-      // Later we'll implement the mutation to save connections
+      if (!projectId || !params.source || !params.target) return
+
+      // Add edge visually immediately for better UX
       setEdges((eds) => addEdge(params, eds))
+
+      // Persist connection to database
+      createConnectionMutation({
+        variables: {
+          input: {
+            projectId,
+            sourceSnippetId: params.source,
+            targetSnippetId: params.target,
+            label: ''
+          }
+        }
+      }).catch((error) => {
+        console.error('Failed to save connection:', error)
+        // Remove the edge if save failed
+        setEdges((eds) => eds.filter(e => !(e.source === params.source && e.target === params.target)))
+      })
     },
-    [setEdges]
+    [projectId, setEdges, createConnectionMutation]
   )
 
   const normalisedProject = project
@@ -271,8 +317,8 @@ export const Canvas = () => {
     const variables = {
       input: {
         projectId,
-        textField1: 'New Snippet',
-        textField2: 'Click to edit...',
+        textField1: '',
+        textField2: '',
         position: {
           x: position.x,
           y: position.y
@@ -330,6 +376,55 @@ export const Canvas = () => {
       console.error('Failed to save snippet position:', error)
     })
   }, [snippets, projectId, updateSnippetMutation])
+
+  // Handle Delete key press for selected edges
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        // Get selected edges
+        const selectedEdges = edges.filter(edge => edge.selected)
+
+        if (selectedEdges.length > 0) {
+          event.preventDefault()
+
+          if (!projectId) {
+            console.error('Cannot delete connection: no project ID')
+            return
+          }
+
+          // Delete each selected connection
+          selectedEdges.forEach(edge => {
+            const connectionId = edge.data?.connectionId || edge.id
+
+            console.log('Deleting connection:', {
+              projectId,
+              edgeId: edge.id,
+              connectionId,
+              edgeData: edge.data
+            })
+
+            if (!connectionId) {
+              console.error('No connection ID found for edge:', edge)
+              return
+            }
+
+            deleteConnectionMutation({
+              variables: {
+                projectId,
+                connectionId
+              }
+            }).catch((error) => {
+              console.error('Failed to delete connection:', error)
+              console.error('Connection details:', { projectId, connectionId })
+            })
+          })
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [edges, projectId, deleteConnectionMutation])
 
   if (loading) {
     return (
@@ -395,6 +490,16 @@ export const Canvas = () => {
             onInit={onInit}
             onNodeDragStop={onNodeDragStop}
             nodeTypes={nodeTypes}
+            defaultEdgeOptions={{
+              style: { stroke: '#6366f1', strokeWidth: 2 }
+            }}
+            connectionLineStyle={{ stroke: '#6366f1', strokeWidth: 2 }}
+            edgesFocusable={true}
+            edgesUpdatable={false}
+            nodesDraggable={true}
+            nodesConnectable={true}
+            nodesFocusable={true}
+            elementsSelectable={true}
           >
             <Background
               variant={BackgroundVariant.Dots}

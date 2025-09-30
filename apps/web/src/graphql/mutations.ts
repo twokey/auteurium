@@ -130,8 +130,8 @@ export const UPDATE_CONNECTION = gql`
 `
 
 export const DELETE_CONNECTION = gql`
-  mutation DeleteConnection($id: ID!) {
-    deleteConnection(id: $id)
+  mutation DeleteConnection($projectId: ID!, $connectionId: ID!) {
+    deleteConnection(projectId: $projectId, connectionId: $connectionId)
   }
 `
 
