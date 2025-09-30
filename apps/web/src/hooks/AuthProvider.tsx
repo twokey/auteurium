@@ -75,20 +75,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Listen to auth events
     const unsubscribe = Hub.listen('auth', ({ payload: { event } }) => {
       switch (event) {
-        case 'signIn':
-        case 'cognitoHostedUI':
+        case 'signedIn':
+        case 'signInWithRedirect':
           void checkAuthState()
           break
-        case 'signOut':
+        case 'signedOut':
           updateAuthState({
             user: null,
             hasCheckedAuth: true,
             isLoading: false
           })
           break
-        case 'signUp':
-          break
-        case 'confirmSignUp':
+        case 'tokenRefresh':
+          void checkAuthState()
           break
         default:
           break

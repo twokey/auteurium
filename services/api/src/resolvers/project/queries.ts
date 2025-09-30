@@ -7,7 +7,7 @@ import type { Project } from '@auteurium/shared-types'
 export const projectQueries = {
   projects: async (
     _parent: unknown,
-    _args: Record<string, never>,
+    _args: unknown,
     context: GraphQLContext
   ): Promise<Project[]> => {
     const { user, logger } = context
@@ -31,22 +31,23 @@ export const projectQueries = {
 
   project: async (
     _parent: unknown,
-    args: { id: string },
+    args: unknown,
     context: GraphQLContext
   ): Promise<Project | null> => {
+    const { id } = args as { id: string }
     const { user, logger } = context
 
     if (!user) {
       throw createAuthError()
     }
 
-    logger.info('Fetching project', { projectId: args.id, userId: user.id })
+    logger.info('Fetching project', { projectId: id, userId: user.id })
 
     try {
-      return await getProjectById(user.id, args.id)
+      return await getProjectById(user.id, id)
     } catch (error) {
       logger.error('Error fetching project', {
-        projectId: args.id,
+        projectId: id,
         userId: user.id,
         error: error instanceof Error ? error.message : error
       })

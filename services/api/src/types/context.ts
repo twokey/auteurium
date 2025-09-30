@@ -1,10 +1,5 @@
 import type { User } from '@auteurium/shared-types'
-
-interface Logger {
-  info: (message: string, metadata?: Record<string, unknown>) => void
-  warn: (message: string, metadata?: Record<string, unknown>) => void
-  error: (message: string, metadata?: Record<string, unknown>) => void
-}
+import type { Logger } from '@aws-lambda-powertools/logger'
 
 export interface GraphQLContext {
   user?: User

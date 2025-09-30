@@ -65,39 +65,57 @@ export const connectionQueries = {
 
   // Get connections for a specific snippet
   snippetConnections: async (
-    _parent: unknown,
+    parent: unknown,
     args: unknown,
     context: GraphQLContext
   ): Promise<Connection[]> => {
-    const { snippetId, direction, limit } = validateInput(snippetConnectionsSchema, args)
+    // When called as a field resolver, get snippetId from parent
+    // When called as a query, get snippetId from args
+    const parentObj = parent as { id?: string; snippetId?: string; projectId?: string } | null
+    const argsObj = args as { snippetId?: string; direction?: string; limit?: number } | null
+
+    const snippetId = parentObj?.id ?? parentObj?.snippetId ?? argsObj?.snippetId
+    const projectId = parentObj?.projectId
+    const direction = argsObj?.direction ?? 'both'
+    const limit = argsObj?.limit ?? 100
+
+    if (!snippetId) {
+      context.logger.error('snippetId is required but not found', {
+        parent,
+        args,
+        parentKeys: parentObj ? Object.keys(parentObj) : []
+      })
+      // Return empty array instead of throwing error for field resolvers
+      return []
+    }
+
     const user = requireAuth(context.user)
 
     context.logger.info('Getting snippet connections', {
       snippetId,
       direction,
       userId: user.id,
-      limit
+      limit,
+      isFieldResolver: !!parentObj
     })
 
     const connections: Connection[] = []
 
     // Get outgoing connections
     if (direction === 'outgoing' || direction === 'both') {
-      const outgoingConnections = await queryConnections({
-        projectId: '', // We'll need to get this from the snippet
-        sourceSnippetId: snippetId,
-        limit
-      })
+      const options: ConnectionQueryOptions = projectId
+        ? { projectId, sourceSnippetId: snippetId, limit }
+        : { sourceSnippetId: snippetId, limit }
+      const outgoingConnections = await queryConnections(options)
       connections.push(...outgoingConnections)
     }
 
     // Get incoming connections
     if (direction === 'incoming' || direction === 'both') {
-      const incomingConnections = await queryConnections({
-        projectId: '', // We'll need to get this from the snippet
-        targetSnippetId: snippetId,
-        limit
-      })
+      const options: ConnectionQueryOptions = projectId
+        ? { projectId, targetSnippetId: snippetId, limit }
+        : { targetSnippetId: snippetId, limit }
+      const incomingConnections = await queryConnections(options)
       connections.push(...incomingConnections)
     }
 

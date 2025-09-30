@@ -59,7 +59,14 @@ export const handleError = (
   logger: Logger,
   context?: Record<string, unknown>
 ): never => {
-  logger.error('Error occurred', { error, context })
+  logger.error('Error occurred', {
+    error: error instanceof Error ? {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    } : error,
+    context
+  })
 
   if (error instanceof ZodError) {
     throw createValidationError(error)
@@ -81,5 +88,11 @@ export const handleError = (
     })
   }
 
-  throw new AppError(ErrorCode.INTERNAL_ERROR, 'An internal error occurred', 500)
+  // In development, expose more error details
+  const isDevelopment = process.env.NODE_ENV !== 'production'
+  const errorMessage = isDevelopment && error instanceof Error
+    ? `Internal error: ${error.message}`
+    : 'An internal error occurred'
+
+  throw new AppError(ErrorCode.INTERNAL_ERROR, errorMessage, 500)
 }

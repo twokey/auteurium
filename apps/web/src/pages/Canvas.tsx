@@ -1,4 +1,4 @@
-import { useQuery } from '@apollo/client'
+import { useMutation, useQuery } from '@apollo/client'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
@@ -16,6 +16,7 @@ import 'reactflow/dist/style.css'
 import { CanvasInfoPanel } from '../components/canvas/CanvasInfoPanel'
 import { CanvasToolbar } from '../components/canvas/CanvasToolbar'
 import { Navigation } from '../components/ui/Navigation'
+import { CREATE_SNIPPET } from '../graphql/mutations'
 import { GET_PROJECT_WITH_SNIPPETS } from '../graphql/queries'
 
 import type { Connection, Edge, Node, ReactFlowInstance } from 'reactflow'
@@ -66,7 +67,7 @@ export const Canvas = () => {
   const { id: projectId } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null)
-  
+
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const [isLoading, setIsLoading] = useState(false)
@@ -79,16 +80,52 @@ export const Canvas = () => {
   >(GET_PROJECT_WITH_SNIPPETS, {
     variables: queryVariables,
     skip: !projectId,
-    errorPolicy: 'all'
+    errorPolicy: 'all',
+    fetchPolicy: 'cache-and-network',
+    notifyOnNetworkStatusChange: true
+  })
+
+  useEffect(() => {
+    console.log('Query data updated:', {
+      loading,
+      hasProject: !!data?.project,
+      snippetCount: data?.project?.snippets?.length ?? 0
+    })
+  }, [data, loading])
+
+  const [createSnippetMutation] = useMutation(CREATE_SNIPPET, {
+    refetchQueries: [
+      {
+        query: GET_PROJECT_WITH_SNIPPETS,
+        variables: { projectId }
+      }
+    ],
+    awaitRefetchQueries: true,
+    onCompleted: (data) => {
+      console.log('Snippet created successfully:', data)
+    },
+    onError: (error) => {
+      console.error('Error creating snippet:', error)
+      console.error('Error details:', JSON.stringify(error, null, 2))
+      console.error('GraphQL errors:', error.graphQLErrors)
+      console.error('Network error:', error.networkError)
+      alert(`Failed to create snippet: ${error.message}`)
+    }
   })
 
   const project: Project | null = data?.project ?? null
   const rawSnippets = project?.snippets
-  const snippets = useMemo<Snippet[]>(() => rawSnippets ?? EMPTY_SNIPPET_LIST, [rawSnippets])
+  const snippets = useMemo<Snippet[]>(() => {
+    const result = rawSnippets ?? EMPTY_SNIPPET_LIST
+    console.log('Snippets from query:', result)
+    return result
+  }, [rawSnippets])
 
   const flowNodes = useMemo(() => {
+    console.log('Creating flow nodes from snippets:', snippets.length)
     return snippets.map((snippet) => {
       const position = snippet.position ?? { x: 0, y: 0 }
+      console.log('Creating node for snippet:', snippet.id, position)
       const snippetTitle = snippet.textField1?.trim() ? snippet.textField1 : 'Untitled snippet'
 
       return {
@@ -213,39 +250,39 @@ export const Canvas = () => {
     ? { id: normalisedProject.id, name: normalisedProject.name }
     : undefined
 
-  const handleCreateSnippet = useCallback((position: { x: number; y: number }) => {
-    // For now, create a temporary snippet visually
-    // Later we'll implement the mutation to create actual snippets
-    const nodeId = `temp-${Date.now()}`
-    const newNode: Node = {
-      id: nodeId,
-      type: 'default',
-      position,
-      data: {
-        label: (
-          <div className="p-3" data-testid="snippet-node" data-snippet-id={nodeId}>
-            <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-              <span className="uppercase tracking-wide">Snippet</span>
-              <span className="font-mono text-[11px] text-gray-400">#{nodeId}</span>
-            </div>
-            <div className="font-medium text-sm mb-1 text-gray-900">
-              New Snippet
-            </div>
-            <div className="text-xs text-gray-600">
-              Click to edit...
-            </div>
-          </div>
-        )
-      },
-      style: {
-        background: '#fff',
-        border: '2px solid #e5e7eb',
-        borderRadius: '8px',
-        minWidth: '200px'
-      }
+  const handleCreateSnippet = useCallback(async (position: { x: number; y: number }) => {
+    if (!projectId) {
+      console.error('Cannot create snippet: no project ID')
+      return
     }
-    setNodes((nds) => [...nds, newNode])
-  }, [setNodes])
+
+    console.log('Creating snippet at position:', position, 'for project:', projectId)
+
+    setIsLoading(true)
+    try {
+      const variables = {
+        input: {
+          projectId,
+          textField1: 'New Snippet',
+          textField2: 'Click to edit...',
+          position: {
+            x: position.x,
+            y: position.y
+          },
+          tags: [],
+          categories: []
+        }
+      }
+      console.log('Mutation variables:', JSON.stringify(variables, null, 2))
+
+      const result = await createSnippetMutation({ variables })
+      console.log('Mutation result:', result)
+    } catch (error) {
+      console.error('Failed to create snippet (caught in handler):', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [projectId, createSnippetMutation])
 
   const handleSaveCanvas = useCallback(() => {
     setIsLoading(true)
@@ -329,11 +366,12 @@ export const Canvas = () => {
             onInit={onInit}
             fitView
           >
-            <Background 
-              variant={BackgroundVariant.Dots} 
-              gap={20} 
-              size={1} 
-              color="#e5e7eb"
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={16}
+              size={2}
+              color="#94a3b8"
+              style={{ opacity: 0.5 }}
             />
             <Controls 
               position="bottom-right"

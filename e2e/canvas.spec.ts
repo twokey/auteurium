@@ -156,6 +156,96 @@ test.describe('Canvas Functionality', () => {
     await canvasPage.expectConnectionExists(testData1.snippetTitle, testData2.snippetTitle);
   });
 
+  test('should display visible grid pattern for navigation feedback', async ({
+    page
+  }) => {
+    // Setup
+    await page.goto('/');
+    const createButton = page.locator('text=Create New Project');
+    await createButton.click();
+
+    const modal = page.locator('[data-testid="create-project-modal"]');
+    await modal.locator('input[name="name"]').fill('Grid Test Project');
+    await modal.locator('button[type="submit"]').click();
+
+    // Wait for canvas to load
+    const canvas = page.locator('[data-testid="react-flow-canvas"]');
+    await expect(canvas).toBeVisible();
+
+    // Verify background pattern exists (React Flow adds .react-flow__background)
+    const background = canvas.locator('.react-flow__background');
+    await expect(background).toBeVisible();
+
+    // Check that the background has dot pattern SVG
+    const backgroundSvg = background.locator('svg pattern[id*="pattern"]');
+    await expect(backgroundSvg).toBeAttached();
+
+    // Take a screenshot to visually verify the grid
+    await page.screenshot({ path: 'e2e/screenshots/canvas-grid-default.png' });
+  });
+
+  test('should show grid visual feedback during zoom and pan', async ({
+    page
+  }) => {
+    // Setup
+    await page.goto('/');
+    const createButton = page.locator('text=Create New Project');
+    await createButton.click();
+
+    const modal = page.locator('[data-testid="create-project-modal"]');
+    await modal.locator('input[name="name"]').fill('Zoom Pan Test');
+    await modal.locator('button[type="submit"]').click();
+
+    const canvas = page.locator('[data-testid="react-flow-canvas"]');
+    await expect(canvas).toBeVisible();
+
+    // Wait a moment for canvas to initialize
+    await page.waitForTimeout(500);
+
+    // Take screenshot at default zoom
+    await page.screenshot({ path: 'e2e/screenshots/canvas-grid-zoom-0-default.png' });
+
+    // Find zoom controls
+    const controls = page.locator('.react-flow__controls');
+    await expect(controls).toBeVisible();
+
+    const zoomInButton = controls.locator('button[aria-label="zoom in"]');
+    const zoomOutButton = controls.locator('button[aria-label="zoom out"]');
+
+    // Zoom in twice and verify grid is still visible
+    await zoomInButton.click();
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: 'e2e/screenshots/canvas-grid-zoom-1-in.png' });
+
+    await zoomInButton.click();
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: 'e2e/screenshots/canvas-grid-zoom-2-in-more.png' });
+
+    // Verify background is still visible after zooming
+    const background = canvas.locator('.react-flow__background');
+    await expect(background).toBeVisible();
+
+    // Zoom out and verify
+    await zoomOutButton.click();
+    await zoomOutButton.click();
+    await zoomOutButton.click();
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: 'e2e/screenshots/canvas-grid-zoom-3-out.png' });
+
+    // Test panning - drag the canvas
+    const canvasElement = page.locator('.react-flow__pane');
+    await canvasElement.hover({ position: { x: 200, y: 200 } });
+    await page.mouse.down();
+    await page.mouse.move(400, 400);
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+
+    await page.screenshot({ path: 'e2e/screenshots/canvas-grid-zoom-4-after-pan.png' });
+
+    // Verify grid is still visible after panning
+    await expect(background).toBeVisible();
+  });
+
   test('should handle canvas zoom and pan', async ({
     canvasPage,
     page

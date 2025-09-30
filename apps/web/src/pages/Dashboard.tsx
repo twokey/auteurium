@@ -6,7 +6,7 @@ import { ProjectCard } from '../components/projects/ProjectCard'
 import { GET_PROJECTS } from '../graphql/queries'
 import { useAuth } from '../hooks/useAuth'
 
-import type { GraphQLError } from 'graphql'
+import type { GraphQLFormattedError } from 'graphql'
 
 interface Project {
   id: string
@@ -29,7 +29,7 @@ export const Dashboard = () => {
     errorPolicy: 'all'
   })
 
-  const isNonBlockingProjectsError = error?.graphQLErrors?.some((graphQLError: GraphQLError) => {
+  const isNonBlockingProjectsError = error?.graphQLErrors?.some((graphQLError: GraphQLFormattedError) => {
     const [firstPathSegment] = graphQLError.path ?? []
     if (firstPathSegment !== 'projects') {
       return false

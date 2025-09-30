@@ -126,8 +126,8 @@ export const validateToken = async (token: string): Promise<User | undefined> =>
 export type AppSyncEvent = AppSyncResolverEvent<Record<string, unknown>, GraphQLContext>
 
 export const createContext = async (event: AppSyncEvent): Promise<GraphQLContext> => {
-  const ctx = event.requestContext as { requestId?: string } | undefined
-  const requestId = (ctx && typeof ctx.requestId === 'string') ? ctx.requestId : 'unknown'
+  const eventWithContext = event as AppSyncEvent & { requestContext?: { requestId?: string } }
+  const requestId = eventWithContext.requestContext?.requestId ?? 'unknown'
 
   try {
     const identity = event.identity

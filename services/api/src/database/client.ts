@@ -1,7 +1,7 @@
 import { DynamoDB } from 'aws-sdk'
 
 export type DocumentClientType = DynamoDB.DocumentClient
-export type WriteRequest = DocumentClientType.WriteRequest
+export type WriteRequest = DynamoDB.DocumentClient.WriteRequest
 
 // Initialize DynamoDB client
 const resolveEnv = (value: string | undefined, fallback: string) =>

@@ -81,6 +81,19 @@ export class AuteuriumApiStack extends cdk.Stack {
     connectionsTable.grantReadWriteData(apiFunction)
     versionsTable.grantReadWriteData(apiFunction)
 
+    // Grant permissions to query GSIs
+    apiFunction.addToRolePolicy(new iam.PolicyStatement({
+      actions: [
+        'dynamodb:Query',
+        'dynamodb:Scan'
+      ],
+      resources: [
+        `${connectionsTable.tableArn}/index/*`,
+        `${snippetsTable.tableArn}/index/*`,
+        `${versionsTable.tableArn}/index/*`
+      ]
+    }))
+
     // Grant Cognito permissions
     apiFunction.addToRolePolicy(new iam.PolicyStatement({
       actions: [
@@ -106,7 +119,7 @@ export class AuteuriumApiStack extends cdk.Stack {
       { typeName: 'Query', fieldName: 'snippet' },
       { typeName: 'Query', fieldName: 'snippetVersions' },
       { typeName: 'Query', fieldName: 'systemAnalytics' },
-      
+
       // Mutation resolvers
       { typeName: 'Mutation', fieldName: 'createProject' },
       { typeName: 'Mutation', fieldName: 'updateProject' },
@@ -120,7 +133,11 @@ export class AuteuriumApiStack extends cdk.Stack {
       { typeName: 'Mutation', fieldName: 'deleteConnection' },
       { typeName: 'Mutation', fieldName: 'createUser' },
       { typeName: 'Mutation', fieldName: 'deleteUser' },
-      { typeName: 'Mutation', fieldName: 'resetUserPassword' }
+      { typeName: 'Mutation', fieldName: 'resetUserPassword' },
+
+      // Field resolvers
+      { typeName: 'Project', fieldName: 'snippets' },
+      { typeName: 'Snippet', fieldName: 'connections' }
     ]
 
     resolvers.forEach(({ typeName, fieldName }) => {

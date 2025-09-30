@@ -53,27 +53,31 @@ const resolverMap: Record<string, ResolverFunction> = {
   'Mutation.updateConnection': connectionMutations.updateConnection,
   'Mutation.deleteConnection': connectionMutations.deleteConnection,
   'Mutation.bulkCreateConnections': connectionMutations.bulkCreateConnections,
-  'Mutation.removeConnectionsBetweenSnippets': connectionMutations.removeConnectionsBetweenSnippets
+  'Mutation.removeConnectionsBetweenSnippets': connectionMutations.removeConnectionsBetweenSnippets,
+
+  // Field resolvers
+  'Project.snippets': snippetQueries.projectSnippets,
+  'Snippet.connections': connectionQueries.snippetConnections
 }
 
 const getRequestId = (event: AppSyncEvent): string => {
-  const ctx = event.requestContext as { requestId?: string } | undefined
-  if (ctx && typeof ctx.requestId === 'string') {
-    return ctx.requestId
+  const eventWithContext = event as AppSyncEvent & { requestContext?: { requestId?: string } }
+  if (eventWithContext.requestContext?.requestId) {
+    return eventWithContext.requestContext.requestId
   }
-  
+
   const headers = event.request?.headers as Record<string, string> | undefined
   if (headers && typeof headers['x-amz-requestid'] === 'string') {
     return headers['x-amz-requestid']
   }
-  
+
   return 'unknown'
 }
 
 export const handler: AppSyncResolverHandler<Record<string, unknown>, unknown> = async (
-  lambdaEvent: AppSyncResolverEvent<Record<string, unknown>, GraphQLContext>
+  lambdaEvent: AppSyncResolverEvent<Record<string, unknown>, Record<string, unknown> | null>
 ) => {
-  const event = lambdaEvent as AppSyncEvent
+  const event = lambdaEvent as unknown as AppSyncEvent
   const { fieldName, parentTypeName } = event.info
   const resolverKey = `${parentTypeName}.${fieldName}`
   const resolver = resolverMap[resolverKey]
@@ -82,7 +86,8 @@ export const handler: AppSyncResolverHandler<Record<string, unknown>, unknown> =
   logger.info('GraphQL request', {
     fieldName,
     parentTypeName,
-    requestId
+    requestId,
+    hasSource: !!event.source
   })
 
   if (!resolver) {
@@ -92,7 +97,8 @@ export const handler: AppSyncResolverHandler<Record<string, unknown>, unknown> =
 
   try {
     const context = await createContext(event)
-    return await resolver(null, event.arguments, context)
+    // Pass event.source as the parent for field resolvers
+    return await resolver(event.source ?? null, event.arguments, context)
   } catch (error) {
     logger.error('Resolver error', {
       error: error instanceof Error ? error.message : error,

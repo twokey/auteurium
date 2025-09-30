@@ -54,11 +54,25 @@ export const snippetQueries = {
 
   // Get all snippets for a project
   projectSnippets: async (
-    _parent: unknown,
+    parent: unknown,
     args: unknown,
     context: GraphQLContext
   ): Promise<Snippet[]> => {
-    const { projectId } = validateInput(getProjectSnippetsSchema, args)
+    // When called as a field resolver on Project, get projectId from parent
+    // When called as a query, get projectId from args
+    const parentObj = parent as { id?: string; projectId?: string } | null
+    const argsObj = args as { projectId?: string } | null
+    const projectId = parentObj?.id ?? parentObj?.projectId ?? argsObj?.projectId
+
+    if (!projectId) {
+      context.logger.error('projectId is required but not found', {
+        parent,
+        args,
+        parentKeys: parentObj ? Object.keys(parentObj) : []
+      })
+      throw new Error('projectId is required')
+    }
+
     const user = requireAuth(context.user)
 
     context.logger.info('Getting project snippets', { projectId, userId: user.id })
@@ -72,13 +86,13 @@ export const snippetQueries = {
     _parent: unknown,
     args: unknown,
     context: GraphQLContext
-  ): Promise<{ snippets: Snippet[], lastKey?: string }> => {
+  ): Promise<{ snippets: Snippet[], lastKey?: Record<string, unknown> }> => {
     const { limit = 20, offset = 0, lastKey } = validateInput(getUserSnippetsSchema, args)
     const user = requireAuth(context.user)
 
     context.logger.info('Getting user snippets', { userId: user.id, limit, offset })
 
-    const result = await getUserSnippets(user.id, limit, lastKey)
+    const result = await getUserSnippets(user.id, limit, lastKey as Record<string, unknown> | undefined)
 
     return {
       snippets: result.snippets,
@@ -97,7 +111,7 @@ export const snippetQueries = {
 
     context.logger.info('Getting snippet versions', { snippetId, userId: user.id })
 
-    // Note: getSnippetVersions already filters by userId for privacy
-    return await getSnippetVersions(snippetId, user.id)
+    // Note: getSnippetVersions takes limit as second parameter
+    return await getSnippetVersions(snippetId, 50)
   }
 }
