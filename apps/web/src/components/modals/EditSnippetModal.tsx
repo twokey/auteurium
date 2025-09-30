@@ -9,6 +9,7 @@ interface EditSnippetModalProps {
   snippet: {
     id: string
     projectId: string
+    title?: string
     textField1: string
     textField2: string
     tags?: string[]
@@ -17,6 +18,8 @@ interface EditSnippetModalProps {
 }
 
 export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalProps) => {
+  const normalisedTitle = snippet.title && snippet.title.trim() !== '' ? snippet.title : 'New snippet'
+  const [title, setTitle] = useState(normalisedTitle)
   const [textField1, setTextField1] = useState(snippet.textField1 || '')
   const [textField2, setTextField2] = useState(snippet.textField2 || '')
   const [tags, setTags] = useState<string[]>(snippet.tags || [])
@@ -27,6 +30,8 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
 
   // Reset form when snippet changes
   useEffect(() => {
+    const nextTitle = snippet.title && snippet.title.trim() !== '' ? snippet.title : 'New snippet'
+    setTitle(nextTitle)
     setTextField1(snippet.textField1 || '')
     setTextField2(snippet.textField2 || '')
     setTags(snippet.tags || [])
@@ -53,6 +58,7 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
           projectId: snippet.projectId,
           id: snippet.id,
           input: {
+            title: title.trim() || undefined,
             textField1,
             textField2,
             tags,
@@ -67,7 +73,7 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
     } finally {
       setIsSaving(false)
     }
-  }, [snippet.id, textField1, textField2, tags, categories, updateSnippetMutation, onClose])
+  }, [snippet.id, snippet.projectId, title, textField1, textField2, tags, categories, updateSnippetMutation, onClose])
 
   const handleAddTag = useCallback(() => {
     const trimmedTag = tagInput.trim()
@@ -134,6 +140,22 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
         {/* Content */}
         <div className="px-6 py-4 overflow-y-auto flex-1">
           <div className="space-y-4">
+            {/* Title */}
+            <div>
+              <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
+                Title (optional)
+              </label>
+              <input
+                id="title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter snippet title..."
+                disabled={isSaving}
+              />
+            </div>
+
             {/* Text Field 1 */}
             <div>
               <label htmlFor="textField1" className="block text-sm font-medium text-gray-700 mb-1">

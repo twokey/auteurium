@@ -84,7 +84,7 @@
   * Connections are **directional** If A is connected to B, then the content of B depends on content of A but not vice versa.  
 * **5.2. Creating Connections:**  
   * To create a connection, a user types the Snippet ID of one snippet into a designated field associated with another snippet.
-  * *Future:* Drag-and-drop interface to create connections between snippets on the canvas.  
+  * Drag-and-drop interface to create connections between snippets on the canvas.  
 * **5.3. Connection Labels:**  
   * Connections can have **tagss** (e.g., "explains," "supports," "related to").  
   * Connection tags are free-form text, defined by the user.  

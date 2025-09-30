@@ -77,13 +77,6 @@ export const ManageConnectionsModal = ({ isOpen, onClose, snippet, allSnippets }
 
     if (!fullTargetId) return
 
-    // Check if connection already exists
-    const connectionExists = outgoingConnections.some(conn => conn.targetSnippetId === fullTargetId)
-    if (connectionExists) {
-      alert('Connection to this snippet already exists.')
-      return
-    }
-
     // Don't allow self-connections
     if (fullTargetId === snippet.id) {
       alert('Cannot create connection to the same snippet.')

@@ -65,6 +65,7 @@ const buildSnippet = (input: SnippetInput, userId: string, now: string): Snippet
   id: generateId(),
   projectId: input.projectId,
   userId,
+  title: input.title ?? 'New snippet',
   textField1: input.textField1 ?? '',
   textField2: input.textField2 ?? '',
   position: input.position ?? { x: 0, y: 0 },
@@ -83,6 +84,7 @@ const createSnippetVersion = async (snippet: Snippet): Promise<void> => {
       snippetId: snippet.id,
       projectId: snippet.projectId,
       version: snippet.version,
+      title: snippet.title,
       textField1: snippet.textField1,
       textField2: snippet.textField2,
       userId: snippet.userId,
@@ -250,6 +252,7 @@ const buildSnippetUpdate = (
     }
   }
 
+  assignField('title', updates.title)
   assignField('textField1', updates.textField1)
   assignField('textField2', updates.textField2)
   assignField('position', updates.position)

@@ -210,6 +210,7 @@ describe('GraphQL Resolvers Integration Tests', () => {
         const snippetInput = {
           input: {
             projectId,
+            title: 'Test snippet title',
             textField1: 'Test text 1',
             textField2: 'Test text 2',
             position: { x: 100, y: 200 },
@@ -240,6 +241,7 @@ describe('GraphQL Resolvers Integration Tests', () => {
           id: 'test-generated-id',
           projectId,
           userId: user.id,
+          title: 'Test snippet title',
           textField1: 'Test text 1',
           textField2: 'Test text 2',
           position: { x: 100, y: 200 },
@@ -255,6 +257,7 @@ describe('GraphQL Resolvers Integration Tests', () => {
             TableName: 'test-snippets',
             Item: expect.objectContaining({
               projectId,
+              title: 'Test snippet title',
               textField1: 'Test text 1',
               textField2: 'Test text 2'
             }) as Record<string, unknown>
@@ -276,6 +279,7 @@ describe('GraphQL Resolvers Integration Tests', () => {
               id: snippetId,
               projectId,
               userId: user.id,
+              title: 'Original title',
               textField1: 'Original text 1',
               textField2: 'Original text 2',
               position: { x: 0, y: 0 },
@@ -294,6 +298,7 @@ describe('GraphQL Resolvers Integration Tests', () => {
               id: snippetId,
               projectId,
               userId: user.id,
+              title: 'Updated title',
               textField1: 'Updated text 1',
               textField2: 'Updated text 2',
               position: { x: 50, y: 50 },
@@ -314,6 +319,7 @@ describe('GraphQL Resolvers Integration Tests', () => {
           projectId,
           snippetId,
           input: {
+            title: 'Updated title',
             textField1: 'Updated text 1',
             textField2: 'Updated text 2',
             position: { x: 50, y: 50 },
@@ -326,6 +332,7 @@ describe('GraphQL Resolvers Integration Tests', () => {
 
         expect(result.version).toBe(2)
         expect(result.textField1).toBe('Updated text 1')
+        expect(result.title).toBe('Updated title')
 
         // Verify version was created
         expect(mockDynamoDBOperations.put).toHaveBeenCalledWith(
@@ -333,7 +340,8 @@ describe('GraphQL Resolvers Integration Tests', () => {
             TableName: 'test-versions',
             Item: expect.objectContaining({
               snippetId,
-              version: 2
+              version: 2,
+              title: 'Updated title'
             }) as Record<string, unknown>
           })
         )

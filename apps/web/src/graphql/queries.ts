@@ -73,6 +73,7 @@ export const GET_PROJECT_WITH_SNIPPETS = gql`
       snippets {
         id
         projectId
+        title
         textField1
         textField2
         position {

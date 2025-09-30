@@ -6,6 +6,7 @@ interface SnippetNodeProps {
   data: {
     snippet: {
       id: string
+      title?: string
       textField1: string
       textField2: string
       tags?: string[]
@@ -54,6 +55,10 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
   const displayText2 = isLarge
     ? truncateToWords(snippet.textField2, Math.floor(WORD_LIMIT * 0.4))
     : snippet.textField2
+
+  const displayTitle = snippet.title && snippet.title.trim() !== ''
+    ? snippet.title
+    : 'New snippet'
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -105,9 +110,9 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
         data-testid="snippet-node"
         data-snippet-id={snippet.id}
       >
-        {/* Header with snippet type label and ID */}
+        {/* Header with title or snippet label and ID */}
         <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-          <span className="uppercase tracking-wide">Snippet</span>
+          <span className="tracking-wide">{displayTitle}</span>
           <span className="font-mono text-[11px] text-gray-400">#{snippet.id.slice(0, 8)}</span>
         </div>
 

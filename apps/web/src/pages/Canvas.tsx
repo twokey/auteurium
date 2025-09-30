@@ -29,6 +29,7 @@ import type { Connection, Edge, Node, NodeTypes, ReactFlowInstance } from 'react
 interface Snippet {
   id: string
   projectId: string
+  title?: string
   textField1: string
   textField2: string
   position?: {
@@ -200,6 +201,7 @@ export const Canvas = () => {
         data: {
           snippet: {
             id: snippet.id,
+            title: snippet.title,
             textField1: snippet.textField1,
             textField2: snippet.textField2,
             tags: snippet.tags,
@@ -317,6 +319,7 @@ export const Canvas = () => {
     const variables = {
       input: {
         projectId,
+        title: 'New snippet',
         textField1: '',
         textField2: '',
         position: {
@@ -353,7 +356,20 @@ export const Canvas = () => {
 
   const onInit = useCallback((instance: ReactFlowInstance) => {
     reactFlowInstance.current = instance
-  }, [])
+
+    // Restore saved viewport for this project
+    if (projectId) {
+      const savedViewport = localStorage.getItem(`canvas-viewport-${projectId}`)
+      if (savedViewport) {
+        try {
+          const viewport = JSON.parse(savedViewport)
+          instance.setViewport(viewport)
+        } catch (error) {
+          console.error('Failed to restore viewport:', error)
+        }
+      }
+    }
+  }, [projectId])
 
   const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
     // Find the snippet to get its projectId
@@ -376,6 +392,14 @@ export const Canvas = () => {
       console.error('Failed to save snippet position:', error)
     })
   }, [snippets, projectId, updateSnippetMutation])
+
+  // Save viewport when it changes (pan, zoom)
+  const onMoveEnd = useCallback(() => {
+    if (reactFlowInstance.current && projectId) {
+      const viewport = reactFlowInstance.current.getViewport()
+      localStorage.setItem(`canvas-viewport-${projectId}`, JSON.stringify(viewport))
+    }
+  }, [projectId])
 
   // Handle Delete key press for selected edges
   useEffect(() => {
@@ -489,6 +513,7 @@ export const Canvas = () => {
             onConnect={onConnect}
             onInit={onInit}
             onNodeDragStop={onNodeDragStop}
+            onMoveEnd={onMoveEnd}
             nodeTypes={nodeTypes}
             defaultEdgeOptions={{
               style: { stroke: '#6366f1', strokeWidth: 2 }

@@ -39,6 +39,7 @@ export const CREATE_SNIPPET = gql`
     createSnippet(input: $input) {
       id
       projectId
+      title
       textField1
       textField2
       position {
@@ -59,6 +60,7 @@ export const UPDATE_SNIPPET = gql`
     updateSnippet(projectId: $projectId, id: $id, input: $input) {
       id
       projectId
+      title
       textField1
       textField2
       position {
@@ -85,6 +87,7 @@ export const REVERT_SNIPPET = gql`
     revertSnippet(projectId: $projectId, id: $id, version: $version) {
       id
       projectId
+      title
       textField1
       textField2
       position {

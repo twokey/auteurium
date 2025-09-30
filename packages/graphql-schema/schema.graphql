@@ -27,6 +27,7 @@ type Snippet {
   id: ID!
   projectId: ID!
   userId: ID!
+  title: String
   textField1: String!
   textField2: String!
   position: Position!
@@ -43,6 +44,7 @@ type SnippetVersion {
   id: ID!
   snippetId: ID!
   version: Int!
+  title: String
   textField1: String!
   textField2: String!
   createdAt: String!
@@ -82,6 +84,7 @@ input UpdateProjectInput {
 
 input CreateSnippetInput {
   projectId: ID!
+  title: String
   textField1: String
   textField2: String
   position: PositionInput!
@@ -90,6 +93,7 @@ input CreateSnippetInput {
 }
 
 input UpdateSnippetInput {
+  title: String
   textField1: String
   textField2: String
   position: PositionInput

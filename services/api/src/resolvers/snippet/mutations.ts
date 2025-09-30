@@ -17,6 +17,7 @@ import type { GraphQLContext } from '../../types/context'
 const createSnippetSchema = z.object({
   input: z.object({
     projectId: z.string(),
+    title: z.string().optional().default('New snippet'),
     textField1: z.string().optional().default(''),
     textField2: z.string().optional().default(''),
     position: z.object({
@@ -32,6 +33,7 @@ const updateSnippetSchema = z.object({
   projectId: z.string(),
   id: z.string(),
   input: z.object({
+    title: z.string().optional(),
     textField1: z.string().optional(),
     textField2: z.string().optional(),
     position: z.object({

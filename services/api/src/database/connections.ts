@@ -70,16 +70,6 @@ export const createConnection = async (
   }
 
   try {
-    const existingConnections = await queryConnections({
-      projectId: connection.projectId,
-      sourceSnippetId: connection.sourceSnippetId,
-      targetSnippetId: connection.targetSnippetId
-    })
-
-    if (existingConnections.length > 0) {
-      throw createConflictError('Connection already exists between these snippets')
-    }
-
     const params: Parameters<DocumentClientType['put']>[0] = {
       TableName: TABLES.CONNECTIONS,
       Item: connectionRecord

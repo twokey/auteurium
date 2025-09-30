@@ -7,6 +7,7 @@ export interface Snippet {
   id: string
   projectId: string
   userId: string
+  title?: string
   textField1: string
   textField2: string
   position: Position
@@ -22,6 +23,7 @@ export interface SnippetVersion {
   snippetId: string
   projectId: string
   version: number
+  title?: string
   textField1: string
   textField2: string
   position?: Position
@@ -33,6 +35,7 @@ export interface SnippetVersion {
 
 export interface SnippetInput {
   projectId: string
+  title?: string
   textField1?: string
   textField2?: string
   position?: Position
@@ -41,6 +44,7 @@ export interface SnippetInput {
 }
 
 export interface UpdateSnippetInput {
+  title?: string
   textField1?: string
   textField2?: string
   position?: Position
