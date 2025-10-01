@@ -1,7 +1,7 @@
 import { useMutation } from '@apollo/client'
 import { useCallback, useEffect, useState } from 'react'
 
-import { UPDATE_SNIPPET } from '../../graphql/mutations'
+import { DELETE_SNIPPET, UPDATE_SNIPPET } from '../../graphql/mutations'
 import { GET_PROJECT_WITH_SNIPPETS } from '../../graphql/queries'
 
 interface EditSnippetModalProps {
@@ -28,6 +28,9 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
   const [tagInput, setTagInput] = useState('')
   const [categoryInput, setCategoryInput] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [selectedModel, setSelectedModel] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Reset form when snippet changes
   useEffect(() => {
@@ -39,9 +42,22 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
     setCategories(snippet.categories ?? [])
     setTagInput('')
     setCategoryInput('')
+    setSelectedModel('')
+    setIsGenerating(false)
+    setIsDeleting(false)
   }, [snippet])
 
   const [updateSnippetMutation] = useMutation(UPDATE_SNIPPET, {
+    refetchQueries: [
+      {
+        query: GET_PROJECT_WITH_SNIPPETS,
+        variables: { projectId: snippet.projectId }
+      }
+    ],
+    awaitRefetchQueries: true
+  })
+
+  const [deleteSnippetMutation] = useMutation(DELETE_SNIPPET, {
     refetchQueries: [
       {
         query: GET_PROJECT_WITH_SNIPPETS,
@@ -116,6 +132,44 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
     }
   }, [handleAddCategory])
 
+  const handleGenerate = useCallback(async () => {
+    if (!selectedModel) {
+      alert('Please select an LLM model before generating.')
+      return
+    }
+
+    setIsGenerating(true)
+    try {
+      // TODO: Replace with API integration for LLM generation.
+      setTextField2(textField1)
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [selectedModel, textField1])
+
+  const handleDelete = useCallback(async () => {
+    const shouldDelete = window.confirm('Are you sure you want to delete this snippet? This action cannot be undone.')
+    if (!shouldDelete) {
+      return
+    }
+
+    setIsDeleting(true)
+    try {
+      await deleteSnippetMutation({
+        variables: {
+          projectId: snippet.projectId,
+          id: snippet.id
+        }
+      })
+      onClose()
+    } catch (error) {
+      console.error('Failed to delete snippet:', error)
+      alert(`Failed to delete snippet: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setIsDeleting(false)
+    }
+  }, [deleteSnippetMutation, onClose, snippet.id, snippet.projectId])
+
   if (!isOpen) return null
 
   return (
@@ -128,7 +182,7 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 transition-colors"
-              disabled={isSaving}
+              disabled={isSaving || isDeleting}
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -155,7 +209,7 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Enter snippet title..."
-                disabled={isSaving}
+                disabled={isSaving || isDeleting}
               />
             </div>
 
@@ -171,8 +225,43 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 rows={6}
                 placeholder="Enter text for field 1..."
-                disabled={isSaving}
+                disabled={isSaving || isDeleting}
               />
+            </div>
+
+            {/* LLM Model Selector */}
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="flex-1 min-w-[200px]">
+                <label htmlFor="llmModel" className="block text-sm font-medium text-gray-700 mb-1">
+                  LLM Model
+                </label>
+                <select
+                  id="llmModel"
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={isSaving || isGenerating || isDeleting}
+                >
+                  <option value="" disabled>Select a model...</option>
+                  <option value="placeholder-1">placeholder 1</option>
+                  <option value="placeholder-2">placeholder 2</option>
+                </select>
+              </div>
+              <button
+                onClick={() => {
+                  void handleGenerate()
+                }}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:bg-green-400 flex items-center gap-2"
+                disabled={isSaving || isGenerating || isDeleting || !selectedModel || textField1.trim() === ''}
+              >
+                {isGenerating && (
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                )}
+                {isGenerating ? 'Generating...' : 'Generate'}
+              </button>
             </div>
 
             {/* Text Field 2 */}
@@ -187,7 +276,7 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 rows={6}
                 placeholder="Enter text for field 2..."
-                disabled={isSaving}
+                disabled={isSaving || isDeleting}
               />
             </div>
 
@@ -205,12 +294,12 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
                   onKeyPress={handleTagKeyPress}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Add a tag..."
-                  disabled={isSaving}
+                  disabled={isSaving || isDeleting}
                 />
                 <button
                   onClick={handleAddTag}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-blue-400"
-                  disabled={isSaving || !tagInput.trim()}
+                  disabled={isSaving || isDeleting || !tagInput.trim()}
                 >
                   Add
                 </button>
@@ -226,7 +315,7 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
                       <button
                         onClick={() => handleRemoveTag(tag)}
                         className="text-blue-600 hover:text-blue-800"
-                        disabled={isSaving}
+                        disabled={isSaving || isDeleting}
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -252,12 +341,12 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
                   onKeyPress={handleCategoryKeyPress}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Add a category..."
-                  disabled={isSaving}
+                  disabled={isSaving || isDeleting}
                 />
                 <button
                   onClick={handleAddCategory}
                   className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors disabled:bg-purple-400"
-                  disabled={isSaving || !categoryInput.trim()}
+                  disabled={isSaving || isDeleting || !categoryInput.trim()}
                 >
                   Add
                 </button>
@@ -273,7 +362,7 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
                       <button
                         onClick={() => handleRemoveCategory(category)}
                         className="text-purple-600 hover:text-purple-800"
-                        disabled={isSaving}
+                        disabled={isSaving || isDeleting}
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -288,29 +377,40 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-            disabled={isSaving}
-          >
-            Cancel
-          </button>
+        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between gap-3">
           <button
             onClick={() => {
-              void handleSave()
+              void handleDelete()
             }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-blue-400 flex items-center gap-2"
-            disabled={isSaving}
+            className="px-4 py-2 text-red-700 bg-red-100 rounded-md hover:bg-red-200 transition-colors disabled:bg-red-50 disabled:text-red-300"
+            disabled={isSaving || isDeleting || isGenerating}
           >
-            {isSaving && (
-              <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-            )}
-            {isSaving ? 'Saving...' : 'Save Changes'}
+            {isDeleting ? 'Deleting...' : 'Delete'}
           </button>
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors disabled:bg-gray-50 disabled:text-gray-400"
+              disabled={isSaving || isDeleting}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                void handleSave()
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-blue-400 flex items-center gap-2"
+              disabled={isSaving || isDeleting}
+            >
+              {isSaving && (
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              )}
+              {isSaving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
