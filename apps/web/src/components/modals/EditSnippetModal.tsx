@@ -1,5 +1,6 @@
 import { useMutation } from '@apollo/client'
 import { useCallback, useEffect, useState } from 'react'
+
 import { UPDATE_SNIPPET } from '../../graphql/mutations'
 import { GET_PROJECT_WITH_SNIPPETS } from '../../graphql/queries'
 
@@ -20,10 +21,10 @@ interface EditSnippetModalProps {
 export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalProps) => {
   const normalisedTitle = snippet.title && snippet.title.trim() !== '' ? snippet.title : 'New snippet'
   const [title, setTitle] = useState(normalisedTitle)
-  const [textField1, setTextField1] = useState(snippet.textField1 || '')
-  const [textField2, setTextField2] = useState(snippet.textField2 || '')
-  const [tags, setTags] = useState<string[]>(snippet.tags || [])
-  const [categories, setCategories] = useState<string[]>(snippet.categories || [])
+  const [textField1, setTextField1] = useState(snippet.textField1 ?? '')
+  const [textField2, setTextField2] = useState(snippet.textField2 ?? '')
+  const [tags, setTags] = useState<string[]>(snippet.tags ?? [])
+  const [categories, setCategories] = useState<string[]>(snippet.categories ?? [])
   const [tagInput, setTagInput] = useState('')
   const [categoryInput, setCategoryInput] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -32,10 +33,10 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
   useEffect(() => {
     const nextTitle = snippet.title && snippet.title.trim() !== '' ? snippet.title : 'New snippet'
     setTitle(nextTitle)
-    setTextField1(snippet.textField1 || '')
-    setTextField2(snippet.textField2 || '')
-    setTags(snippet.tags || [])
-    setCategories(snippet.categories || [])
+    setTextField1(snippet.textField1 ?? '')
+    setTextField2(snippet.textField2 ?? '')
+    setTags(snippet.tags ?? [])
+    setCategories(snippet.categories ?? [])
     setTagInput('')
     setCategoryInput('')
   }, [snippet])
@@ -53,12 +54,14 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
   const handleSave = useCallback(async () => {
     setIsSaving(true)
     try {
+      const trimmedTitle = title.trim()
+
       await updateSnippetMutation({
         variables: {
           projectId: snippet.projectId,
           id: snippet.id,
           input: {
-            title: title.trim() || undefined,
+            title: trimmedTitle === '' ? undefined : trimmedTitle,
             textField1,
             textField2,
             tags,
@@ -294,7 +297,9 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
             Cancel
           </button>
           <button
-            onClick={handleSave}
+            onClick={() => {
+              void handleSave()
+            }}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-blue-400 flex items-center gap-2"
             disabled={isSaving}
           >

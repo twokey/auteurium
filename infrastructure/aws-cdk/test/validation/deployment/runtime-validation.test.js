@@ -1,9 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const client_lambda_1 = require("@aws-sdk/client-lambda");
-const client_dynamodb_1 = require("@aws-sdk/client-dynamodb");
-const client_cognito_identity_provider_1 = require("@aws-sdk/client-cognito-identity-provider");
 const client_appsync_1 = require("@aws-sdk/client-appsync");
+const client_cognito_identity_provider_1 = require("@aws-sdk/client-cognito-identity-provider");
+const client_dynamodb_1 = require("@aws-sdk/client-dynamodb");
+const client_lambda_1 = require("@aws-sdk/client-lambda");
+
 describe('Deployed Infrastructure Validation', () => {
     const stage = process.env.STAGE || 'test';
     const region = process.env.AWS_REGION || 'us-west-2';

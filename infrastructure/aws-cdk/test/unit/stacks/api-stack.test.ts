@@ -1,7 +1,7 @@
+import { describe, test, beforeEach, expect } from '@jest/globals';
 import * as cdk from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
-import { describe, test, beforeEach, expect } from '@jest/globals';
 
 import { AuteuriumApiStack } from '../../../lib/stacks/auteurium-api-stack';
 
@@ -114,8 +114,7 @@ describe('AuteuriumApiStack', () => {
       // Check that Lambda functions have proper S3 code assets
       const functions = template.findResources('AWS::Lambda::Function');
       const appFunctions = Object.values(functions).filter((func: any) =>
-        func.Properties.FunctionName &&
-        func.Properties.FunctionName.includes('auteurium-api')
+        func.Properties.FunctionName?.includes('auteurium-api')
       );
 
       appFunctions.forEach((func: any) => {
@@ -262,7 +261,7 @@ describe('AuteuriumApiStack', () => {
       const outputs = template.findOutputs('GraphQLApiUrl');
       expect(Object.keys(outputs)).toHaveLength(1);
 
-      const output = outputs['GraphQLApiUrl'];
+      const output = outputs.GraphQLApiUrl;
       expect(output.Value).toBeDefined();
       expect(output.Value['Fn::GetAtt']).toBeDefined();
       expect(output.Value['Fn::GetAtt']).toHaveLength(2);
@@ -309,8 +308,7 @@ describe('AuteuriumApiStack', () => {
       // API stack may have additional custom resource handlers
       const functions = template.findResources('AWS::Lambda::Function');
       const appFunctions = Object.values(functions).filter((func: any) =>
-        func.Properties.FunctionName &&
-        func.Properties.FunctionName.includes('auteurium-api')
+        func.Properties.FunctionName?.includes('auteurium-api')
       );
       expect(appFunctions).toHaveLength(1);
     });

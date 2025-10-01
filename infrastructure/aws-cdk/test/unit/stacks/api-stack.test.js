@@ -25,8 +25,10 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const cdk = __importStar(require("aws-cdk-lib"));
 const assertions_1 = require("aws-cdk-lib/assertions");
+
 const cognito = __importStar(require("aws-cdk-lib/aws-cognito"));
 const auteurium_api_stack_1 = require("../../../lib/stacks/auteurium-api-stack");
+
 describe('AuteuriumApiStack', () => {
     let app;
     let stack;

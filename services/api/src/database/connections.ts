@@ -8,7 +8,7 @@ import {
   getCurrentTimestamp,
   type DocumentClientType
 } from './client'
-import { createConflictError, createNotFoundError } from '../utils/errors'
+import { createNotFoundError } from '../utils/errors'
 
 import type { Connection, ConnectionInput } from '@auteurium/shared-types'
 

@@ -2,11 +2,12 @@ import * as path from 'path'
 
 import * as cdk from 'aws-cdk-lib'
 import * as appsync from 'aws-cdk-lib/aws-appsync'
-import type * as cognito from 'aws-cdk-lib/aws-cognito'
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb'
 import * as iam from 'aws-cdk-lib/aws-iam'
 import * as lambda from 'aws-cdk-lib/aws-lambda'
 import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs'
+
+import type * as cognito from 'aws-cdk-lib/aws-cognito'
 import type { Construct } from 'constructs'
 
 interface AuteuriumApiStackProps extends cdk.StackProps {

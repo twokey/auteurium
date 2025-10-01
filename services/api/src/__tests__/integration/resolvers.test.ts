@@ -102,12 +102,7 @@ describe('GraphQL Resolvers Integration Tests', () => {
         // Remove auth header to simulate unauthenticated request
         delete event.headers.Authorization
 
-        try {
-          await handler(event)
-          throw new Error('Expected handler to throw')
-        } catch (error) {
-          expect((error as Error).message).toContain('Authentication required')
-        }
+        await expect(handler(event)).rejects.toThrow('Authentication required')
       })
     })
 
@@ -192,12 +187,7 @@ describe('GraphQL Resolvers Integration Tests', () => {
 
         const event = createMockEvent('deleteProject', 'Mutation', { projectId }, user)
 
-        try {
-          await handler(event)
-          throw new Error('Expected handler to throw')
-        } catch (error) {
-          expect((error as Error).message).toContain('Access denied to project')
-        }
+        await expect(handler(event)).rejects.toThrow('Access denied to project')
       })
     })
   })
@@ -458,12 +448,7 @@ describe('GraphQL Resolvers Integration Tests', () => {
 
         const event = createMockEvent('createConnection', 'Mutation', connectionInput, user)
 
-        try {
-          await handler(event)
-          throw new Error('Expected handler to throw')
-        } catch (error) {
-          expect((error as Error).message).toContain('Content access denied - privacy protected')
-        }
+        await expect(handler(event)).rejects.toThrow('Content access denied - privacy protected')
       })
 
       it('should prevent self-connections', async () => {
@@ -500,12 +485,7 @@ describe('GraphQL Resolvers Integration Tests', () => {
 
         const event = createMockEvent('createConnection', 'Mutation', connectionInput, user)
 
-        try {
-          await handler(event)
-          throw new Error('Expected handler to throw')
-        } catch (error) {
-          expect((error as Error).message).toContain('Cannot create connection from snippet to itself')
-        }
+        await expect(handler(event)).rejects.toThrow('Cannot create connection from snippet to itself')
       })
     })
   })
@@ -516,12 +496,7 @@ describe('GraphQL Resolvers Integration Tests', () => {
 
       const event = createMockEvent('users', 'Query', {}, admin)
 
-      try {
-        await handler(event)
-        throw new Error('Expected handler to throw')
-      } catch (error) {
-        expect((error as Error).message).toContain('Not implemented')
-      }
+      await expect(handler(event)).rejects.toThrow('Not implemented')
     })
 
     it('should prevent standard user from accessing user management endpoints', async () => {
@@ -529,12 +504,7 @@ describe('GraphQL Resolvers Integration Tests', () => {
 
       const event = createMockEvent('users', 'Query', {}, user)
 
-      try {
-        await handler(event)
-        throw new Error('Expected handler to throw')
-      } catch (error) {
-        expect((error as Error).message).toContain('Admin access required')
-      }
+      await expect(handler(event)).rejects.toThrow('Admin access required')
     })
 
     it('should enforce content privacy even for admin users', async () => {
@@ -564,12 +534,7 @@ describe('GraphQL Resolvers Integration Tests', () => {
 
       const event = createMockEvent('snippet', 'Query', { projectId, snippetId }, admin)
 
-      try {
-        await handler(event)
-        throw new Error('Expected handler to throw')
-      } catch (error) {
-        expect((error as Error).message).toContain('Content access denied - privacy protected')
-      }
+      await expect(handler(event)).rejects.toThrow('Content access denied - privacy protected')
     })
   })
 })

@@ -24,10 +24,11 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const cdk = __importStar(require("aws-cdk-lib"));
+const globals_1 = require("@jest/globals");
 const assertions_1 = require("aws-cdk-lib/assertions");
+
 const auteurium_media_stack_1 = require("../../../lib/stacks/auteurium-media-stack");
 // Explicit Jest type imports to resolve TypeScript issues
-const globals_1 = require("@jest/globals");
 (0, globals_1.describe)('AuteuriumMediaStack', () => {
     let app;
     let stack;

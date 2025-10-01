@@ -1,6 +1,6 @@
+import { describe, test, beforeEach, expect } from '@jest/globals';
 import * as cdk from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
-import { describe, test, beforeEach, expect } from '@jest/globals';
 
 import { AuteuriumMediaStack } from '../../../lib/stacks/auteurium-media-stack';
 
@@ -107,8 +107,7 @@ describe('AuteuriumMediaStack', () => {
       // Check that both functions have environment variables with correct structure
       const functions = template.findResources('AWS::Lambda::Function');
       const appFunctions = Object.values(functions).filter((func: any) =>
-        func.Properties.FunctionName &&
-        func.Properties.FunctionName.includes('auteurium')
+        func.Properties.FunctionName?.includes('auteurium')
       );
 
       appFunctions.forEach((func: any) => {
@@ -124,8 +123,7 @@ describe('AuteuriumMediaStack', () => {
       // Check that Lambda functions have proper S3 code assets
       const functions = template.findResources('AWS::Lambda::Function');
       const appFunctions = Object.values(functions).filter((func: any) =>
-        func.Properties.FunctionName &&
-        func.Properties.FunctionName.includes('auteurium')
+        func.Properties.FunctionName?.includes('auteurium')
       );
 
       appFunctions.forEach((func: any) => {
@@ -145,8 +143,7 @@ describe('AuteuriumMediaStack', () => {
       const customResources = template.findResources('Custom::S3BucketNotifications');
 
       const hasBucketNotification = Object.values(buckets).some((bucket: any) =>
-        bucket.Properties.NotificationConfiguration &&
-        bucket.Properties.NotificationConfiguration.LambdaConfigurations
+        bucket.Properties.NotificationConfiguration?.LambdaConfigurations
       );
 
       const hasCustomResourceNotification = Object.keys(customResources).length > 0;
@@ -211,7 +208,7 @@ describe('AuteuriumMediaStack', () => {
       const outputs = template.findOutputs('MediaBucketName');
       expect(Object.keys(outputs)).toHaveLength(1);
 
-      const output = outputs['MediaBucketName'];
+      const output = outputs.MediaBucketName;
       expect(output.Value).toBeDefined();
       expect(output.Value.Ref).toBeDefined();
       expect(output.Export.Name).toBe('Auteurium-MediaBucketName-test');
@@ -221,7 +218,7 @@ describe('AuteuriumMediaStack', () => {
       const outputs = template.findOutputs('PresignedUrlFunctionArn');
       expect(Object.keys(outputs)).toHaveLength(1);
 
-      const output = outputs['PresignedUrlFunctionArn'];
+      const output = outputs.PresignedUrlFunctionArn;
       expect(output.Value).toBeDefined();
       expect(output.Value['Fn::GetAtt']).toBeDefined();
       expect(output.Value['Fn::GetAtt']).toHaveLength(2);
@@ -239,8 +236,7 @@ describe('AuteuriumMediaStack', () => {
       // Note: CDK may create additional Lambda functions for custom resources
       const functions = template.findResources('AWS::Lambda::Function');
       const appFunctions = Object.values(functions).filter((func: any) =>
-        func.Properties.FunctionName &&
-        func.Properties.FunctionName.includes('auteurium')
+        func.Properties.FunctionName?.includes('auteurium')
       );
 
       expect(appFunctions).toHaveLength(2);
@@ -323,10 +319,8 @@ describe('AuteuriumMediaStack', () => {
       const functions = template.findResources('AWS::Lambda::Function');
       Object.values(functions).forEach((func: any) => {
         if (
-          func.Properties.FunctionName &&
-          func.Properties.FunctionName.includes('auteurium') &&
-          func.Properties.Runtime &&
-          func.Properties.Runtime.startsWith('nodejs')
+          func.Properties.FunctionName?.includes('auteurium') &&
+          func.Properties.Runtime?.startsWith('nodejs')
         ) {
           expect(func.Properties.Runtime).toBe('nodejs22.x');
         }

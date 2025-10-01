@@ -13,11 +13,7 @@ export const userQueries = {
 
     logger.info('Fetching current user profile')
 
-    if (!user) {
-      return null
-    }
-
-    return user
+    return await Promise.resolve(user ?? null)
   },
 
   users: async (

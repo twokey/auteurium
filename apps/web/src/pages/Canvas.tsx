@@ -24,7 +24,7 @@ import { Navigation } from '../components/ui/Navigation'
 import { CREATE_SNIPPET, UPDATE_SNIPPET, CREATE_CONNECTION, DELETE_CONNECTION } from '../graphql/mutations'
 import { GET_PROJECT_WITH_SNIPPETS } from '../graphql/queries'
 
-import type { Connection, Edge, Node, NodeTypes, ReactFlowInstance } from 'reactflow'
+import type { Connection, Edge, Node, NodeTypes, ReactFlowInstance, Viewport } from 'reactflow'
 
 interface Snippet {
   id: string
@@ -68,16 +68,48 @@ interface ProjectWithSnippetsQueryVariables {
 }
 
 const EMPTY_SNIPPET_LIST: Snippet[] = []
-const initialNodes: Node[] = []
-const initialEdges: Edge[] = []
+interface SnippetNodeData {
+  snippet: {
+    id: string
+    title?: string
+    textField1: string
+    textField2: string
+    tags?: string[]
+    categories?: string[]
+  }
+  onEdit: (snippetId: string) => void
+  onDelete: (snippetId: string) => void
+  onManageConnections: (snippetId: string) => void
+  onViewVersions: (snippetId: string) => void
+}
+
+interface ConnectionEdgeData {
+  connectionId?: string
+}
+
+const initialNodes: Node<SnippetNodeData>[] = []
+const initialEdges: Edge<ConnectionEdgeData>[] = []
+
+const isViewport = (value: unknown): value is Viewport => {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+
+  const candidate = value as Record<string, unknown>
+  return (
+    typeof candidate.x === 'number' &&
+    typeof candidate.y === 'number' &&
+    typeof candidate.zoom === 'number'
+  )
+}
 
 export const Canvas = () => {
   const { id: projectId } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null)
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+  const [nodes, setNodes, onNodesChange] = useNodesState<SnippetNodeData>(initialNodes)
+  const [edges, setEdges, onEdgesChange] = useEdgesState<ConnectionEdgeData>(initialEdges)
   const [isLoading, setIsLoading] = useState(false)
 
   // Modal states
@@ -219,7 +251,7 @@ export const Canvas = () => {
           minWidth: 200,
           boxShadow: '0 10px 15px -3px rgba(15, 23, 42, 0.08)'
         }
-      } as Node
+      } as Node<SnippetNodeData>
     })
   }, [snippets, handleEditSnippet, handleDeleteSnippet, handleManageConnections, handleViewVersions])
 
@@ -228,7 +260,7 @@ export const Canvas = () => {
   }, [flowNodes, setNodes])
 
   const flowEdges = useMemo(() => {
-    const edgesMap = new Map<string, Edge>()
+    const edgesMap = new Map<string, Edge<ConnectionEdgeData>>()
 
     snippets.forEach((snippet) => {
       if (!snippet.connections) return
@@ -362,8 +394,10 @@ export const Canvas = () => {
       const savedViewport = localStorage.getItem(`canvas-viewport-${projectId}`)
       if (savedViewport) {
         try {
-          const viewport = JSON.parse(savedViewport)
-          instance.setViewport(viewport)
+          const parsed: unknown = JSON.parse(savedViewport)
+          if (isViewport(parsed)) {
+            instance.setViewport(parsed)
+          }
         } catch (error) {
           console.error('Failed to restore viewport:', error)
         }
@@ -418,9 +452,9 @@ export const Canvas = () => {
 
           // Delete each selected connection
           selectedEdges.forEach(edge => {
-            const connectionId = edge.data?.connectionId || edge.id
+            const connectionId = edge.data?.connectionId ?? edge.id
 
-            console.log('Deleting connection:', {
+            console.warn('Deleting connection', {
               projectId,
               edgeId: edge.id,
               connectionId,

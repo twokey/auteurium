@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from '@apollo/client'
 import { useCallback, useState } from 'react'
+
 import { REVERT_SNIPPET } from '../../graphql/mutations'
 import { GET_PROJECT_WITH_SNIPPETS, GET_SNIPPET_VERSIONS } from '../../graphql/queries'
 
@@ -9,6 +10,10 @@ interface SnippetVersion {
   textField1: string
   textField2: string
   createdAt: string
+}
+
+interface SnippetVersionsQueryData {
+  snippetVersions: SnippetVersion[]
 }
 
 interface VersionHistoryModalProps {
@@ -27,7 +32,7 @@ export const VersionHistoryModal = ({ isOpen, onClose, snippet }: VersionHistory
   const [selectedVersion, setSelectedVersion] = useState<SnippetVersion | null>(null)
   const [isReverting, setIsReverting] = useState(false)
 
-  const { data, loading, error } = useQuery(GET_SNIPPET_VERSIONS, {
+  const { data, loading, error } = useQuery<SnippetVersionsQueryData, { snippetId: string }>(GET_SNIPPET_VERSIONS, {
     variables: { snippetId: snippet.id },
     skip: !isOpen,
     fetchPolicy: 'cache-and-network'
@@ -43,7 +48,7 @@ export const VersionHistoryModal = ({ isOpen, onClose, snippet }: VersionHistory
     awaitRefetchQueries: true
   })
 
-  const versions: SnippetVersion[] = data?.snippetVersions || []
+  const versions = data?.snippetVersions ?? []
 
   const handleRevert = useCallback(async () => {
     if (!selectedVersion) return
@@ -68,7 +73,7 @@ export const VersionHistoryModal = ({ isOpen, onClose, snippet }: VersionHistory
     } finally {
       setIsReverting(false)
     }
-  }, [selectedVersion, snippet.id, revertSnippetMutation, onClose])
+  }, [selectedVersion, snippet.id, snippet.projectId, revertSnippetMutation, onClose])
 
   const formatDate = useCallback((dateString: string) => {
     return new Date(dateString).toLocaleString('en-US', {
@@ -178,7 +183,9 @@ export const VersionHistoryModal = ({ isOpen, onClose, snippet }: VersionHistory
                   </div>
                   {selectedVersion.version !== snippet.version && (
                     <button
-                      onClick={handleRevert}
+                      onClick={() => {
+                        void handleRevert()
+                      }}
                       disabled={isReverting}
                       className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-blue-400 flex items-center gap-2 text-sm"
                     >
@@ -195,20 +202,24 @@ export const VersionHistoryModal = ({ isOpen, onClose, snippet }: VersionHistory
 
                 <div className="border-t border-gray-200 pt-4">
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <p className="text-sm font-medium text-gray-700 mb-2">
                       Text Field 1
-                    </label>
+                    </p>
                     <div className="bg-gray-50 rounded-md p-3 border border-gray-200 whitespace-pre-wrap break-words">
-                      {selectedVersion.textField1 || <span className="text-gray-400 italic">Empty</span>}
+                      {selectedVersion.textField1 !== ''
+                        ? selectedVersion.textField1
+                        : <span className="text-gray-400 italic">Empty</span>}
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <p className="text-sm font-medium text-gray-700 mb-2">
                       Text Field 2
-                    </label>
+                    </p>
                     <div className="bg-gray-50 rounded-md p-3 border border-gray-200 whitespace-pre-wrap break-words">
-                      {selectedVersion.textField2 || <span className="text-gray-400 italic">Empty</span>}
+                      {selectedVersion.textField2 !== ''
+                        ? selectedVersion.textField2
+                        : <span className="text-gray-400 italic">Empty</span>}
                     </div>
                   </div>
                 </div>

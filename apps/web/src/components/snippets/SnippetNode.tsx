@@ -44,6 +44,16 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
     }
   }, [snippet.id, onEdit, showContextMenu])
 
+  const handleSnippetKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        onEdit(snippet.id)
+      }
+    },
+    [onEdit, snippet.id]
+  )
+
   const combinedText = `${snippet.textField1} ${snippet.textField2}`.trim()
   const wordCount = countWords(combinedText)
   const isLarge = wordCount > WORD_LIMIT
@@ -107,6 +117,10 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
         className="p-3 min-w-[200px] max-w-[300px] cursor-pointer hover:bg-gray-50 transition-colors"
         onContextMenu={handleContextMenu}
         onClick={handleSnippetClick}
+        onKeyDown={handleSnippetKeyDown}
+        role="button"
+        tabIndex={0}
+        aria-label={`Edit snippet ${displayTitle}`}
         data-testid="snippet-node"
         data-snippet-id={snippet.id}
       >
@@ -182,9 +196,17 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
       {showContextMenu && (
         <>
           {/* Backdrop to close menu */}
-          <div
+          <button
+            type="button"
             className="fixed inset-0 z-[9998]"
             onClick={handleCloseContextMenu}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                handleCloseContextMenu()
+              }
+            }}
+            aria-label="Close snippet context menu"
           />
 
           {/* Context Menu */}

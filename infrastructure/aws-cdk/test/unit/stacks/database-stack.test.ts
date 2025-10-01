@@ -1,6 +1,6 @@
+import { describe, test, beforeEach, expect } from '@jest/globals';
 import * as cdk from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
-import { describe, test, beforeEach, expect } from '@jest/globals';
 
 import { AuteuriumDatabaseStack } from '../../../lib/stacks/auteurium-database-stack';
 
@@ -328,7 +328,7 @@ describe('AuteuriumDatabaseStack', () => {
       const outputs = template.findOutputs('UsersTableNametest');
       expect(Object.keys(outputs)).toHaveLength(1);
 
-      const output = outputs['UsersTableNametest'];
+      const output = outputs.UsersTableNametest;
       expect(output.Value).toBeDefined();
       expect(output.Value.Ref).toBeDefined();
       expect(output.Export.Name).toBe('AuteuriumUsersTable-test');

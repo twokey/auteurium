@@ -1,7 +1,9 @@
 import { expect } from '@playwright/test';
-import type { Page } from '@playwright/test';
 
 import { CredentialManager } from './credential-manager';
+
+import type { Page } from '@playwright/test';
+
 
 /**
  * Wait for the application to be fully loaded

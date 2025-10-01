@@ -1,5 +1,6 @@
 import { useMutation } from '@apollo/client'
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+
 import { CREATE_CONNECTION, DELETE_CONNECTION } from '../../graphql/mutations'
 import { GET_PROJECT_WITH_SNIPPETS } from '../../graphql/queries'
 
@@ -21,11 +22,11 @@ interface ManageConnectionsModalProps {
     textField1: string
     connections?: Connection[]
   }
-  allSnippets: Array<{
+  allSnippets: {
     id: string
     textField1: string
     connections?: Connection[]
-  }>
+  }[]
 }
 
 export const ManageConnectionsModal = ({ isOpen, onClose, snippet, allSnippets }: ManageConnectionsModalProps) => {
@@ -54,12 +55,20 @@ export const ManageConnectionsModal = ({ isOpen, onClose, snippet, allSnippets }
   })
 
   // Get all connections where this snippet is the source
-  const outgoingConnections = snippet.connections || []
+  const outgoingConnections = useMemo(() => snippet.connections ?? [], [snippet.connections])
+  const snippetTitlePreview = useMemo(() => {
+    const preview = snippet.textField1?.substring(0, 40)
+    return preview && preview !== '' ? preview : 'Untitled'
+  }, [snippet.textField1])
 
   // Get all connections where this snippet is the target
-  const incomingConnections = allSnippets
-    .flatMap(s => (s.connections || []).map(conn => ({ ...conn, sourceSnippet: s })))
-    .filter(conn => conn.targetSnippetId === snippet.id)
+  const incomingConnections = useMemo(
+    () =>
+      allSnippets
+        .flatMap(s => (s.connections ?? []).map(conn => ({ ...conn, sourceSnippet: s })))
+        .filter(conn => conn.targetSnippetId === snippet.id),
+    [allSnippets, snippet.id]
+  )
 
   const handleCreateConnection = useCallback(async () => {
     const trimmedId = targetSnippetId.trim()
@@ -85,13 +94,14 @@ export const ManageConnectionsModal = ({ isOpen, onClose, snippet, allSnippets }
 
     setIsCreating(true)
     try {
+      const trimmedLabel = connectionLabel.trim()
       await createConnectionMutation({
         variables: {
           input: {
             projectId: snippet.projectId,
             sourceSnippetId: snippet.id,
             targetSnippetId: fullTargetId,
-            label: connectionLabel.trim() || null
+            label: trimmedLabel === '' ? null : trimmedLabel
           }
         }
       })
@@ -103,7 +113,7 @@ export const ManageConnectionsModal = ({ isOpen, onClose, snippet, allSnippets }
     } finally {
       setIsCreating(false)
     }
-  }, [targetSnippetId, connectionLabel, snippet, allSnippets, outgoingConnections, createConnectionMutation])
+  }, [targetSnippetId, connectionLabel, allSnippets, snippet.id, snippet.projectId, createConnectionMutation])
 
   const handleDeleteConnection = useCallback(async (connectionId: string) => {
     if (!confirm('Are you sure you want to delete this connection?')) return
@@ -111,20 +121,22 @@ export const ManageConnectionsModal = ({ isOpen, onClose, snippet, allSnippets }
     try {
       await deleteConnectionMutation({
         variables: {
-          id: connectionId
+          projectId: snippet.projectId,
+          connectionId
         }
       })
     } catch (error) {
       console.error('Failed to delete connection:', error)
       alert(`Failed to delete connection: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
-  }, [deleteConnectionMutation])
+  }, [deleteConnectionMutation, snippet.projectId])
 
   const getSnippetPreview = useCallback((snippetId: string) => {
     const foundSnippet = allSnippets.find(s => s.id === snippetId)
     if (!foundSnippet) return `Unknown snippet (${snippetId.slice(0, 8)})`
-    const preview = foundSnippet.textField1?.trim() || 'Untitled snippet'
-    return preview.length > 40 ? preview.substring(0, 40) + '...' : preview
+    const previewSource = foundSnippet.textField1?.trim()
+    const preview = previewSource && previewSource !== '' ? previewSource : 'Untitled snippet'
+    return preview.length > 40 ? `${preview.substring(0, 40)}...` : preview
   }, [allSnippets])
 
   if (!isOpen) return null
@@ -146,7 +158,7 @@ export const ManageConnectionsModal = ({ isOpen, onClose, snippet, allSnippets }
             </button>
           </div>
           <p className="text-sm text-gray-500 mt-1">
-            Snippet: <span className="font-mono">#{snippet.id.slice(0, 8)}</span> - {snippet.textField1?.substring(0, 40) || 'Untitled'}
+            Snippet: <span className="font-mono">#{snippet.id.slice(0, 8)}</span> - {snippetTitlePreview}
           </p>
         </div>
 
@@ -190,7 +202,9 @@ export const ManageConnectionsModal = ({ isOpen, onClose, snippet, allSnippets }
               </div>
 
               <button
-                onClick={handleCreateConnection}
+                onClick={() => {
+                  void handleCreateConnection()
+                }}
                 className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-blue-400 flex items-center justify-center gap-2"
                 disabled={isCreating || !targetSnippetId.trim()}
               >
@@ -233,7 +247,9 @@ export const ManageConnectionsModal = ({ isOpen, onClose, snippet, allSnippets }
                       </p>
                     </div>
                     <button
-                      onClick={() => handleDeleteConnection(connection.id)}
+                      onClick={() => {
+                        void handleDeleteConnection(connection.id)
+                      }}
                       className="ml-3 text-red-600 hover:text-red-800 p-1"
                       title="Delete connection"
                     >
@@ -275,7 +291,9 @@ export const ManageConnectionsModal = ({ isOpen, onClose, snippet, allSnippets }
                       </p>
                     </div>
                     <button
-                      onClick={() => handleDeleteConnection(connection.id)}
+                      onClick={() => {
+                        void handleDeleteConnection(connection.id)
+                      }}
                       className="ml-3 text-red-600 hover:text-red-800 p-1"
                       title="Delete connection"
                     >

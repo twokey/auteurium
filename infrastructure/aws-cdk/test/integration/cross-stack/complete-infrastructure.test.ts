@@ -259,7 +259,7 @@ describe('Complete Infrastructure Integration', () => {
         const lambdaFunctions = template.findResources('AWS::Lambda::Function');
 
         Object.values(lambdaFunctions).forEach((func: any) => {
-          if (func.Properties.Runtime && func.Properties.Runtime.startsWith('nodejs')) {
+          if (func.Properties.Runtime?.startsWith('nodejs')) {
             expect(func.Properties.Runtime).toBe('nodejs22.x');
           }
         });

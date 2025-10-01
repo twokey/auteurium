@@ -1,5 +1,6 @@
 import { useMutation } from '@apollo/client'
 import { useCallback, useState } from 'react'
+
 import { DELETE_SNIPPET } from '../../graphql/mutations'
 import { GET_PROJECT_WITH_SNIPPETS } from '../../graphql/queries'
 
@@ -39,13 +40,17 @@ export const DeleteSnippetConfirmation = ({ isOpen, onClose, snippet }: DeleteSn
     } catch (error) {
       console.error('Failed to delete snippet:', error)
       alert(`Failed to delete snippet: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
       setIsDeleting(false)
     }
-  }, [snippet.id, deleteSnippetMutation, onClose])
+  }, [deleteSnippetMutation, onClose, snippet.id, snippet.projectId])
 
   if (!isOpen) return null
 
-  const snippetPreview = snippet.textField1?.trim() || 'Untitled snippet'
+  const snippetPreviewSource = snippet.textField1?.trim()
+  const snippetPreview = snippetPreviewSource && snippetPreviewSource !== ''
+    ? snippetPreviewSource
+    : 'Untitled snippet'
   const displayPreview = snippetPreview.length > 50
     ? snippetPreview.substring(0, 50) + '...'
     : snippetPreview
@@ -93,7 +98,9 @@ export const DeleteSnippetConfirmation = ({ isOpen, onClose, snippet }: DeleteSn
             Cancel
           </button>
           <button
-            onClick={handleDelete}
+            onClick={() => {
+              void handleDelete()
+            }}
             className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors disabled:bg-red-400 flex items-center gap-2"
             disabled={isDeleting}
           >

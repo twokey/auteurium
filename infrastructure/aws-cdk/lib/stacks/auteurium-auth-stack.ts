@@ -1,6 +1,6 @@
 import * as cdk from 'aws-cdk-lib'
 import * as cognito from 'aws-cdk-lib/aws-cognito'
-import { Construct } from 'constructs'
+import { type Construct } from 'constructs'
 
 interface AuteuriumAuthStackProps extends cdk.StackProps {
   stage: string
