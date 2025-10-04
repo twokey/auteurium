@@ -52,6 +52,67 @@ export type CreateSnippetInput = {
   title?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type GenerateContentInput = {
+  maxTokens?: InputMaybe<Scalars['Int']['input']>;
+  modelId: Scalars['ID']['input'];
+  prompt: Scalars['String']['input'];
+  systemPrompt?: InputMaybe<Scalars['String']['input']>;
+  temperature?: InputMaybe<Scalars['Float']['input']>;
+};
+
+export enum GenerationModality {
+  TextToAudio = 'TEXT_TO_AUDIO',
+  TextToImage = 'TEXT_TO_IMAGE',
+  TextToText = 'TEXT_TO_TEXT',
+  TextToVideo = 'TEXT_TO_VIDEO'
+}
+
+export type GenerationRecord = {
+  __typename?: 'GenerationRecord';
+  cost: Scalars['Float']['output'];
+  createdAt: Scalars['String']['output'];
+  generationTimeMs: Scalars['Int']['output'];
+  id: Scalars['ID']['output'];
+  modelId: Scalars['String']['output'];
+  modelProvider: Scalars['String']['output'];
+  projectId: Scalars['ID']['output'];
+  prompt: Scalars['String']['output'];
+  result: Scalars['String']['output'];
+  snippetId: Scalars['ID']['output'];
+  systemPrompt?: Maybe<Scalars['String']['output']>;
+  tokensUsed: Scalars['Int']['output'];
+  userId: Scalars['ID']['output'];
+};
+
+export type GenerationResult = {
+  __typename?: 'GenerationResult';
+  content: Scalars['String']['output'];
+  cost: Scalars['Float']['output'];
+  generationTimeMs: Scalars['Int']['output'];
+  modelUsed: Scalars['String']['output'];
+  tokensUsed: Scalars['Int']['output'];
+};
+
+export type ModelConfig = {
+  __typename?: 'ModelConfig';
+  costPerToken?: Maybe<Scalars['Float']['output']>;
+  description?: Maybe<Scalars['String']['output']>;
+  displayName: Scalars['String']['output'];
+  enabled: Scalars['Boolean']['output'];
+  id: Scalars['ID']['output'];
+  maxTokens?: Maybe<Scalars['Int']['output']>;
+  modality: GenerationModality;
+  modelId: Scalars['String']['output'];
+  provider: ModelProvider;
+};
+
+export enum ModelProvider {
+  Anthropic = 'ANTHROPIC',
+  Custom = 'CUSTOM',
+  Gemini = 'GEMINI',
+  Openai = 'OPENAI'
+}
+
 export type Mutation = {
   __typename?: 'Mutation';
   createConnection: Connection;
@@ -62,6 +123,7 @@ export type Mutation = {
   deleteProject: Scalars['Boolean']['output'];
   deleteSnippet: Scalars['Boolean']['output'];
   deleteUser: Scalars['Boolean']['output'];
+  generateContent: GenerationResult;
   resetUserPassword: Scalars['String']['output'];
   revertSnippet: Snippet;
   updateConnection: Connection;
@@ -111,6 +173,13 @@ export type MutationDeleteSnippetArgs = {
 
 export type MutationDeleteUserArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type MutationGenerateContentArgs = {
+  input: GenerateContentInput;
+  projectId: Scalars['ID']['input'];
+  snippetId: Scalars['ID']['input'];
 };
 
 
@@ -169,6 +238,8 @@ export type Project = {
 
 export type Query = {
   __typename?: 'Query';
+  availableModels: Array<ModelConfig>;
+  generationHistory: Array<GenerationRecord>;
   me?: Maybe<User>;
   project?: Maybe<Project>;
   projects: Array<Project>;
@@ -176,6 +247,16 @@ export type Query = {
   snippetVersions: Array<SnippetVersion>;
   systemAnalytics: SystemAnalytics;
   users: Array<User>;
+};
+
+
+export type QueryAvailableModelsArgs = {
+  modality?: InputMaybe<GenerationModality>;
+};
+
+
+export type QueryGenerationHistoryArgs = {
+  snippetId: Scalars['ID']['input'];
 };
 
 
@@ -343,8 +424,14 @@ export type ResolversTypes = ResolversObject<{
   CreateProjectInput: CreateProjectInput;
   CreateSnippetInput: CreateSnippetInput;
   Float: ResolverTypeWrapper<Scalars['Float']['output']>;
+  GenerateContentInput: GenerateContentInput;
+  GenerationModality: GenerationModality;
+  GenerationRecord: ResolverTypeWrapper<GenerationRecord>;
+  GenerationResult: ResolverTypeWrapper<GenerationResult>;
   ID: ResolverTypeWrapper<Scalars['ID']['output']>;
   Int: ResolverTypeWrapper<Scalars['Int']['output']>;
+  ModelConfig: ResolverTypeWrapper<ModelConfig>;
+  ModelProvider: ModelProvider;
   Mutation: ResolverTypeWrapper<Record<PropertyKey, never>>;
   Position: ResolverTypeWrapper<Position>;
   PositionInput: PositionInput;
@@ -369,8 +456,12 @@ export type ResolversParentTypes = ResolversObject<{
   CreateProjectInput: CreateProjectInput;
   CreateSnippetInput: CreateSnippetInput;
   Float: Scalars['Float']['output'];
+  GenerateContentInput: GenerateContentInput;
+  GenerationRecord: GenerationRecord;
+  GenerationResult: GenerationResult;
   ID: Scalars['ID']['output'];
   Int: Scalars['Int']['output'];
+  ModelConfig: ModelConfig;
   Mutation: Record<PropertyKey, never>;
   Position: Position;
   PositionInput: PositionInput;
@@ -398,6 +489,42 @@ export type ConnectionResolvers<ContextType = GraphQLContext, ParentType extends
   updatedAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
 }>;
 
+export type GenerationRecordResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['GenerationRecord'] = ResolversParentTypes['GenerationRecord']> = ResolversObject<{
+  cost?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  createdAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  generationTimeMs?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  modelId?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  modelProvider?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  projectId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  prompt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  result?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  snippetId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  systemPrompt?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  tokensUsed?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  userId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+}>;
+
+export type GenerationResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['GenerationResult'] = ResolversParentTypes['GenerationResult']> = ResolversObject<{
+  content?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  cost?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  generationTimeMs?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  modelUsed?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  tokensUsed?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+}>;
+
+export type ModelConfigResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['ModelConfig'] = ResolversParentTypes['ModelConfig']> = ResolversObject<{
+  costPerToken?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
+  description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  displayName?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  enabled?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  maxTokens?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
+  modality?: Resolver<ResolversTypes['GenerationModality'], ParentType, ContextType>;
+  modelId?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  provider?: Resolver<ResolversTypes['ModelProvider'], ParentType, ContextType>;
+}>;
+
 export type MutationResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Mutation'] = ResolversParentTypes['Mutation']> = ResolversObject<{
   createConnection?: Resolver<ResolversTypes['Connection'], ParentType, ContextType, RequireFields<MutationCreateConnectionArgs, 'input'>>;
   createProject?: Resolver<ResolversTypes['Project'], ParentType, ContextType, RequireFields<MutationCreateProjectArgs, 'input'>>;
@@ -407,6 +534,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   deleteProject?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationDeleteProjectArgs, 'id'>>;
   deleteSnippet?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationDeleteSnippetArgs, 'id' | 'projectId'>>;
   deleteUser?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationDeleteUserArgs, 'id'>>;
+  generateContent?: Resolver<ResolversTypes['GenerationResult'], ParentType, ContextType, RequireFields<MutationGenerateContentArgs, 'input' | 'projectId' | 'snippetId'>>;
   resetUserPassword?: Resolver<ResolversTypes['String'], ParentType, ContextType, RequireFields<MutationResetUserPasswordArgs, 'id'>>;
   revertSnippet?: Resolver<ResolversTypes['Snippet'], ParentType, ContextType, RequireFields<MutationRevertSnippetArgs, 'id' | 'projectId' | 'version'>>;
   updateConnection?: Resolver<ResolversTypes['Connection'], ParentType, ContextType, RequireFields<MutationUpdateConnectionArgs, 'id' | 'input'>>;
@@ -431,6 +559,8 @@ export type ProjectResolvers<ContextType = GraphQLContext, ParentType extends Re
 }>;
 
 export type QueryResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Query'] = ResolversParentTypes['Query']> = ResolversObject<{
+  availableModels?: Resolver<Array<ResolversTypes['ModelConfig']>, ParentType, ContextType, Partial<QueryAvailableModelsArgs>>;
+  generationHistory?: Resolver<Array<ResolversTypes['GenerationRecord']>, ParentType, ContextType, RequireFields<QueryGenerationHistoryArgs, 'snippetId'>>;
   me?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
   project?: Resolver<Maybe<ResolversTypes['Project']>, ParentType, ContextType, RequireFields<QueryProjectArgs, 'id'>>;
   projects?: Resolver<Array<ResolversTypes['Project']>, ParentType, ContextType>;
@@ -485,6 +615,9 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
 
 export type Resolvers<ContextType = GraphQLContext> = ResolversObject<{
   Connection?: ConnectionResolvers<ContextType>;
+  GenerationRecord?: GenerationRecordResolvers<ContextType>;
+  GenerationResult?: GenerationResultResolvers<ContextType>;
+  ModelConfig?: ModelConfigResolvers<ContextType>;
   Mutation?: MutationResolvers<ContextType>;
   Position?: PositionResolvers<ContextType>;
   Project?: ProjectResolvers<ContextType>;

@@ -14,6 +14,10 @@ echo "📦 Building shared packages..."
 echo "🔄 Generating GraphQL types..."
 (cd packages/graphql-schema && npm run codegen)
 
+# Build GenAI orchestrator
+echo "🤖 Building GenAI orchestrator..."
+(cd services/genai-orchestrator && npm run build)
+
 # Build backend services
 echo "⚡ Building backend services..."
 (cd services/api && npm run build)

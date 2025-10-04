@@ -118,10 +118,14 @@ type Query {
   project(id: ID!): Project
   snippet(id: ID!): Snippet
   snippetVersions(snippetId: ID!): [SnippetVersion!]!
-  
+
   # Admin queries
   users: [User!]!
   systemAnalytics: SystemAnalytics!
+
+  # GenAI queries
+  availableModels(modality: GenerationModality): [ModelConfig!]!
+  generationHistory(snippetId: ID!): [GenerationRecord!]!
 }
 
 type Mutation {
@@ -145,6 +149,9 @@ type Mutation {
   createUser(email: String!, name: String!, temporaryPassword: String!): User!
   deleteUser(id: ID!): Boolean!
   resetUserPassword(id: ID!): String!
+
+  # GenAI mutations
+  generateContent(projectId: ID!, snippetId: ID!, input: GenerateContentInput!): GenerationResult!
 }
 
 type SystemAnalytics {
@@ -152,6 +159,66 @@ type SystemAnalytics {
   totalProjects: Int!
   totalSnippets: Int!
   averageSnippetsPerUser: Float!
+}
+
+# GenAI Types
+
+enum ModelProvider {
+  GEMINI
+  OPENAI
+  ANTHROPIC
+  CUSTOM
+}
+
+enum GenerationModality {
+  TEXT_TO_TEXT
+  TEXT_TO_IMAGE
+  TEXT_TO_VIDEO
+  TEXT_TO_AUDIO
+}
+
+type ModelConfig {
+  id: ID!
+  provider: ModelProvider!
+  modelId: String!
+  modality: GenerationModality!
+  displayName: String!
+  description: String
+  maxTokens: Int
+  costPerToken: Float
+  enabled: Boolean!
+}
+
+type GenerationResult {
+  content: String!
+  tokensUsed: Int!
+  cost: Float!
+  modelUsed: String!
+  generationTimeMs: Int!
+}
+
+type GenerationRecord {
+  id: ID!
+  userId: ID!
+  snippetId: ID!
+  projectId: ID!
+  modelProvider: String!
+  modelId: String!
+  prompt: String!
+  systemPrompt: String
+  result: String!
+  tokensUsed: Int!
+  cost: Float!
+  generationTimeMs: Int!
+  createdAt: String!
+}
+
+input GenerateContentInput {
+  modelId: ID!
+  prompt: String!
+  systemPrompt: String
+  temperature: Float
+  maxTokens: Int
 }
 
 schema {

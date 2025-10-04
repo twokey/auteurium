@@ -26,6 +26,8 @@ export const userQueries = {
 
     logger.info('Fetching all users')
 
+    await Promise.resolve()
+
     // Not yet implemented
     throw new Error('Not implemented')
   }

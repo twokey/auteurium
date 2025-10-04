@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { DELETE_SNIPPET, UPDATE_SNIPPET } from '../../graphql/mutations'
 import { GET_PROJECT_WITH_SNIPPETS } from '../../graphql/queries'
+import { useGenAI } from '../../hooks/useGenAI'
 
 interface EditSnippetModalProps {
   isOpen: boolean
@@ -29,8 +30,15 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
   const [categoryInput, setCategoryInput] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [selectedModel, setSelectedModel] = useState('')
-  const [isGenerating, setIsGenerating] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  const {
+    models,
+    isLoadingModels,
+    modelsError,
+    generate,
+    isGenerating
+  } = useGenAI({ enabled: isOpen })
 
   // Reset form when snippet changes
   useEffect(() => {
@@ -43,9 +51,15 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
     setTagInput('')
     setCategoryInput('')
     setSelectedModel('')
-    setIsGenerating(false)
     setIsDeleting(false)
   }, [snippet])
+
+  useEffect(() => {
+    if (!isOpen) return
+    if (!selectedModel && models.length > 0) {
+      setSelectedModel(models[0].id)
+    }
+  }, [isOpen, models, selectedModel])
 
   const [updateSnippetMutation] = useMutation(UPDATE_SNIPPET, {
     refetchQueries: [
@@ -138,14 +152,22 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
       return
     }
 
-    setIsGenerating(true)
     try {
-      // TODO: Replace with API integration for LLM generation.
-      setTextField2(textField1)
+      const generation = await generate(snippet.projectId, snippet.id, selectedModel, textField1)
+
+      if (!generation || generation.content.trim() === '') {
+        alert('The selected model did not return any content. Please try again or choose another model.')
+        return
+      }
+
+      setTextField2(generation.content)
+    } catch (error) {
+      console.error('Failed to generate content:', error)
+      alert(`Failed to generate content: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
-      setIsGenerating(false)
+      // no-op: loading state managed by Apollo mutation
     }
-  }, [selectedModel, textField1])
+  }, [generate, selectedModel, snippet.projectId, snippet.id, textField1])
 
   const handleDelete = useCallback(async () => {
     const shouldDelete = window.confirm('Are you sure you want to delete this snippet? This action cannot be undone.')
@@ -240,11 +262,16 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
                   value={selectedModel}
                   onChange={(e) => setSelectedModel(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  disabled={isSaving || isGenerating || isDeleting}
+                  disabled={isSaving || isGenerating || isDeleting || isLoadingModels}
                 >
-                  <option value="" disabled>Select a model...</option>
-                  <option value="placeholder-1">placeholder 1</option>
-                  <option value="placeholder-2">placeholder 2</option>
+                  <option value="" disabled>
+                    {isLoadingModels ? 'Loading models...' : 'Select a model...'}
+                  </option>
+                  {models.map((model) => (
+                    <option key={model.id} value={model.id} title={model.description ?? undefined}>
+                      {model.displayName}
+                    </option>
+                  ))}
                 </select>
               </div>
               <button
@@ -252,7 +279,14 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
                   void handleGenerate()
                 }}
                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:bg-green-400 flex items-center gap-2"
-                disabled={isSaving || isGenerating || isDeleting || !selectedModel || textField1.trim() === ''}
+                disabled={
+                  isSaving ||
+                  isGenerating ||
+                  isDeleting ||
+                  !selectedModel ||
+                  textField1.trim() === '' ||
+                  isLoadingModels
+                }
               >
                 {isGenerating && (
                   <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -263,6 +297,15 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
                 {isGenerating ? 'Generating...' : 'Generate'}
               </button>
             </div>
+
+            {modelsError && (
+              <p className="text-sm text-red-600">
+                Failed to load models. Please try again later or contact your administrator.
+              </p>
+            )}
+            {!modelsError && !isLoadingModels && models.length === 0 && (
+              <p className="text-sm text-gray-500">No models available. Please contact your administrator.</p>
+            )}
 
             {/* Text Field 2 */}
             <div>
