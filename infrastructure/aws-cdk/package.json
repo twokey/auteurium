@@ -22,7 +22,7 @@
     "@aws-sdk/client-cognito-identity-provider": "^3.899.0",
     "@aws-sdk/client-dynamodb": "^3.899.0",
     "@aws-sdk/client-lambda": "^3.899.0",
-    "@types/jest": "^29.5.0",
+    "@types/jest": "^30.0.0",
     "@types/node": "^22.0.0",
     "aws-cdk": "2.1029.2",
     "aws-cdk-lib": "2.215.0",
