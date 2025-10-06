@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "react-dom": "^19.2.0",
     "reactflow": "^11.10.1",
     "react-router-dom": "^6.8.1",
     "@aws-amplify/api-graphql": "^3.4.4",
