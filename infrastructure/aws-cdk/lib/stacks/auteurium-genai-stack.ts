@@ -99,7 +99,7 @@ export class AuteuriumGenAIStack extends cdk.Stack {
         target: 'node22',
         sourceMap: true,
         tsconfig: path.join(__dirname, '../../../../services/api/tsconfig.json'),
-        nodeModules: ['@google/generative-ai'] // Include Gemini SDK
+        nodeModules: ['@google/genai'] // Include Gemini SDK
       },
       environment: {
         STAGE: stage,
