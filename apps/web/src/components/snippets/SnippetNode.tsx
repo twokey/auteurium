@@ -1,4 +1,4 @@
-import { memo, useCallback, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Handle, Position } from 'reactflow'
 
 interface SnippetNodeProps {
@@ -11,15 +11,19 @@ interface SnippetNodeProps {
       textField2: string
       tags?: string[]
       categories?: string[]
+      connectionCount: number
     }
     onEdit: (snippetId: string) => void
     onDelete: (snippetId: string) => void
     onManageConnections: (snippetId: string) => void
     onViewVersions: (snippetId: string) => void
+    onUpdateContent: (snippetId: string, changes: Partial<Record<'textField1' | 'textField2', string>>) => Promise<void>
+    onCombine: (snippetId: string) => Promise<void>
   }
 }
 
 const WORD_LIMIT = 100
+type EditableField = 'textField1' | 'textField2'
 
 const countWords = (text: string): number => {
   return text.trim().split(/\s+/).filter(word => word.length > 0).length
@@ -32,27 +36,207 @@ const truncateToWords = (text: string, wordLimit: number): string => {
 }
 
 export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
+  const {
+    snippet,
+    onEdit,
+    onDelete,
+    onManageConnections,
+    onViewVersions,
+    onUpdateContent,
+    onCombine
+  } = data
+
   const [showContextMenu, setShowContextMenu] = useState(false)
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 })
+  const [activeField, setActiveField] = useState<EditableField | null>(null)
+  const [draftValues, setDraftValues] = useState({
+    textField1: snippet.textField1,
+    textField2: snippet.textField2
+  })
+  const [savingField, setSavingField] = useState<EditableField | null>(null)
+  const textField1Ref = useRef<HTMLTextAreaElement | null>(null)
+  const textField2Ref = useRef<HTMLTextAreaElement | null>(null)
+  const [isCombining, setIsCombining] = useState(false)
 
-  const { snippet, onEdit, onDelete, onManageConnections, onViewVersions } = data
+  useEffect(() => {
+    if (activeField === 'textField1') return
+
+    setDraftValues((prev) => {
+      if (prev.textField1 === snippet.textField1) {
+        return prev
+      }
+
+      return {
+        ...prev,
+        textField1: snippet.textField1
+      }
+    })
+  }, [snippet.textField1, activeField])
+
+  useEffect(() => {
+    if (activeField === 'textField2') return
+
+    setDraftValues((prev) => {
+      if (prev.textField2 === snippet.textField2) {
+        return prev
+      }
+
+      return {
+        ...prev,
+        textField2: snippet.textField2
+      }
+    })
+  }, [snippet.textField2, activeField])
+
+  useEffect(() => {
+    if (activeField === 'textField1') {
+      const target = textField1Ref.current
+      target?.focus()
+      const length = target?.value.length ?? 0
+      target?.setSelectionRange(length, length)
+    } else if (activeField === 'textField2') {
+      const target = textField2Ref.current
+      target?.focus()
+      const length = target?.value.length ?? 0
+      target?.setSelectionRange(length, length)
+    }
+  }, [activeField])
+
+  const commitField = useCallback(async (field: EditableField) => {
+    const newValue = draftValues[field]
+    const currentValue = field === 'textField1' ? snippet.textField1 : snippet.textField2
+
+    setActiveField(null)
+
+    if (newValue === currentValue) {
+      return
+    }
+
+    setSavingField(field)
+
+    try {
+      await onUpdateContent(snippet.id, { [field]: newValue })
+    } catch (error) {
+      console.error('Failed to update snippet content:', error)
+      alert('Failed to save snippet changes. Please try again.')
+      setDraftValues((prev) => ({
+        ...prev,
+        [field]: currentValue
+      }))
+    } finally {
+      setSavingField(null)
+    }
+  }, [draftValues, onUpdateContent, snippet.id, snippet.textField1, snippet.textField2])
+
+  const handleFieldActivate = useCallback(
+    (field: EditableField) =>
+      (event: React.MouseEvent<HTMLButtonElement>) => {
+        event.stopPropagation()
+
+        if (isCombining) {
+          return
+        }
+
+        if (activeField && activeField !== field) {
+          void commitField(activeField)
+        }
+
+        setActiveField(field)
+        setDraftValues((prev) => ({
+          ...prev,
+          [field]: field === 'textField1' ? snippet.textField1 : snippet.textField2
+        }))
+      },
+    [activeField, commitField, snippet.textField1, snippet.textField2, isCombining]
+  )
+
+  const handleDraftChange = useCallback(
+    (field: EditableField) =>
+      (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const { value } = event.target
+        setDraftValues((prev) => ({
+          ...prev,
+          [field]: value
+        }))
+      },
+    []
+  )
+
+  const handleBlur = useCallback(
+    (field: EditableField) => () => {
+      void commitField(field)
+    },
+    [commitField]
+  )
+
+  const handleTextareaKeyDown = useCallback(
+    (field: EditableField) =>
+      (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          setDraftValues((prev) => ({
+            ...prev,
+            [field]: field === 'textField1' ? snippet.textField1 : snippet.textField2
+          }))
+          setActiveField(null)
+          return
+        }
+
+        if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+          event.preventDefault()
+          void commitField(field)
+        }
+      },
+    [commitField, snippet.textField1, snippet.textField2]
+  )
 
   const handleSnippetClick = useCallback((e: React.MouseEvent) => {
     // Only trigger edit on direct click, not on context menu or expand button
+    if (activeField !== null || savingField !== null || isCombining) {
+      return
+    }
+
     if (e.button === 0 && !showContextMenu) {
       onEdit(snippet.id)
     }
-  }, [snippet.id, onEdit, showContextMenu])
+  }, [activeField, isCombining, savingField, snippet.id, onEdit, showContextMenu])
 
   const handleSnippetKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (activeField !== null || savingField !== null || isCombining) {
+        return
+      }
+
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault()
         onEdit(snippet.id)
       }
     },
-    [onEdit, snippet.id]
+    [activeField, isCombining, savingField, onEdit, snippet.id]
   )
+
+  const handleCombine = useCallback(async () => {
+    if (isCombining || savingField !== null || snippet.connectionCount === 0) {
+      return
+    }
+
+    if (activeField) {
+      await commitField(activeField)
+    }
+
+    setIsCombining(true)
+    try {
+      await onCombine(snippet.id)
+      alert('Successfully combined connected snippets!')
+    } catch (error) {
+      console.error('Failed to combine snippets from canvas:', error)
+      alert('Failed to combine connected snippets. Please try again.')
+    } finally {
+      setIsCombining(false)
+    }
+  }, [activeField, commitField, isCombining, onCombine, savingField, snippet.connectionCount, snippet.id])
+
+  const hasConnections = snippet.connectionCount > 0
 
   const combinedText = `${snippet.textField1} ${snippet.textField2}`.trim()
   const wordCount = countWords(combinedText)
@@ -131,14 +315,91 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
         </div>
 
         {/* Title / Text Field 1 */}
-        <div className="font-medium text-sm mb-2 text-gray-900 break-words">
-          {displayText1 || 'Input...'}
+        <div className="mb-2">
+          {activeField === 'textField1' ? (
+            <textarea
+              ref={textField1Ref}
+              className="w-full text-sm font-medium text-gray-900 bg-white border border-blue-200 rounded-sm p-1 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
+              value={draftValues.textField1}
+              onChange={handleDraftChange('textField1')}
+              onBlur={handleBlur('textField1')}
+              onKeyDown={handleTextareaKeyDown('textField1')}
+              onClick={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
+              rows={Math.min(6, Math.max(2, draftValues.textField1.split('\n').length))}
+              placeholder="Input..."
+            />
+          ) : (
+            <button
+              type="button"
+              className="w-full text-left font-medium text-sm text-gray-900 break-words cursor-text bg-transparent border-none p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-1 focus-visible:ring-offset-white rounded-sm"
+              onClick={handleFieldActivate('textField1')}
+            >
+              {(displayText1 && displayText1.trim() !== '') ? displayText1 : 'Input...'}
+            </button>
+          )}
         </div>
 
         {/* Text Field 2 - Always visible */}
-        <div className="text-xs text-gray-600 break-words min-h-[16px]">
-          {displayText2 || 'Output...'}
+        <div className="min-h-[16px]">
+          {activeField === 'textField2' ? (
+            <textarea
+              ref={textField2Ref}
+              className="w-full text-xs text-gray-600 bg-white border border-blue-200 rounded-sm p-1 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
+              value={draftValues.textField2}
+              onChange={handleDraftChange('textField2')}
+              onBlur={handleBlur('textField2')}
+              onKeyDown={handleTextareaKeyDown('textField2')}
+              onClick={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
+              rows={Math.min(6, Math.max(2, draftValues.textField2.split('\n').length))}
+              placeholder="Output..."
+            />
+          ) : (
+            <button
+              type="button"
+              className="w-full text-left text-xs text-gray-600 break-words cursor-text bg-transparent border-none p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-1 focus-visible:ring-offset-white rounded-sm min-h-[16px]"
+              onClick={handleFieldActivate('textField2')}
+            >
+                {(displayText2 && displayText2.trim() !== '') ? displayText2 : 'Output...'}
+            </button>
+          )}
         </div>
+
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed rounded transition-colors"
+            onClick={(event) => {
+              event.stopPropagation()
+              void handleCombine()
+            }}
+            disabled={!hasConnections || isCombining || savingField !== null}
+          >
+            {isCombining && (
+              <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+            )}
+            {isCombining ? 'Combining...' : 'Combine'}
+          </button>
+          {!hasConnections && (
+            <span className="text-[11px] text-gray-400">
+              Connect snippets to enable combine
+            </span>
+          )}
+        </div>
+
+        {(savingField !== null || isCombining) && (
+          <div className="text-[11px] text-gray-400 mt-1">
+            {savingField ? 'Saving...' : 'Combining...'}
+          </div>
+        )}
 
         {/* Large snippet indicator and expand button */}
         {isLarge && (

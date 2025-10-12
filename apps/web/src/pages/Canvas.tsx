@@ -21,7 +21,13 @@ import { ManageConnectionsModal } from '../components/modals/ManageConnectionsMo
 import { VersionHistoryModal } from '../components/modals/VersionHistoryModal'
 import { SnippetNode } from '../components/snippets/SnippetNode'
 import { Navigation } from '../components/ui/Navigation'
-import { CREATE_SNIPPET, UPDATE_SNIPPET, CREATE_CONNECTION, DELETE_CONNECTION } from '../graphql/mutations'
+import {
+  CREATE_SNIPPET,
+  UPDATE_SNIPPET,
+  CREATE_CONNECTION,
+  DELETE_CONNECTION,
+  COMBINE_SNIPPET_CONNECTIONS
+} from '../graphql/mutations'
 import { GET_PROJECT_WITH_SNIPPETS } from '../graphql/queries'
 
 import type { Connection, Edge, Node, NodeTypes, ReactFlowInstance, Viewport } from 'reactflow'
@@ -68,6 +74,21 @@ interface ProjectWithSnippetsQueryVariables {
 }
 
 const EMPTY_SNIPPET_LIST: Snippet[] = []
+type SnippetContentChanges = Partial<Pick<Snippet, 'textField1' | 'textField2'>>
+
+interface CombineSnippetConnectionsResponse {
+  combineSnippetConnections: {
+    id: string
+    textField1: string
+    textField2: string
+  }
+}
+
+interface CombineSnippetConnectionsVariables {
+  projectId: string
+  snippetId: string
+}
+
 interface SnippetNodeData {
   snippet: {
     id: string
@@ -76,11 +97,14 @@ interface SnippetNodeData {
     textField2: string
     tags?: string[]
     categories?: string[]
+    connectionCount: number
   }
   onEdit: (snippetId: string) => void
   onDelete: (snippetId: string) => void
   onManageConnections: (snippetId: string) => void
   onViewVersions: (snippetId: string) => void
+  onUpdateContent: (snippetId: string, changes: SnippetContentChanges) => Promise<void>
+  onCombine: (snippetId: string) => Promise<void>
 }
 
 interface ConnectionEdgeData {
@@ -189,6 +213,22 @@ export const Canvas = () => {
     }
   })
 
+  const [combineConnectionsMutation] = useMutation<
+    CombineSnippetConnectionsResponse,
+    CombineSnippetConnectionsVariables
+  >(COMBINE_SNIPPET_CONNECTIONS, {
+    refetchQueries: [
+      {
+        query: GET_PROJECT_WITH_SNIPPETS,
+        variables: { projectId }
+      }
+    ],
+    awaitRefetchQueries: true,
+    onError: (mutationError) => {
+      console.error('Error combining snippets:', mutationError)
+    }
+  })
+
   const project: Project | null = data?.project ?? null
   const rawSnippets = project?.snippets
   const snippets = useMemo<Snippet[]>(() => {
@@ -217,6 +257,131 @@ export const Canvas = () => {
     if (snippet) setViewingVersionsSnippet(snippet)
   }, [snippets])
 
+  const handleUpdateSnippetContent = useCallback(async (snippetId: string, changes: SnippetContentChanges) => {
+    if (!projectId) {
+      console.error('Cannot update snippet content: no project ID')
+      return
+    }
+
+    const snippetBeforeUpdate = snippets.find(s => s.id === snippetId)
+    if (!snippetBeforeUpdate) {
+      console.error('Cannot update snippet content: snippet not found')
+      return
+    }
+
+    const updateInput: SnippetContentChanges = {}
+    const previousValues: SnippetContentChanges = {}
+
+    if (Object.prototype.hasOwnProperty.call(changes, 'textField1')) {
+      updateInput.textField1 = changes.textField1 ?? ''
+      previousValues.textField1 = snippetBeforeUpdate.textField1
+    }
+
+    if (Object.prototype.hasOwnProperty.call(changes, 'textField2')) {
+      updateInput.textField2 = changes.textField2 ?? ''
+      previousValues.textField2 = snippetBeforeUpdate.textField2
+    }
+
+    if (Object.keys(updateInput).length === 0) {
+      return
+    }
+
+    setNodes((currentNodes) =>
+      currentNodes.map((node) =>
+        node.id === snippetId
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                snippet: {
+                  ...node.data.snippet,
+                  ...updateInput
+                }
+              }
+            }
+          : node
+      )
+    )
+
+    try {
+      await updateSnippetMutation({
+        variables: {
+          projectId,
+          id: snippetId,
+          input: updateInput
+        }
+      })
+    } catch (error) {
+      console.error('Failed to update snippet content:', error)
+      setNodes((currentNodes) =>
+        currentNodes.map((node) =>
+          node.id === snippetId
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  snippet: {
+                    ...node.data.snippet,
+                    ...previousValues
+                  }
+                }
+              }
+            : node
+        )
+      )
+      throw error
+    }
+  }, [projectId, setNodes, snippets, updateSnippetMutation])
+
+  const handleCombineSnippetContent = useCallback(async (snippetId: string) => {
+    if (!projectId) {
+      console.error('Cannot combine snippet content: no project ID')
+      return
+    }
+
+    const snippetBeforeCombine = snippets.find((snippetItem) => snippetItem.id === snippetId)
+    if (!snippetBeforeCombine) {
+      console.error('Cannot combine snippet content: snippet not found')
+      return
+    }
+
+    try {
+      const result = await combineConnectionsMutation({
+        variables: {
+          projectId,
+          snippetId
+        }
+      })
+
+      const updatedSnippet = result.data?.combineSnippetConnections
+      if (!updatedSnippet) {
+        throw new Error('No data returned from combine operation')
+      }
+
+      setNodes((currentNodes) =>
+        currentNodes.map((node) =>
+          node.id === snippetId
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  snippet: {
+                    ...node.data.snippet,
+                    textField1: updatedSnippet.textField1,
+                    textField2: updatedSnippet.textField2,
+                    connectionCount: node.data.snippet.connectionCount
+                  }
+                }
+              }
+            : node
+        )
+      )
+    } catch (error) {
+      console.error('Failed to combine snippet content:', error)
+      throw error
+    }
+  }, [combineConnectionsMutation, projectId, setNodes, snippets])
+
   // Custom node types
   const nodeTypes = useMemo<NodeTypes>(() => ({
     snippet: SnippetNode
@@ -237,12 +402,15 @@ export const Canvas = () => {
             textField1: snippet.textField1,
             textField2: snippet.textField2,
             tags: snippet.tags,
-            categories: snippet.categories
+            categories: snippet.categories,
+            connectionCount: snippet.connections?.length ?? 0
           },
           onEdit: handleEditSnippet,
           onDelete: handleDeleteSnippet,
           onManageConnections: handleManageConnections,
-          onViewVersions: handleViewVersions
+          onViewVersions: handleViewVersions,
+          onUpdateContent: handleUpdateSnippetContent,
+          onCombine: handleCombineSnippetContent
         },
         style: {
           background: '#fff',
@@ -253,7 +421,7 @@ export const Canvas = () => {
         }
       } as Node<SnippetNodeData>
     })
-  }, [snippets, handleEditSnippet, handleDeleteSnippet, handleManageConnections, handleViewVersions])
+  }, [snippets, handleEditSnippet, handleDeleteSnippet, handleManageConnections, handleViewVersions, handleUpdateSnippetContent, handleCombineSnippetContent])
 
   useEffect(() => {
     setNodes(flowNodes)
