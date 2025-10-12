@@ -46,6 +46,7 @@ const resolverMap: Record<string, ResolverFunction> = {
   'Mutation.createSnippet': snippetMutations.createSnippet,
   'Mutation.updateSnippet': snippetMutations.updateSnippet,
   'Mutation.deleteSnippet': snippetMutations.deleteSnippet,
+  'Mutation.combineSnippetConnections': snippetMutations.combineSnippetConnections,
   'Mutation.revertSnippetToVersion': snippetMutations.revertSnippetToVersion,
   'Mutation.updateSnippetPositions': snippetMutations.updateSnippetPositions,
 

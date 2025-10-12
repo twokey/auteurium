@@ -1,7 +1,7 @@
 import { useMutation } from '@apollo/client'
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 
-import { DELETE_SNIPPET, UPDATE_SNIPPET } from '../../graphql/mutations'
+import { COMBINE_SNIPPET_CONNECTIONS, DELETE_SNIPPET, UPDATE_SNIPPET } from '../../graphql/mutations'
 import { GET_PROJECT_WITH_SNIPPETS } from '../../graphql/queries'
 import { useGenAI } from '../../hooks/useGenAI'
 
@@ -37,6 +37,7 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
   const [isSaving, setIsSaving] = useState(false)
   const [selectedModel, setSelectedModel] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isCombining, setIsCombining] = useState(false)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamError, setStreamError] = useState<string | null>(null)
@@ -126,6 +127,16 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
   })
 
   const [deleteSnippetMutation] = useMutation(DELETE_SNIPPET, {
+    refetchQueries: [
+      {
+        query: GET_PROJECT_WITH_SNIPPETS,
+        variables: { projectId: snippet.projectId }
+      }
+    ],
+    awaitRefetchQueries: true
+  })
+
+  const [combineConnectionsMutation] = useMutation(COMBINE_SNIPPET_CONNECTIONS, {
     refetchQueries: [
       {
         query: GET_PROJECT_WITH_SNIPPETS,
@@ -373,6 +384,51 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
     }
   }, [deleteSnippetMutation, onClose, snippet.id, snippet.projectId])
 
+  const handleCombine = useCallback(async () => {
+    setIsCombining(true)
+    try {
+      const result = await combineConnectionsMutation({
+        variables: {
+          projectId: snippet.projectId,
+          snippetId: snippet.id
+        }
+      })
+
+      const updatedSnippet = result.data?.combineSnippetConnections
+      if (!updatedSnippet) {
+        throw new Error('No data returned from combine operation')
+      }
+
+      // Update local state with new textField2
+      setTextField2(updatedSnippet.textField2)
+
+      // Rebuild chat messages with combined content
+      const newChatMessages: ChatMessage[] = []
+      if (updatedSnippet.textField1.trim()) {
+        newChatMessages.push({
+          id: `user-combined-${Date.now()}`,
+          role: 'user',
+          content: updatedSnippet.textField1
+        })
+      }
+      if (updatedSnippet.textField2.trim()) {
+        newChatMessages.push({
+          id: `assistant-combined-${Date.now()}`,
+          role: 'assistant',
+          content: updatedSnippet.textField2
+        })
+      }
+      setChatMessages(newChatMessages)
+
+      alert('Successfully combined connected snippets!')
+    } catch (error) {
+      console.error('Failed to combine snippets:', error)
+      alert(`Failed to combine: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setIsCombining(false)
+    }
+  }, [combineConnectionsMutation, snippet.projectId, snippet.id])
+
   if (!isOpen) return null
 
   return (
@@ -433,7 +489,7 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
             </div>
 
             {/* LLM Model Selector */}
-            <div className="flex flex-wrap items-end gap-3">
+            <div className="flex items-end gap-3">
               <div className="flex-1 min-w-[200px]">
                 <label htmlFor="llmModel" className="block text-sm font-medium text-gray-700 mb-1">
                   LLM Model
@@ -476,6 +532,21 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
                   </svg>
                 )}
                 {isLlmBusy ? 'Generating...' : 'Generate'}
+              </button>
+              <button
+                onClick={() => {
+                  void handleCombine()
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-blue-400 flex items-center gap-2"
+                disabled={isSaving || isDeleting || isCombining}
+              >
+                {isCombining && (
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                )}
+                {isCombining ? 'Combining...' : 'Combine'}
               </button>
             </div>
 

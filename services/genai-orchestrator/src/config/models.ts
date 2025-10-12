@@ -5,16 +5,16 @@ import { GenerationModality, ModelConfig, ModelProvider } from '@auteurium/share
  * Add new models here as providers are implemented
  */
 export const MODEL_REGISTRY: ModelConfig[] = [
-  // Gemini Models
+  // Gemini Models - Flash-Lite is default
   {
-    id: 'gemini-2.5-pro',
+    id: 'gemini-2.5-flash-lite',
     provider: ModelProvider.GEMINI,
-    modelId: 'gemini-2.5-pro',
+    modelId: 'gemini-2.5-flash-lite',
     modality: GenerationModality.TEXT_TO_TEXT,
-    displayName: 'Gemini 2.5 Pro',
-    description: 'Most powerful model with complex reasoning capabilities',
+    displayName: 'Gemini 2.5 Flash-Lite',
+    description: 'Fastest and most cost-efficient model',
     maxTokens: 8192,
-    costPerToken: 0.00000125, // $1.25 per million input tokens
+    costPerToken: 0.0000001, // $0.10 per million input tokens
     enabled: true
   },
   {
@@ -29,14 +29,14 @@ export const MODEL_REGISTRY: ModelConfig[] = [
     enabled: true
   },
   {
-    id: 'gemini-2.5-flash-lite',
+    id: 'gemini-2.5-pro',
     provider: ModelProvider.GEMINI,
-    modelId: 'gemini-2.5-flash-lite',
+    modelId: 'gemini-2.5-pro',
     modality: GenerationModality.TEXT_TO_TEXT,
-    displayName: 'Gemini 2.5 Flash-Lite',
-    description: 'Fastest and most cost-efficient model',
+    displayName: 'Gemini 2.5 Pro',
+    description: 'Most powerful model with complex reasoning capabilities',
     maxTokens: 8192,
-    costPerToken: 0.0000001, // $0.10 per million input tokens
+    costPerToken: 0.00000125, // $1.25 per million input tokens
     enabled: true
   },
 

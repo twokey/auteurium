@@ -8,6 +8,7 @@ import {
   revertSnippetToVersion,
   updateSnippet
 } from '../../database/snippets'
+import { combineSnippetConnectionsLogic } from '../../database/snippet-combine'
 import { requireAuth, requireOwnership, validateInput } from '../../middleware/validation'
 import { createNotFoundError } from '../../utils/errors'
 
@@ -54,6 +55,11 @@ const revertSnippetSchema = z.object({
   projectId: z.string(),
   id: z.string(),
   version: z.number().min(1)
+})
+
+const combineSnippetSchema = z.object({
+  projectId: z.string(),
+  snippetId: z.string()
 })
 
 export const snippetMutations = {
@@ -194,5 +200,46 @@ export const snippetMutations = {
     })
 
     return updatedSnippets
+  },
+
+  // Combine connected snippets' textField2 values
+  combineSnippetConnections: async (
+    _parent: unknown,
+    args: unknown,
+    context: GraphQLContext
+  ): Promise<Snippet> => {
+    const { projectId, snippetId } = validateInput(combineSnippetSchema, args)
+    const user = requireAuth(context.user)
+
+    context.logger.info('Combining snippet connections', {
+      projectId,
+      snippetId,
+      userId: user.id
+    })
+
+    // Verify the user owns the project
+    const project = await getProjectById(user.id, projectId)
+    if (!project) {
+      throw createNotFoundError('Project')
+    }
+
+    // Ensure project ownership
+    requireOwnership(user, project.userId, 'project')
+
+    // Perform the combination logic
+    const updatedSnippet = await combineSnippetConnectionsLogic(
+      projectId,
+      snippetId,
+      user.id
+    )
+
+    context.logger.info('Snippet connections combined successfully', {
+      projectId,
+      snippetId,
+      userId: user.id,
+      newTextLength: updatedSnippet.textField2.length
+    })
+
+    return updatedSnippet
   }
 }

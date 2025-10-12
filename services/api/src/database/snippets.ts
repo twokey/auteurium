@@ -423,3 +423,69 @@ export const revertSnippetToVersion = async (
     userId
   )
 }
+
+/**
+ * Helper function to chunk an array into smaller arrays
+ */
+const chunkArray = <T>(array: T[], size: number): T[][] => {
+  const chunks: T[][] = []
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size))
+  }
+  return chunks
+}
+
+/**
+ * Batch fetch multiple snippets efficiently using DynamoDB batchGet
+ * DynamoDB supports up to 100 items per batchGet call
+ */
+export const batchGetSnippets = async (
+  projectId: string,
+  snippetIds: string[]
+): Promise<Map<string, Snippet>> => {
+  const snippetMap = new Map<string, Snippet>()
+
+  if (snippetIds.length === 0) {
+    return snippetMap
+  }
+
+  try {
+    // DynamoDB batchGet supports up to 100 items per call
+    const chunks = chunkArray(snippetIds, 100)
+
+    for (const chunk of chunks) {
+      const keys = chunk.map(id => ({ projectId, id }))
+
+      const params = {
+        RequestItems: {
+          [TABLES.SNIPPETS]: {
+            Keys: keys
+          }
+        }
+      }
+
+      const result = await dynamodb.batchGet(params).promise()
+      const items = result.Responses?.[TABLES.SNIPPETS] ?? []
+
+      for (const item of items) {
+        const snippet = item as Snippet
+        snippetMap.set(snippet.id, snippet)
+      }
+    }
+
+    logger.info('Batch fetched snippets', {
+      projectId,
+      requestedCount: snippetIds.length,
+      fetchedCount: snippetMap.size
+    })
+
+    return snippetMap
+  } catch (error) {
+    logger.error('Failed to batch fetch snippets', {
+      error,
+      projectId,
+      snippetIds
+    })
+    throw error
+  }
+}
