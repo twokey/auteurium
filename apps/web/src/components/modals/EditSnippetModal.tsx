@@ -1,7 +1,7 @@
 import { useMutation } from '@apollo/client'
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 
-import { COMBINE_SNIPPET_CONNECTIONS, DELETE_SNIPPET, UPDATE_SNIPPET } from '../../graphql/mutations'
+import { COMBINE_SNIPPET_CONNECTIONS, DELETE_SNIPPET, GENERATE_SNIPPET_IMAGE, UPDATE_SNIPPET } from '../../graphql/mutations'
 import { GET_PROJECT_WITH_SNIPPETS } from '../../graphql/queries'
 import { useGenAI } from '../../hooks/useGenAI'
 
@@ -16,6 +16,13 @@ interface EditSnippetModalProps {
     textField2: string
     tags?: string[]
     categories?: string[]
+    imageUrl?: string
+    imageS3Key?: string
+    imageMetadata?: {
+      width: number
+      height: number
+      aspectRatio: string
+    }
   }
 }
 
@@ -38,6 +45,7 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
   const [selectedModel, setSelectedModel] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
   const [isCombining, setIsCombining] = useState(false)
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamError, setStreamError] = useState<string | null>(null)
@@ -137,6 +145,16 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
   })
 
   const [combineConnectionsMutation] = useMutation(COMBINE_SNIPPET_CONNECTIONS, {
+    refetchQueries: [
+      {
+        query: GET_PROJECT_WITH_SNIPPETS,
+        variables: { projectId: snippet.projectId }
+      }
+    ],
+    awaitRefetchQueries: true
+  })
+
+  const [generateImageMutation] = useMutation(GENERATE_SNIPPET_IMAGE, {
     refetchQueries: [
       {
         query: GET_PROJECT_WITH_SNIPPETS,
@@ -429,6 +447,29 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
     }
   }, [combineConnectionsMutation, snippet.projectId, snippet.id])
 
+  const handleGenerateImage = useCallback(async () => {
+    if (!textField1.trim()) {
+      alert('Please provide input in Text Field 1 for image generation.')
+      return
+    }
+
+    setIsGeneratingImage(true)
+    try {
+      await generateImageMutation({
+        variables: {
+          projectId: snippet.projectId,
+          snippetId: snippet.id
+        }
+      })
+      alert('Image generated successfully!')
+    } catch (error) {
+      console.error('Failed to generate image:', error)
+      alert(`Failed to generate image: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setIsGeneratingImage(false)
+    }
+  }, [generateImageMutation, snippet.projectId, snippet.id, textField1])
+
   if (!isOpen) return null
 
   return (
@@ -548,6 +589,21 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
                 )}
                 {isCombining ? 'Combining...' : 'Combine'}
               </button>
+              <button
+                onClick={() => {
+                  void handleGenerateImage()
+                }}
+                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors disabled:bg-purple-400 flex items-center gap-2"
+                disabled={isSaving || isDeleting || isGeneratingImage || !textField1.trim()}
+              >
+                {isGeneratingImage && (
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                )}
+                {isGeneratingImage ? 'Generating...' : 'Image'}
+              </button>
             </div>
 
             {modelsError && (
@@ -644,6 +700,27 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
                 </div>
               )}
             </div>
+
+            {/* Generated Image Display */}
+            {snippet.imageUrl && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Generated Image
+                </label>
+                <div className="relative">
+                  <img
+                    src={snippet.imageUrl}
+                    alt="Generated from snippet text"
+                    className="max-w-full h-auto rounded-lg border border-gray-300 shadow-sm"
+                  />
+                  {snippet.imageMetadata && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {snippet.imageMetadata.width}x{snippet.imageMetadata.height} • {snippet.imageMetadata.aspectRatio}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Categories */}
             <div>

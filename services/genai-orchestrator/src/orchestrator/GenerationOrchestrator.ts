@@ -2,6 +2,8 @@ import { Logger } from '@aws-lambda-powertools/logger'
 import type { GenerationRequest, GenerationResponse, GenerationRecord, StreamingChunk } from '@auteurium/shared-types'
 import { ProviderRegistry } from '../providers/registry'
 import { getModelConfig } from '../config/models'
+import type { ImageGenerationRequest, ImageGenerationResponse } from '../providers/base/IImageProvider'
+import { GeminiImageProvider } from '../providers/gemini'
 
 const logger = new Logger({ serviceName: 'generation-orchestrator' })
 
@@ -213,6 +215,69 @@ export class GenerationOrchestrator {
       tokensUsed: response.tokensUsed,
       cost: response.cost,
       generationTimeMs: response.generationTimeMs
+    }
+  }
+
+  /**
+   * Generate image using specified model
+   * @param request - Image generation parameters
+   * @param context - User and snippet context
+   * @returns Generated image with metadata
+   */
+  async generateImage(
+    request: ImageGenerationRequest,
+    context: OrchestrationContext
+  ): Promise<ImageGenerationResponse & { imageData: unknown }> {
+    const startTime = Date.now()
+
+    try {
+      // Get model configuration
+      const modelConfig = getModelConfig(request.modelId)
+      if (!modelConfig) {
+        throw new Error(`Model not found: ${request.modelId}`)
+      }
+
+      if (!modelConfig.enabled) {
+        throw new Error(`Model is disabled: ${request.modelId}`)
+      }
+
+      logger.info('Starting image generation', {
+        userId: context.userId,
+        snippetId: context.snippetId,
+        projectId: context.projectId,
+        modelId: request.modelId,
+        provider: modelConfig.provider
+      })
+
+      // For now, only Gemini Imagen is supported
+      const apiKey = this.apiKeys.get(modelConfig.provider)
+      if (!apiKey) {
+        throw new Error(`API key not configured for provider: ${modelConfig.provider}`)
+      }
+
+      const provider = new GeminiImageProvider()
+      await provider.initialize(apiKey)
+
+      const response = await provider.generateImage(request)
+
+      const totalTime = Date.now() - startTime
+      logger.info('Image generation completed', {
+        userId: context.userId,
+        snippetId: context.snippetId,
+        modelId: request.modelId,
+        cost: response.cost,
+        totalTimeMs: totalTime
+      })
+
+      return response as ImageGenerationResponse & { imageData: unknown }
+    } catch (error) {
+      logger.error('Image generation failed', {
+        error: error instanceof Error ? error.message : String(error),
+        userId: context.userId,
+        snippetId: context.snippetId,
+        modelId: request.modelId
+      })
+      throw error
     }
   }
 }

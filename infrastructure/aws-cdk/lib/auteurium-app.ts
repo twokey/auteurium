@@ -34,6 +34,12 @@ export class AuteuriumApp extends cdk.App {
       stage
     })
 
+    // Media storage stack (S3)
+    const mediaStack = new AuteuriumMediaStack(this, `Auteurium-Media-${stage}`, {
+      env,
+      stage
+    })
+
     // API stack (AppSync + Lambda)
     const apiStack = new AuteuriumApiStack(this, `Auteurium-Api-${stage}`, {
       env,
@@ -48,13 +54,8 @@ export class AuteuriumApp extends cdk.App {
       stage,
       graphqlApi: apiStack.graphqlApi,
       userPool: authStack.userPool,
-      userPoolClient: authStack.userPoolClient
-    })
-
-    // Media storage stack (S3)
-    const _mediaStack = new AuteuriumMediaStack(this, `Auteurium-Media-${stage}`, {
-      env,
-      stage
+      userPoolClient: authStack.userPoolClient,
+      mediaBucket: mediaStack.mediaBucket
     })
 
     // Web hosting stack (S3 + CloudFront)
@@ -78,6 +79,7 @@ export class AuteuriumApp extends cdk.App {
     apiStack.addDependency(authStack)
     apiStack.addDependency(databaseStack)
     _genaiStack.addDependency(databaseStack)
+    _genaiStack.addDependency(mediaStack)
     // Note: GenAI stack uses apiStack.graphqlApi reference but does not need a dependency
     // because it only adds resolvers to the existing API
     // monitoringStack.addDependency(apiStack) // DISABLED
