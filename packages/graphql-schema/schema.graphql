@@ -152,6 +152,8 @@ type Mutation {
 
   # GenAI mutations
   generateContent(projectId: ID!, snippetId: ID!, input: GenerateContentInput!): GenerationResult!
+  generateContentStream(projectId: ID!, snippetId: ID!, input: GenerateContentInput!): GenerationResult!
+  publishGenerationStreamEvent(input: GenerationStreamEventInput!): GenerationStreamEvent!
 }
 
 type SystemAnalytics {
@@ -160,6 +162,11 @@ type SystemAnalytics {
   totalSnippets: Int!
   averageSnippetsPerUser: Float!
 }
+type Subscription {
+  onGenerationStream(snippetId: ID!): GenerationStreamEvent
+    @aws_subscribe(mutations: ["publishGenerationStreamEvent"])
+}
+
 
 # GenAI Types
 
@@ -197,6 +204,20 @@ type GenerationResult {
   generationTimeMs: Int!
 }
 
+type GenerationStreamEvent {
+  snippetId: ID!
+  content: String
+  isComplete: Boolean!
+  tokensUsed: Int
+}
+
+input GenerationStreamEventInput {
+  snippetId: ID!
+  content: String
+  isComplete: Boolean!
+  tokensUsed: Int
+}
+
 type GenerationRecord {
   id: ID!
   userId: ID!
@@ -224,4 +245,5 @@ input GenerateContentInput {
 schema {
   query: Query
   mutation: Mutation
+  subscription: Subscription
 }

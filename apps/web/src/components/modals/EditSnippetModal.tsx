@@ -1,5 +1,5 @@
 import { useMutation } from '@apollo/client'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 
 import { DELETE_SNIPPET, UPDATE_SNIPPET } from '../../graphql/mutations'
 import { GET_PROJECT_WITH_SNIPPETS } from '../../graphql/queries'
@@ -19,6 +19,12 @@ interface EditSnippetModalProps {
   }
 }
 
+type ChatMessage = {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+}
+
 export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalProps) => {
   const normalisedTitle = snippet.title && snippet.title.trim() !== '' ? snippet.title : 'New snippet'
   const [title, setTitle] = useState(normalisedTitle)
@@ -31,14 +37,24 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
   const [isSaving, setIsSaving] = useState(false)
   const [selectedModel, setSelectedModel] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [streamError, setStreamError] = useState<string | null>(null)
 
   const {
     models,
     isLoadingModels,
     modelsError,
-    generate,
-    isGenerating
+    generateStream,
+    subscribeToGenerationStream,
+    isGenerating,
+    isStreamingSupported,
+    streamingFallbackReason
   } = useGenAI({ enabled: isOpen })
+
+  const streamSubscriptionRef = useRef<{ unsubscribe: () => void } | null>(null)
+  const assistantContentRef = useRef<string>('')
+  const activeAssistantMessageIdRef = useRef<string | null>(null)
 
   // Reset form when snippet changes
   useEffect(() => {
@@ -52,7 +68,38 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
     setCategoryInput('')
     setSelectedModel('')
     setIsDeleting(false)
+    setStreamError(null)
+    setIsStreaming(false)
+
+    if (streamSubscriptionRef.current) {
+      streamSubscriptionRef.current.unsubscribe()
+      streamSubscriptionRef.current = null
+    }
+    activeAssistantMessageIdRef.current = null
+    assistantContentRef.current = snippet.textField2 ?? ''
+
+    const initialChat: ChatMessage[] = []
+    const initialPrompt = (snippet.textField1 ?? '').trim()
+    const initialResponse = (snippet.textField2 ?? '').trim()
+
+    if (initialPrompt) {
+      initialChat.push({ id: `user-initial-${snippet.id}`, role: 'user', content: initialPrompt })
+    }
+    if (initialResponse) {
+      initialChat.push({ id: `assistant-initial-${snippet.id}`, role: 'assistant', content: initialResponse })
+    }
+
+    setChatMessages(initialChat)
   }, [snippet])
+
+  useEffect(() => {
+    if (!isOpen && streamSubscriptionRef.current) {
+      streamSubscriptionRef.current.unsubscribe()
+      streamSubscriptionRef.current = null
+      activeAssistantMessageIdRef.current = null
+      setIsStreaming(false)
+    }
+  }, [isOpen])
 
   useEffect(() => {
     if (!isOpen) return
@@ -60,6 +107,13 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
       setSelectedModel(models[0].id)
     }
   }, [isOpen, models, selectedModel])
+
+  useEffect(() => () => {
+    if (streamSubscriptionRef.current) {
+      streamSubscriptionRef.current.unsubscribe()
+      streamSubscriptionRef.current = null
+    }
+  }, [])
 
   const [updateSnippetMutation] = useMutation(UPDATE_SNIPPET, {
     refetchQueries: [
@@ -132,19 +186,22 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
     setCategories(categories.filter(cat => cat !== categoryToRemove))
   }, [categories])
 
-  const handleTagKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleTagKeyPress = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault()
       handleAddTag()
     }
   }, [handleAddTag])
 
-  const handleCategoryKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleCategoryKeyPress = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault()
       handleAddCategory()
     }
   }, [handleAddCategory])
+
+  const activeAssistantMessageId = activeAssistantMessageIdRef.current
+  const isLlmBusy = isGenerating || isStreaming
 
   const handleGenerate = useCallback(async () => {
     if (!selectedModel) {
@@ -152,22 +209,146 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
       return
     }
 
+    if (textField1.trim() === '') {
+      alert('Please provide input in Text Field 1 to send to the model.')
+      return
+    }
+
+    if (streamSubscriptionRef.current) {
+      streamSubscriptionRef.current.unsubscribe()
+      streamSubscriptionRef.current = null
+    }
+
+    const timestamp = Date.now()
+    const userMessageId = `user-${timestamp}`
+    const assistantMessageId = `assistant-${timestamp}`
+
+    activeAssistantMessageIdRef.current = assistantMessageId
+    assistantContentRef.current = ''
+    setStreamError(null)
+
+    setChatMessages(prev => [
+      ...prev,
+      { id: userMessageId, role: 'user', content: textField1 },
+      { id: assistantMessageId, role: 'assistant', content: '' }
+    ])
+
+    const shouldAttemptStreaming = isStreamingSupported
+    if (shouldAttemptStreaming) {
+      setIsStreaming(true)
+      try {
+        streamSubscriptionRef.current = subscribeToGenerationStream(snippet.id, {
+          onNext: (event) => {
+            // Skip null events (filtered out by server)
+            if (!event) return
+
+            if (event.snippetId !== snippet.id) return
+
+            if (event.content) {
+              assistantContentRef.current += event.content
+            }
+
+            const currentAssistantId = activeAssistantMessageIdRef.current
+            if (currentAssistantId) {
+              setChatMessages(prev =>
+                prev.map(message =>
+                  message.id === currentAssistantId
+                    ? { ...message, content: assistantContentRef.current }
+                    : message
+                )
+              )
+            }
+
+            if (event.isComplete) {
+              setTextField2(assistantContentRef.current)
+              setIsStreaming(false)
+              if (streamSubscriptionRef.current) {
+                streamSubscriptionRef.current.unsubscribe()
+                streamSubscriptionRef.current = null
+              }
+              activeAssistantMessageIdRef.current = null
+            }
+          },
+          onError: (error) => {
+            const fallbackMessage = streamingFallbackReason ?? 'Streaming is not available right now. You will see the full response once it is ready.'
+            console.warn('Streaming disabled. Falling back to non-streaming generation.', error)
+            setStreamError(fallbackMessage)
+            setIsStreaming(false)
+            if (streamSubscriptionRef.current) {
+              streamSubscriptionRef.current.unsubscribe()
+              streamSubscriptionRef.current = null
+            }
+            activeAssistantMessageIdRef.current = null
+          },
+          onComplete: () => {
+            setIsStreaming(false)
+            streamSubscriptionRef.current = null
+            activeAssistantMessageIdRef.current = null
+          }
+        })
+      } catch (subscriptionError) {
+        console.warn('Failed to subscribe to generation stream. Falling back to non-streaming mode.', subscriptionError)
+        setStreamError(streamingFallbackReason ?? 'Streaming is not available right now. You will see the full response once it is ready.')
+        setIsStreaming(false)
+      }
+    } else if (streamingFallbackReason) {
+      setStreamError(streamingFallbackReason)
+    }
+
     try {
-      const generation = await generate(snippet.projectId, snippet.id, selectedModel, textField1)
+      const { result: generation, usedStreaming, fallbackReason } = await generateStream(
+        snippet.projectId,
+        snippet.id,
+        selectedModel,
+        textField1
+      )
 
       if (!generation || generation.content.trim() === '') {
         alert('The selected model did not return any content. Please try again or choose another model.')
+        setIsStreaming(false)
         return
       }
 
+      if (!usedStreaming && fallbackReason) {
+        setStreamError(fallbackReason)
+      }
+
+      assistantContentRef.current = generation.content
       setTextField2(generation.content)
+
+      const currentAssistantId = activeAssistantMessageIdRef.current
+      if (currentAssistantId) {
+        setChatMessages(prev =>
+          prev.map(message =>
+            message.id === currentAssistantId
+              ? { ...message, content: generation.content }
+              : message
+          )
+        )
+      }
     } catch (error) {
       console.error('Failed to generate content:', error)
-      alert(`Failed to generate content: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      setStreamError(message)
+      alert(`Failed to generate content: ${message}`)
     } finally {
-      // no-op: loading state managed by Apollo mutation
+      if (streamSubscriptionRef.current) {
+        streamSubscriptionRef.current.unsubscribe()
+        streamSubscriptionRef.current = null
+      }
+      activeAssistantMessageIdRef.current = null
+      setIsStreaming(false)
     }
-  }, [generate, selectedModel, snippet.projectId, snippet.id, textField1])
+  }, [
+    generateStream,
+    isStreamingSupported,
+    selectedModel,
+    snippet.id,
+    snippet.projectId,
+    streamingFallbackReason,
+    subscribeToGenerationStream,
+    textField1
+  ])
 
   const handleDelete = useCallback(async () => {
     const shouldDelete = window.confirm('Are you sure you want to delete this snippet? This action cannot be undone.')
@@ -247,7 +428,7 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 rows={6}
                 placeholder="Enter text for field 1..."
-                disabled={isSaving || isDeleting}
+                disabled={isSaving || isDeleting || isLlmBusy}
               />
             </div>
 
@@ -262,7 +443,7 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
                   value={selectedModel}
                   onChange={(e) => setSelectedModel(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  disabled={isSaving || isGenerating || isDeleting || isLoadingModels}
+                  disabled={isSaving || isLlmBusy || isDeleting || isLoadingModels}
                 >
                   <option value="" disabled>
                     {isLoadingModels ? 'Loading models...' : 'Select a model...'}
@@ -281,20 +462,20 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:bg-green-400 flex items-center gap-2"
                 disabled={
                   isSaving ||
-                  isGenerating ||
+                  isLlmBusy ||
                   isDeleting ||
                   !selectedModel ||
                   textField1.trim() === '' ||
                   isLoadingModels
                 }
               >
-                {isGenerating && (
+                {isLlmBusy && (
                   <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
                 )}
-                {isGenerating ? 'Generating...' : 'Generate'}
+                {isLlmBusy ? 'Generating...' : 'Generate'}
               </button>
             </div>
 
@@ -307,20 +488,43 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
               <p className="text-sm text-gray-500">No models available. Please contact your administrator.</p>
             )}
 
-            {/* Text Field 2 */}
+            {/* Chat Window */}
             <div>
-              <label htmlFor="textField2" className="block text-sm font-medium text-gray-700 mb-1">
-                Text Field 2
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Text Field 2 (Chat)
               </label>
-              <textarea
-                id="textField2"
-                value={textField2}
-                onChange={(e) => setTextField2(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                rows={6}
-                placeholder="Enter text for field 2..."
-                disabled={isSaving || isDeleting}
-              />
+              <div className="w-full border border-gray-300 rounded-md bg-gray-50 p-3 h-60 overflow-y-auto space-y-3">
+                {chatMessages.length === 0 ? (
+                  <p className="text-sm text-gray-500">No conversation yet. Use Generate to ask the model for help.</p>
+                ) : (
+                  chatMessages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`flex ${message.role === 'assistant' ? 'justify-start' : 'justify-end'}`}
+                    >
+                      <div
+                        className={`max-w-[80%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap shadow-sm ${
+                          message.role === 'assistant'
+                            ? 'bg-white text-gray-900 border border-gray-200'
+                            : 'bg-blue-600 text-white'
+                        }`}
+                      >
+                        <p className="text-xs font-semibold uppercase tracking-wide mb-1 opacity-70">
+                          {message.role === 'assistant' ? 'Model' : 'You'}
+                        </p>
+                        {message.content !== ''
+                          ? message.content
+                          : message.role === 'assistant' && isLlmBusy && activeAssistantMessageId === message.id
+                            ? 'Generating response…'
+                            : ''}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              {streamError && (
+                <p className="text-sm text-red-600 mt-2">{streamError}</p>
+              )}
             </div>
 
             {/* Tags */}
@@ -426,7 +630,7 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
               void handleDelete()
             }}
             className="px-4 py-2 text-red-700 bg-red-100 rounded-md hover:bg-red-200 transition-colors disabled:bg-red-50 disabled:text-red-300"
-            disabled={isSaving || isDeleting || isGenerating}
+            disabled={isSaving || isDeleting || isLlmBusy}
           >
             {isDeleting ? 'Deleting...' : 'Delete'}
           </button>

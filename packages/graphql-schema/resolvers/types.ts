@@ -93,6 +93,21 @@ export type GenerationResult = {
   tokensUsed: Scalars['Int']['output'];
 };
 
+export type GenerationStreamEvent = {
+  __typename?: 'GenerationStreamEvent';
+  content?: Maybe<Scalars['String']['output']>;
+  isComplete: Scalars['Boolean']['output'];
+  snippetId: Scalars['ID']['output'];
+  tokensUsed?: Maybe<Scalars['Int']['output']>;
+};
+
+export type GenerationStreamEventInput = {
+  content?: InputMaybe<Scalars['String']['input']>;
+  isComplete: Scalars['Boolean']['input'];
+  snippetId: Scalars['ID']['input'];
+  tokensUsed?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type ModelConfig = {
   __typename?: 'ModelConfig';
   costPerToken?: Maybe<Scalars['Float']['output']>;
@@ -124,6 +139,8 @@ export type Mutation = {
   deleteSnippet: Scalars['Boolean']['output'];
   deleteUser: Scalars['Boolean']['output'];
   generateContent: GenerationResult;
+  generateContentStream: GenerationResult;
+  publishGenerationStreamEvent: GenerationStreamEvent;
   resetUserPassword: Scalars['String']['output'];
   revertSnippet: Snippet;
   updateConnection: Connection;
@@ -180,6 +197,18 @@ export type MutationGenerateContentArgs = {
   input: GenerateContentInput;
   projectId: Scalars['ID']['input'];
   snippetId: Scalars['ID']['input'];
+};
+
+
+export type MutationGenerateContentStreamArgs = {
+  input: GenerateContentInput;
+  projectId: Scalars['ID']['input'];
+  snippetId: Scalars['ID']['input'];
+};
+
+
+export type MutationPublishGenerationStreamEventArgs = {
+  input: GenerationStreamEventInput;
 };
 
 
@@ -301,6 +330,16 @@ export type SnippetVersion = {
   textField2: Scalars['String']['output'];
   title?: Maybe<Scalars['String']['output']>;
   version: Scalars['Int']['output'];
+};
+
+export type Subscription = {
+  __typename?: 'Subscription';
+  onGenerationStream?: Maybe<GenerationStreamEvent>;
+};
+
+
+export type SubscriptionOnGenerationStreamArgs = {
+  snippetId: Scalars['ID']['input'];
 };
 
 export type SystemAnalytics = {
@@ -428,6 +467,8 @@ export type ResolversTypes = ResolversObject<{
   GenerationModality: GenerationModality;
   GenerationRecord: ResolverTypeWrapper<GenerationRecord>;
   GenerationResult: ResolverTypeWrapper<GenerationResult>;
+  GenerationStreamEvent: ResolverTypeWrapper<GenerationStreamEvent>;
+  GenerationStreamEventInput: GenerationStreamEventInput;
   ID: ResolverTypeWrapper<Scalars['ID']['output']>;
   Int: ResolverTypeWrapper<Scalars['Int']['output']>;
   ModelConfig: ResolverTypeWrapper<ModelConfig>;
@@ -440,6 +481,7 @@ export type ResolversTypes = ResolversObject<{
   Snippet: ResolverTypeWrapper<Snippet>;
   SnippetVersion: ResolverTypeWrapper<SnippetVersion>;
   String: ResolverTypeWrapper<Scalars['String']['output']>;
+  Subscription: ResolverTypeWrapper<Record<PropertyKey, never>>;
   SystemAnalytics: ResolverTypeWrapper<SystemAnalytics>;
   UpdateConnectionInput: UpdateConnectionInput;
   UpdateProjectInput: UpdateProjectInput;
@@ -459,6 +501,8 @@ export type ResolversParentTypes = ResolversObject<{
   GenerateContentInput: GenerateContentInput;
   GenerationRecord: GenerationRecord;
   GenerationResult: GenerationResult;
+  GenerationStreamEvent: GenerationStreamEvent;
+  GenerationStreamEventInput: GenerationStreamEventInput;
   ID: Scalars['ID']['output'];
   Int: Scalars['Int']['output'];
   ModelConfig: ModelConfig;
@@ -470,6 +514,7 @@ export type ResolversParentTypes = ResolversObject<{
   Snippet: Snippet;
   SnippetVersion: SnippetVersion;
   String: Scalars['String']['output'];
+  Subscription: Record<PropertyKey, never>;
   SystemAnalytics: SystemAnalytics;
   UpdateConnectionInput: UpdateConnectionInput;
   UpdateProjectInput: UpdateProjectInput;
@@ -513,6 +558,13 @@ export type GenerationResultResolvers<ContextType = GraphQLContext, ParentType e
   tokensUsed?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
 }>;
 
+export type GenerationStreamEventResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['GenerationStreamEvent'] = ResolversParentTypes['GenerationStreamEvent']> = ResolversObject<{
+  content?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  isComplete?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  snippetId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  tokensUsed?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
+}>;
+
 export type ModelConfigResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['ModelConfig'] = ResolversParentTypes['ModelConfig']> = ResolversObject<{
   costPerToken?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
@@ -535,6 +587,8 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   deleteSnippet?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationDeleteSnippetArgs, 'id' | 'projectId'>>;
   deleteUser?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationDeleteUserArgs, 'id'>>;
   generateContent?: Resolver<ResolversTypes['GenerationResult'], ParentType, ContextType, RequireFields<MutationGenerateContentArgs, 'input' | 'projectId' | 'snippetId'>>;
+  generateContentStream?: Resolver<ResolversTypes['GenerationResult'], ParentType, ContextType, RequireFields<MutationGenerateContentStreamArgs, 'input' | 'projectId' | 'snippetId'>>;
+  publishGenerationStreamEvent?: Resolver<ResolversTypes['GenerationStreamEvent'], ParentType, ContextType, RequireFields<MutationPublishGenerationStreamEventArgs, 'input'>>;
   resetUserPassword?: Resolver<ResolversTypes['String'], ParentType, ContextType, RequireFields<MutationResetUserPasswordArgs, 'id'>>;
   revertSnippet?: Resolver<ResolversTypes['Snippet'], ParentType, ContextType, RequireFields<MutationRevertSnippetArgs, 'id' | 'projectId' | 'version'>>;
   updateConnection?: Resolver<ResolversTypes['Connection'], ParentType, ContextType, RequireFields<MutationUpdateConnectionArgs, 'id' | 'input'>>;
@@ -597,6 +651,10 @@ export type SnippetVersionResolvers<ContextType = GraphQLContext, ParentType ext
   version?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
 }>;
 
+export type SubscriptionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Subscription'] = ResolversParentTypes['Subscription']> = ResolversObject<{
+  onGenerationStream?: SubscriptionResolver<Maybe<ResolversTypes['GenerationStreamEvent']>, "onGenerationStream", ParentType, ContextType, RequireFields<SubscriptionOnGenerationStreamArgs, 'snippetId'>>;
+}>;
+
 export type SystemAnalyticsResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['SystemAnalytics'] = ResolversParentTypes['SystemAnalytics']> = ResolversObject<{
   averageSnippetsPerUser?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   totalProjects?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
@@ -617,6 +675,7 @@ export type Resolvers<ContextType = GraphQLContext> = ResolversObject<{
   Connection?: ConnectionResolvers<ContextType>;
   GenerationRecord?: GenerationRecordResolvers<ContextType>;
   GenerationResult?: GenerationResultResolvers<ContextType>;
+  GenerationStreamEvent?: GenerationStreamEventResolvers<ContextType>;
   ModelConfig?: ModelConfigResolvers<ContextType>;
   Mutation?: MutationResolvers<ContextType>;
   Position?: PositionResolvers<ContextType>;
@@ -624,6 +683,7 @@ export type Resolvers<ContextType = GraphQLContext> = ResolversObject<{
   Query?: QueryResolvers<ContextType>;
   Snippet?: SnippetResolvers<ContextType>;
   SnippetVersion?: SnippetVersionResolvers<ContextType>;
+  Subscription?: SubscriptionResolvers<ContextType>;
   SystemAnalytics?: SystemAnalyticsResolvers<ContextType>;
   User?: UserResolvers<ContextType>;
 }>;

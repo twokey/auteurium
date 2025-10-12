@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } from '@google/generative-ai'
+import { GoogleGenAI } from '@google/genai'
 import { Logger } from '@aws-lambda-powertools/logger'
 
 import type {
@@ -15,16 +15,16 @@ const logger = new Logger({ serviceName: 'gemini-text-provider' })
 
 /**
  * Gemini text-to-text provider implementation
- * Uses Google Generative AI SDK
+ * Uses Google Gen AI SDK (@google/genai)
  */
 export class GeminiTextProvider implements ITextProvider {
   readonly name = 'gemini'
-  private client: GoogleGenerativeAI | null = null
+  private client: GoogleGenAI | null = null
   private apiKey: string | null = null
 
   async initialize(apiKey: string): Promise<void> {
     this.apiKey = apiKey
-    this.client = new GoogleGenerativeAI(apiKey)
+    this.client = new GoogleGenAI({ apiKey })
     logger.info('Gemini provider initialized')
   }
 
@@ -39,33 +39,6 @@ export class GeminiTextProvider implements ITextProvider {
       // Validate request
       await this.validatePrompt(request.prompt)
 
-      // Get model instance
-      const model = this.client.getGenerativeModel({
-        model: request.modelId,
-        generationConfig: {
-          temperature: request.temperature ?? 0.7,
-          maxOutputTokens: request.maxTokens ?? 2048
-        },
-        safetySettings: [
-          {
-            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-            threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE
-          },
-          {
-            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-            threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE
-          },
-          {
-            category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-            threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE
-          },
-          {
-            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-            threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE
-          }
-        ]
-      })
-
       // Build prompt with optional system instruction
       const fullPrompt = request.systemPrompt
         ? `${request.systemPrompt}\n\n${request.prompt}`
@@ -77,10 +50,20 @@ export class GeminiTextProvider implements ITextProvider {
         hasSystemPrompt: !!request.systemPrompt
       })
 
-      // Generate content
-      const result = await model.generateContent(fullPrompt)
-      const response = result.response
-      const text = response.text()
+      // Generate content using new SDK
+      const response = await this.client.models.generateContent({
+        model: request.modelId,
+        contents: fullPrompt,
+        config: {
+          temperature: request.temperature ?? 0.7,
+          maxOutputTokens: request.maxTokens ?? 2048,
+          thinkingConfig: {
+            thinkingBudget: 0
+          }
+        }
+      })
+
+      const text = response.text ?? ''
 
       // Calculate metrics
       const generationTimeMs = Date.now() - startTime
@@ -124,14 +107,6 @@ export class GeminiTextProvider implements ITextProvider {
     try {
       await this.validatePrompt(request.prompt)
 
-      const model = this.client.getGenerativeModel({
-        model: request.modelId,
-        generationConfig: {
-          temperature: request.temperature ?? 0.7,
-          maxOutputTokens: request.maxTokens ?? 2048
-        }
-      })
-
       const fullPrompt = request.systemPrompt
         ? `${request.systemPrompt}\n\n${request.prompt}`
         : request.prompt
@@ -141,11 +116,22 @@ export class GeminiTextProvider implements ITextProvider {
         promptLength: request.prompt.length
       })
 
-      const result = await model.generateContentStream(fullPrompt)
+      // Generate content stream using new SDK
+      const response = await this.client.models.generateContentStream({
+        model: request.modelId,
+        contents: fullPrompt,
+        config: {
+          temperature: request.temperature ?? 0.7,
+          maxOutputTokens: request.maxTokens ?? 2048,
+          thinkingConfig: {
+            thinkingBudget: 0
+          }
+        }
+      })
 
       // Stream chunks
-      for await (const chunk of result.stream) {
-        const chunkText = chunk.text()
+      for await (const chunk of response) {
+        const chunkText = chunk.text ?? ''
         fullContent += chunkText
 
         onChunk({
@@ -155,7 +141,7 @@ export class GeminiTextProvider implements ITextProvider {
       }
 
       // Send final chunk
-      onChunk({
+      await onChunk({
         content: '',
         isComplete: true,
         tokensUsed: this.estimateTokens(request.prompt) + this.estimateTokens(fullContent)

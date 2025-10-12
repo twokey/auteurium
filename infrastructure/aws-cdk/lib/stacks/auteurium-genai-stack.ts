@@ -108,8 +108,41 @@ export class AuteuriumGenAIStack extends cdk.Stack {
         PROJECTS_TABLE: projectsTable.tableName,
         LLM_API_KEYS_SECRET_ARN: llmApiKeysSecret.secretArn,
         USER_POOL_ID: userPool.userPoolId,
-        USER_POOL_CLIENT_ID: userPoolClient.userPoolClientId
+        USER_POOL_CLIENT_ID: userPoolClient.userPoolClientId,
+        APPSYNC_API_NAME: `auteurium-api-${stage}`
       }
+    })
+
+    const generateContentStreamFunction = new lambdaNodejs.NodejsFunction(this, `GenerateContentStreamFunction-${stage}`, {
+      functionName: `auteurium-genai-generate-stream-${stage}`,
+      runtime: lambda.Runtime.NODEJS_22_X,
+      entry: path.join(__dirname, '../../../../services/api/src/resolvers/genai/generateContentStream.ts'),
+      handler: 'handler',
+      timeout: cdk.Duration.seconds(60),
+      memorySize: 1024,
+      bundling: {
+        format: lambdaNodejs.OutputFormat.CJS,
+        target: 'node22',
+        sourceMap: true,
+        tsconfig: path.join(__dirname, '../../../../services/api/tsconfig.json'),
+        nodeModules: ['@google/genai']
+      },
+      environment: {
+        STAGE: stage,
+        GENERATIONS_TABLE: this.generationsTable.tableName,
+        SNIPPETS_TABLE: snippetsTable.tableName,
+        PROJECTS_TABLE: projectsTable.tableName,
+        LLM_API_KEYS_SECRET_ARN: llmApiKeysSecret.secretArn,
+        USER_POOL_ID: userPool.userPoolId,
+        USER_POOL_CLIENT_ID: userPoolClient.userPoolClientId,
+        APPSYNC_API_NAME: `auteurium-api-${stage}`
+      }
+    })
+
+    const appSyncFieldArn = this.formatArn({
+      service: 'appsync',
+      resource: 'apis',
+      resourceName: `${graphqlApi.apiId}/types/*/fields/*`
     })
 
     // Lambda function for availableModels query
@@ -155,10 +188,14 @@ export class AuteuriumGenAIStack extends cdk.Stack {
 
     // Grant permissions
     llmApiKeysSecret.grantRead(generateContentFunction)
+    llmApiKeysSecret.grantRead(generateContentStreamFunction)
     this.generationsTable.grantReadWriteData(generateContentFunction)
+    this.generationsTable.grantReadWriteData(generateContentStreamFunction)
     this.generationsTable.grantReadWriteData(generationHistoryFunction)
     snippetsTable.grantReadData(generateContentFunction)
+    snippetsTable.grantReadData(generateContentStreamFunction)
     projectsTable.grantReadData(generateContentFunction)
+    projectsTable.grantReadData(generateContentStreamFunction)
 
     // Grant GSI query permissions
     generateContentFunction.addToRolePolicy(new iam.PolicyStatement({
@@ -170,6 +207,25 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       ]
     }))
 
+    generateContentStreamFunction.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['dynamodb:Query'],
+      resources: [
+        `${this.generationsTable.tableArn}/index/*`,
+        `${snippetsTable.tableArn}/index/*`,
+        `${projectsTable.tableArn}/index/*`
+      ]
+    }))
+
+    generateContentStreamFunction.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['appsync:GraphQL'],
+      resources: [appSyncFieldArn]
+    }))
+
+    generateContentStreamFunction.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['appsync:ListGraphqlApis'],
+      resources: ['*']
+    }))
+
     generationHistoryFunction.addToRolePolicy(new iam.PolicyStatement({
       actions: ['dynamodb:Query'],
       resources: [
@@ -177,36 +233,96 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       ]
     }))
 
-    // Create Lambda data sources
-    const generateContentDataSource = graphqlApi.addLambdaDataSource(
-      `GenerateContentDataSource-${stage}`,
-      generateContentFunction
-    )
+    // Create AppSync data sources
+    const generateContentDataSource = new appsync.LambdaDataSource(this, `GenerateContentDataSource-${stage}`, {
+      api: graphqlApi,
+      name: `genai-generate-${stage}`,
+      lambdaFunction: generateContentFunction
+    })
 
-    const availableModelsDataSource = graphqlApi.addLambdaDataSource(
-      `AvailableModelsDataSource-${stage}`,
-      availableModelsFunction
-    )
+    const generateContentStreamDataSource = new appsync.LambdaDataSource(this, `GenerateContentStreamDataSource-${stage}`, {
+      api: graphqlApi,
+      name: `genai-generate-stream-${stage}`,
+      lambdaFunction: generateContentStreamFunction
+    })
 
-    const generationHistoryDataSource = graphqlApi.addLambdaDataSource(
-      `GenerationHistoryDataSource-${stage}`,
-      generationHistoryFunction
-    )
+    const availableModelsDataSource = new appsync.LambdaDataSource(this, `AvailableModelsDataSource-${stage}`, {
+      api: graphqlApi,
+      name: `genai-models-${stage}`,
+      lambdaFunction: availableModelsFunction
+    })
+
+    const generationHistoryDataSource = new appsync.LambdaDataSource(this, `GenerationHistoryDataSource-${stage}`, {
+      api: graphqlApi,
+      name: `genai-history-${stage}`,
+      lambdaFunction: generationHistoryFunction
+    })
+
+    const generationStreamEventsDataSource = new appsync.NoneDataSource(this, `GenerationStreamEventsDataSource-${stage}`, {
+      api: graphqlApi,
+      name: `genai-stream-events-${stage}`
+    })
 
     // Create resolvers
-    generateContentDataSource.createResolver(`GenerateContentResolver-${stage}`, {
+    new appsync.Resolver(this, `GenerateContentResolver-${stage}`, {
+      api: graphqlApi,
       typeName: 'Mutation',
-      fieldName: 'generateContent'
+      fieldName: 'generateContent',
+      dataSource: generateContentDataSource
     })
 
-    availableModelsDataSource.createResolver(`AvailableModelsResolver-${stage}`, {
-      typeName: 'Query',
-      fieldName: 'availableModels'
+    new appsync.Resolver(this, `GenerateContentStreamResolver-${stage}`, {
+      api: graphqlApi,
+      typeName: 'Mutation',
+      fieldName: 'generateContentStream',
+      dataSource: generateContentStreamDataSource
     })
 
-    generationHistoryDataSource.createResolver(`GenerationHistoryResolver-${stage}`, {
+    new appsync.Resolver(this, `AvailableModelsResolver-${stage}`, {
+      api: graphqlApi,
       typeName: 'Query',
-      fieldName: 'generationHistory'
+      fieldName: 'availableModels',
+      dataSource: availableModelsDataSource
+    })
+
+    new appsync.Resolver(this, `GenerationHistoryResolver-${stage}`, {
+      api: graphqlApi,
+      typeName: 'Query',
+      fieldName: 'generationHistory',
+      dataSource: generationHistoryDataSource
+    })
+
+    new appsync.Resolver(this, `PublishGenerationStreamEventResolver-${stage}`, {
+      api: graphqlApi,
+      typeName: 'Mutation',
+      fieldName: 'publishGenerationStreamEvent',
+      dataSource: generationStreamEventsDataSource,
+      requestMappingTemplate: appsync.MappingTemplate.fromString('$util.toJson($ctx.arguments.input)'),
+      responseMappingTemplate: appsync.MappingTemplate.fromString('$util.toJson($ctx.arguments.input)')
+    })
+
+    // Subscription resolver with server-side filtering by snippetId
+    // Returns null for non-matching events (which is now allowed since return type is nullable)
+    new appsync.Resolver(this, `OnGenerationStreamSubscriptionResolver-${stage}`, {
+      api: graphqlApi,
+      typeName: 'Subscription',
+      fieldName: 'onGenerationStream',
+      dataSource: generationStreamEventsDataSource,
+      requestMappingTemplate: appsync.MappingTemplate.fromString(`
+        {
+          "version": "2018-05-29",
+          "payload": {}
+        }
+      `),
+      responseMappingTemplate: appsync.MappingTemplate.fromString(`
+        ## Filter: only forward events where snippetId matches the subscription argument
+        #if($ctx.result && $ctx.result.snippetId && $ctx.result.snippetId == $ctx.args.snippetId)
+          $util.toJson($ctx.result)
+        #else
+          ## Return null to skip this event (nullable return type allows this)
+          null
+        #end
+      `)
     })
 
     // CloudWatch alarms for cost monitoring (optional for dev)

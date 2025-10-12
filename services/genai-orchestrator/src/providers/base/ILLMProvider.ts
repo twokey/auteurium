@@ -31,7 +31,7 @@ export interface ILLMProvider {
    */
   generateStream?(
     request: GenerationRequest,
-    onChunk: (chunk: StreamingChunk) => void
+    onChunk: (chunk: StreamingChunk) => void | Promise<void>
   ): Promise<GenerationResponse>
 
   /**

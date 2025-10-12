@@ -12,10 +12,22 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
-      "@shared/*": ["../../packages/*"]
+      "@shared/*": [
+        "../../packages/*"
+      ]
     },
-    "noEmit": false
+    "noEmit": false,
+    "lib": [
+      "ES2020",
+      "DOM"
+    ]
   },
-  "include": ["src/**/*"],
-  "exclude": ["dist", "node_modules", "**/*.test.ts"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules",
+    "**/*.test.ts"
+  ]
 }

@@ -24,3 +24,27 @@ export const GENERATE_CONTENT = gql`
     }
   }
 `
+export const GENERATE_CONTENT_STREAM = gql`
+  mutation GenerateContentStream($projectId: ID!, $snippetId: ID!, $input: GenerateContentInput!) {
+    generateContentStream(projectId: $projectId, snippetId: $snippetId, input: $input) {
+      content
+      tokensUsed
+      cost
+      modelUsed
+      generationTimeMs
+    }
+  }
+`
+
+export const GENERATION_STREAM_SUBSCRIPTION = gql`
+  subscription OnGenerationStream($snippetId: ID!) {
+    onGenerationStream(snippetId: $snippetId) {
+      snippetId
+      content
+      isComplete
+      tokensUsed
+    }
+  }
+`
+
+

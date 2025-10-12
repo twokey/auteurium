@@ -1,5 +1,5 @@
 import { Logger } from '@aws-lambda-powertools/logger'
-import type { GenerationRequest, GenerationResponse, GenerationRecord } from '@auteurium/shared-types'
+import type { GenerationRequest, GenerationResponse, GenerationRecord, StreamingChunk } from '@auteurium/shared-types'
 import { ProviderRegistry } from '../providers/registry'
 import { getModelConfig } from '../config/models'
 
@@ -90,6 +90,94 @@ export class GenerationOrchestrator {
       return response
     } catch (error) {
       logger.error('Generation failed', {
+        error: error instanceof Error ? error.message : String(error),
+        userId: context.userId,
+        snippetId: context.snippetId,
+        modelId: request.modelId
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Generate content with streaming support. Invokes onChunk for each streamed update.
+   */
+  async generateStream(
+    request: GenerationRequest,
+    context: OrchestrationContext,
+    onChunk: (chunk: StreamingChunk) => void | Promise<void>
+  ): Promise<GenerationResponse> {
+    const startTime = Date.now()
+
+    try {
+      const modelConfig = getModelConfig(request.modelId)
+      if (!modelConfig) {
+        throw new Error(`Model not found: ${request.modelId}`)
+      }
+
+      if (!modelConfig.enabled) {
+        throw new Error(`Model is disabled: ${request.modelId}`)
+      }
+
+      logger.info('Starting streaming generation', {
+        userId: context.userId,
+        snippetId: context.snippetId,
+        projectId: context.projectId,
+        modelId: request.modelId,
+        provider: modelConfig.provider
+      })
+
+      const provider = ProviderRegistry.getProvider(modelConfig.provider)
+      const apiKey = this.apiKeys.get(modelConfig.provider)
+      if (!apiKey) {
+        throw new Error(`API key not configured for provider: ${modelConfig.provider}`)
+      }
+
+      await provider.initialize(apiKey)
+
+      if (!provider.isModelSupported(request.modelId)) {
+        throw new Error(`Model not supported by provider: ${request.modelId}`)
+      }
+
+      const streamRequest: GenerationRequest = {
+        ...request,
+        stream: true
+      }
+
+      const streamFn = provider.generateStream?.bind(provider)
+
+      if (!streamFn) {
+        logger.warn('Provider does not support streaming, falling back to standard generation', {
+          provider: provider.name,
+          modelId: request.modelId
+        })
+
+        const response = await provider.generate(streamRequest)
+        await onChunk({
+          content: response.content,
+          isComplete: true,
+          tokensUsed: response.tokensUsed
+        })
+        return response
+      }
+
+      const response = await streamFn(streamRequest, async (chunk: StreamingChunk) => {
+        await onChunk(chunk)
+      })
+
+      const totalTime = Date.now() - startTime
+      logger.info('Streaming generation completed', {
+        userId: context.userId,
+        snippetId: context.snippetId,
+        modelId: request.modelId,
+        tokensUsed: response.tokensUsed,
+        cost: response.cost,
+        totalTimeMs: totalTime
+      })
+
+      return response
+    } catch (error) {
+      logger.error('Streaming generation failed', {
         error: error instanceof Error ? error.message : String(error),
         userId: context.userId,
         snippetId: context.snippetId,

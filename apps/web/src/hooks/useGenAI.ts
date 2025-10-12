@@ -1,7 +1,12 @@
-import { useCallback } from 'react'
-import { useMutation, useQuery } from '@apollo/client'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { ApolloError, useApolloClient, useMutation, useQuery } from '@apollo/client'
 
-import { GENERATE_CONTENT, GET_AVAILABLE_MODELS } from '../graphql/genai'
+import {
+  GENERATE_CONTENT,
+  GENERATE_CONTENT_STREAM,
+  GENERATION_STREAM_SUBSCRIPTION,
+  GET_AVAILABLE_MODELS
+} from '../graphql/genai'
 
 type AvailableModel = {
   id: string
@@ -37,12 +42,139 @@ type GenerateContentData = {
   generateContent: GenerateContentResult
 }
 
+type GenerateContentStreamData = {
+  generateContentStream: GenerateContentResult
+}
+
+type GenerationStreamSubscriptionData = {
+  onGenerationStream: {
+    snippetId: string
+    content: string | null
+    isComplete: boolean
+    tokensUsed?: number | null
+  } | null
+}
+
 interface UseGenAIOptions {
   enabled?: boolean
 }
 
+interface StreamHandlers {
+  onNext: (event: GenerationStreamSubscriptionData['onGenerationStream']) => void
+  onError?: (error: unknown) => void
+  onComplete?: () => void
+}
+
+type GenerateStreamResponse = {
+  result: GenerateContentResult | null
+  usedStreaming: boolean
+  fallbackReason: string | null
+}
+
+const STREAMING_ERROR_TOKENS = [
+  'generatecontentstream',
+  'ongenerationstream',
+  'publishgenerationstreamevent',
+  'subscription handshake',
+  'unknown subscription',
+  'resolver not found',
+  'unknown resolver',
+  'not authorized',
+  'unauthorized',
+  'permission denied',
+  'schema is not configured for subscriptions',
+  'schema is not configured'
+]
+
+const DEFAULT_FALLBACK_MESSAGE = 'Streaming is not available in this environment. Returning the full response once it is ready.'
+
+const collectErrorMessages = (error: unknown): string[] => {
+  const messages: string[] = []
+
+  if (!error) {
+    return messages
+  }
+
+  if (error instanceof ApolloError) {
+    if (typeof error.message === 'string' && error.message.trim() !== '') {
+      messages.push(error.message)
+    }
+
+    for (const graphQLError of error.graphQLErrors ?? []) {
+      if (typeof graphQLError.message === 'string' && graphQLError.message.trim() !== '') {
+        messages.push(graphQLError.message)
+      }
+    }
+
+    const networkError = error.networkError as { message?: string; statusCode?: number; result?: { errors?: Array<{ message?: string }> } } | null
+    if (networkError) {
+      if (typeof networkError.message === 'string' && networkError.message.trim() !== '') {
+        messages.push(networkError.message)
+      }
+
+      const networkErrors = networkError.result?.errors
+      if (Array.isArray(networkErrors)) {
+        for (const entry of networkErrors) {
+          if (entry && typeof entry.message === 'string' && entry.message.trim() !== '') {
+            messages.push(entry.message)
+          }
+        }
+      }
+    }
+  } else if (error instanceof Error) {
+    if (typeof error.message === 'string' && error.message.trim() !== '') {
+      messages.push(error.message)
+    }
+  } else if (typeof error === 'object') {
+    const candidate = error as { message?: unknown; errors?: Array<{ message?: unknown }> }
+    if (typeof candidate.message === 'string' && candidate.message.trim() !== '') {
+      messages.push(candidate.message)
+    }
+
+    if (Array.isArray(candidate.errors)) {
+      for (const entry of candidate.errors) {
+        if (entry && typeof entry.message === 'string' && entry.message.trim() !== '') {
+          messages.push(entry.message)
+        }
+      }
+    }
+  }
+
+  return messages
+}
+
+const isStreamingUnsupportedError = (error: unknown): boolean => {
+  const messages = collectErrorMessages(error).map(message => message.toLowerCase())
+
+  if (messages.length === 0) {
+    return false
+  }
+
+  return messages.some(message =>
+    STREAMING_ERROR_TOKENS.some(token => message.includes(token))
+  )
+}
+
+const extractStreamingFallbackReason = (error: unknown): string | null => {
+  const messages = collectErrorMessages(error)
+  if (messages.length === 0) {
+    return null
+  }
+
+  const prioritised = messages.find(message =>
+    STREAMING_ERROR_TOKENS.some(token => message.toLowerCase().includes(token))
+  )
+
+  return prioritised ?? messages[0] ?? null
+}
+
 export const useGenAI = (options: UseGenAIOptions = {}) => {
   const { enabled = true } = options
+  const client = useApolloClient()
+  const streamingSupportedRef = useRef(true)
+  const [isStreamingSupported, setIsStreamingSupported] = useState(true)
+  const streamingFallbackReasonRef = useRef<string | null>(null)
+  const [streamingFallbackReason, setStreamingFallbackReason] = useState<string | null>(null)
 
   const {
     data: modelsData,
@@ -54,10 +186,15 @@ export const useGenAI = (options: UseGenAIOptions = {}) => {
     skip: !enabled
   })
 
-  const [generateContentMutation, { loading: isGenerating }] = useMutation<
+  const [generateContentMutation, { loading: isGeneratingMutation }] = useMutation<
     GenerateContentData,
     GenerateContentVariables
   >(GENERATE_CONTENT)
+
+  const [generateContentStreamMutation, { loading: isStreamingMutation }] = useMutation<
+    GenerateContentStreamData,
+    GenerateContentVariables
+  >(GENERATE_CONTENT_STREAM)
 
   const generate = useCallback(
     async (projectId: string, snippetId: string, modelId: string, prompt: string) => {
@@ -77,12 +214,129 @@ export const useGenAI = (options: UseGenAIOptions = {}) => {
     [generateContentMutation]
   )
 
+  const markStreamingUnsupported = useCallback((reason: string | null) => {
+    if (!streamingSupportedRef.current) {
+      return
+    }
+
+    streamingSupportedRef.current = false
+    setIsStreamingSupported(false)
+
+    const fallbackMessage = DEFAULT_FALLBACK_MESSAGE
+
+    if (reason && reason.trim() !== '') {
+      console.warn('[GenAI] Streaming disabled; falling back to non-streaming mode.', { reason })
+    }
+
+    streamingFallbackReasonRef.current = fallbackMessage
+    setStreamingFallbackReason(fallbackMessage)
+  }, [])
+
+  const runFallbackGeneration = useCallback(async (
+    projectId: string,
+    snippetId: string,
+    modelId: string,
+    prompt: string,
+    reason: string | null
+  ): Promise<GenerateStreamResponse> => {
+    markStreamingUnsupported(reason)
+
+    const result = await generate(projectId, snippetId, modelId, prompt)
+
+    return {
+      result: result ?? null,
+      usedStreaming: false,
+      fallbackReason: streamingFallbackReasonRef.current ?? DEFAULT_FALLBACK_MESSAGE
+    }
+  }, [generate, markStreamingUnsupported])
+
+  const generateStream = useCallback(
+    async (projectId: string, snippetId: string, modelId: string, prompt: string): Promise<GenerateStreamResponse> => {
+      if (!streamingSupportedRef.current) {
+        return runFallbackGeneration(projectId, snippetId, modelId, prompt, streamingFallbackReasonRef.current)
+      }
+
+      try {
+        const result = await generateContentStreamMutation({
+          variables: {
+            projectId,
+            snippetId,
+            input: {
+              modelId,
+              prompt
+            }
+          }
+        })
+
+        return {
+          result: result.data?.generateContentStream ?? null,
+          usedStreaming: true,
+          fallbackReason: null
+        }
+      } catch (error) {
+        if (!isStreamingUnsupportedError(error)) {
+          throw error
+        }
+
+        const reason = extractStreamingFallbackReason(error)
+        return runFallbackGeneration(projectId, snippetId, modelId, prompt, reason)
+      }
+    },
+    [generateContentStreamMutation, runFallbackGeneration]
+  )
+
+  const subscribeToGenerationStream = useCallback(
+    (snippetId: string, handlers: StreamHandlers) => {
+      if (!streamingSupportedRef.current) {
+        return {
+          unsubscribe: () => {}
+        }
+      }
+
+      const observable = client.subscribe<GenerationStreamSubscriptionData>(
+        {
+          query: GENERATION_STREAM_SUBSCRIPTION,
+          variables: { snippetId }
+        }
+      )
+
+      return observable.subscribe({
+        next: ({ data }) => {
+          if (data?.onGenerationStream) {
+            handlers.onNext(data.onGenerationStream)
+          }
+        },
+        error: (error) => {
+          if (isStreamingUnsupportedError(error)) {
+            const reason = extractStreamingFallbackReason(error)
+            markStreamingUnsupported(reason)
+            handlers.onError?.(streamingFallbackReasonRef.current ?? DEFAULT_FALLBACK_MESSAGE)
+            return
+          }
+
+          handlers.onError?.(error)
+        },
+        complete: handlers.onComplete
+      })
+    },
+    [client, markStreamingUnsupported]
+  )
+
+  const memoizedModels = useMemo(
+    () => modelsData?.availableModels ?? [],
+    [modelsData?.availableModels]
+  )
+
   return {
-    models: modelsData?.availableModels ?? [],
+    models: memoizedModels,
     isLoadingModels,
     modelsError,
     refetchModels,
     generate,
-    isGenerating
+    generateStream,
+    subscribeToGenerationStream,
+    isGenerating: isGeneratingMutation || isStreamingMutation,
+    isStreamingSupported,
+    streamingFallbackReason
   }
 }

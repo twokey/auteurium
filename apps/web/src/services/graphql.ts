@@ -1,44 +1,18 @@
-import { ApolloClient, InMemoryCache, createHttpLink, from } from '@apollo/client'
-import { setContext } from '@apollo/client/link/context'
+import { ApolloClient, InMemoryCache, ApolloLink, createHttpLink, from } from '@apollo/client'
 import { onError } from '@apollo/client/link/error'
+import { createAuthLink } from 'aws-appsync-auth-link'
+import { createSubscriptionHandshakeLink } from 'aws-appsync-subscription-link'
 
 import { AuthService } from './auth'
 
-// Create HTTP link
-const httpLink = createHttpLink({
-  uri: import.meta.env.VITE_GRAPHQL_ENDPOINT ?? ''
-})
+const httpUri = import.meta.env.VITE_GRAPHQL_ENDPOINT ?? ''
+const region = import.meta.env.VITE_AWS_REGION ?? 'us-west-2'
 
-// Auth link to add JWT token to requests
-interface AuthLinkContext {
-  headers?: Record<string, string>
-}
+const httpLink = createHttpLink({ uri: httpUri })
 
-const authLink = setContext(async (_operation, context: AuthLinkContext) => {
-  const existingHeaders: Record<string, string> = context.headers
-    ? { ...context.headers }
-    : {}
-
-  try {
-    const token = await AuthService.getAccessToken()
-
-    return {
-      headers: {
-        ...existingHeaders,
-        authorization: token ? `Bearer ${token}` : ''
-      }
-    }
-  } catch (error) {
-    console.error('Error getting auth token:', error)
-    return { headers: existingHeaders }
-  }
-})
-
-// Error link for handling GraphQL errors
 const errorLink = onError(({ graphQLErrors, networkError }) => {
   if (graphQLErrors) {
-    graphQLErrors.forEach((graphQLError) => {
-      const { message, locations, path } = graphQLError
+    graphQLErrors.forEach(({ message, locations, path }) => {
       const formattedLocations = locations
         ?.map(({ line, column }) => `${line}:${column}`)
         .join(', ') ?? 'unknown'
@@ -53,20 +27,45 @@ const errorLink = onError(({ graphQLErrors, networkError }) => {
   }
 
   if (networkError) {
-    console.error('Network error:', networkError)
-
-    // Handle authentication errors
     const message = 'message' in networkError ? networkError.message : undefined
+
+    const isExpectedStreamingError = typeof message === 'string' &&
+      message.toLowerCase().includes('schema is not configured for subscriptions')
+
+    if (!isExpectedStreamingError) {
+      console.error('Network error:', networkError)
+    } else {
+      console.warn('Ignoring subscription network error (streaming not supported on this endpoint).')
+    }
+
     if (message && (message.includes('401') || message.includes('Unauthorized'))) {
-      // TODO: Redirect to login or refresh token
       console.error('Authentication error - user may need to login again')
     }
   }
 })
 
-// Configure Apollo Client
+const auth = {
+  type: 'AMAZON_COGNITO_USER_POOLS' as const,
+  jwtToken: async () => (await AuthService.getAccessToken()) ?? ''
+}
+
+const authLink = createAuthLink({ url: httpUri, region, auth })
+
+const subscriptionLink = typeof window === 'undefined'
+  ? httpLink
+  : createSubscriptionHandshakeLink({ url: httpUri, region, auth }, httpLink)
+
+const links: ApolloLink[] = [errorLink]
+
+if (httpUri) {
+  links.push(authLink as unknown as ApolloLink)
+  links.push(subscriptionLink)
+} else {
+  links.push(httpLink)
+}
+
 export const apolloClient = new ApolloClient({
-  link: from([errorLink, authLink, httpLink]),
+  link: from(links),
   cache: new InMemoryCache({
     typePolicies: {
       Project: {

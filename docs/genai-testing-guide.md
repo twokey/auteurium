@@ -3,12 +3,12 @@
 ## Deployment Status ✅
 
 All GenAI infrastructure has been successfully deployed:
-- ✅ Lambda Functions: `auteurium-genai-generate-dev`, `auteurium-genai-models-dev`, `auteurium-genai-history-dev`
-- ✅ DynamoDB Table: `auteurium-generations-dev`
-- ✅ Secrets Manager: API keys configured at `auteurium/genai/api-keys-dev`
+- ✅ Lambda Functions: `auteurium-genai-generate-{stage}`, `auteurium-genai-models-{stage}`, `auteurium-genai-history-{stage}`
+- ✅ DynamoDB Table: `auteurium-generations-{stage}`
+- ✅ Secrets Manager: API keys configured at `auteurium/genai/api-keys-{stage}`
 - ✅ AppSync Resolvers: Connected to GraphQL API
 
-**GraphQL API Endpoint**: `https://6ch6wplfmfhzvpcpvdbxqm4bje.appsync-api.us-west-2.amazonaws.com/graphql`
+**GraphQL API Endpoint**: Check CDK outputs or AWS AppSync console for your endpoint URL
 
 ## Testing Methods
 
