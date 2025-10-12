@@ -249,6 +249,7 @@ describe('AuteuriumApiStack', () => {
                 'Mutation.createSnippet',
                 'Mutation.updateSnippet',
                 'Mutation.deleteSnippet',
+                'Mutation.combineSnippetConnections',
                 'Mutation.revertSnippet',
                 'Mutation.createConnection',
                 'Mutation.updateConnection',

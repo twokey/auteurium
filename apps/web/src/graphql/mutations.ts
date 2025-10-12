@@ -103,6 +103,27 @@ export const REVERT_SNIPPET = gql`
   }
 `
 
+export const COMBINE_SNIPPET_CONNECTIONS = gql`
+  mutation CombineSnippetConnections($projectId: ID!, $snippetId: ID!) {
+    combineSnippetConnections(projectId: $projectId, snippetId: $snippetId) {
+      id
+      projectId
+      title
+      textField1
+      textField2
+      position {
+        x
+        y
+      }
+      tags
+      categories
+      version
+      createdAt
+      updatedAt
+    }
+  }
+`
+
 // Connection mutations
 export const CREATE_CONNECTION = gql`
   mutation CreateConnection($input: CreateConnectionInput!) {

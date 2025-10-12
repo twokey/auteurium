@@ -130,6 +130,7 @@ export enum ModelProvider {
 
 export type Mutation = {
   __typename?: 'Mutation';
+  combineSnippetConnections: Snippet;
   createConnection: Connection;
   createProject: Project;
   createSnippet: Snippet;
@@ -146,6 +147,12 @@ export type Mutation = {
   updateConnection: Connection;
   updateProject: Project;
   updateSnippet: Snippet;
+};
+
+
+export type MutationCombineSnippetConnectionsArgs = {
+  projectId: Scalars['ID']['input'];
+  snippetId: Scalars['ID']['input'];
 };
 
 
@@ -578,6 +585,7 @@ export type ModelConfigResolvers<ContextType = GraphQLContext, ParentType extend
 }>;
 
 export type MutationResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Mutation'] = ResolversParentTypes['Mutation']> = ResolversObject<{
+  combineSnippetConnections?: Resolver<ResolversTypes['Snippet'], ParentType, ContextType, RequireFields<MutationCombineSnippetConnectionsArgs, 'projectId' | 'snippetId'>>;
   createConnection?: Resolver<ResolversTypes['Connection'], ParentType, ContextType, RequireFields<MutationCreateConnectionArgs, 'input'>>;
   createProject?: Resolver<ResolversTypes['Project'], ParentType, ContextType, RequireFields<MutationCreateProjectArgs, 'input'>>;
   createSnippet?: Resolver<ResolversTypes['Snippet'], ParentType, ContextType, RequireFields<MutationCreateSnippetArgs, 'input'>>;

@@ -130,6 +130,7 @@ export class AuteuriumApiStack extends cdk.Stack {
       { typeName: 'Mutation', fieldName: 'createSnippet' },
       { typeName: 'Mutation', fieldName: 'updateSnippet' },
       { typeName: 'Mutation', fieldName: 'deleteSnippet' },
+      { typeName: 'Mutation', fieldName: 'combineSnippetConnections' },
       { typeName: 'Mutation', fieldName: 'revertSnippet' },
       { typeName: 'Mutation', fieldName: 'createConnection' },
       { typeName: 'Mutation', fieldName: 'updateConnection' },
