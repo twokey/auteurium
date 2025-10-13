@@ -27,7 +27,7 @@
     "@aws-sdk/signature-v4": "^3.6.1",
     "@google/genai": "^1.0.0",
     "@smithy/protocol-http": "^5.2.1",
-    "aws-jwt-verify": "^4.0.1",
+    "aws-jwt-verify": "^5.1.1",
     "aws-lambda": "^1.0.7",
     "aws-sdk": "^2.1490.0",
     "graphql": "^16.8.1",
