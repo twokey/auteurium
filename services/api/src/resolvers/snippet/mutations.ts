@@ -2,15 +2,16 @@ import { type Snippet } from '@auteurium/shared-types'
 import { z } from 'zod'
 
 import { getProjectById } from '../../database/projects'
+import { combineSnippetConnectionsLogic } from '../../database/snippet-combine'
 import {
   createSnippet,
   deleteSnippet,
   revertSnippetToVersion,
   updateSnippet
 } from '../../database/snippets'
-import { combineSnippetConnectionsLogic } from '../../database/snippet-combine'
 import { requireAuth, requireOwnership, validateInput } from '../../middleware/validation'
 import { createNotFoundError } from '../../utils/errors'
+import { withSignedImageUrl, withSignedImageUrls } from '../../utils/snippetImages'
 
 import type { GraphQLContext } from '../../types/context'
 
@@ -86,7 +87,8 @@ export const snippetMutations = {
     // Ensure project ownership
     requireOwnership(user, project.userId, 'project')
 
-    return await createSnippet(input, user.id)
+    const createdSnippet = await createSnippet(input, user.id)
+    return await withSignedImageUrl(createdSnippet, context.logger)
   },
 
   // Update an existing snippet
@@ -105,7 +107,8 @@ export const snippetMutations = {
     })
 
     // The updateSnippet function will verify ownership
-    return await updateSnippet(projectId, snippetId, input, user.id)
+    const updatedSnippet = await updateSnippet(projectId, snippetId, input, user.id)
+    return await withSignedImageUrl(updatedSnippet, context.logger)
   },
 
   // Delete a snippet (with cascade delete of connections and versions)
@@ -150,7 +153,8 @@ export const snippetMutations = {
       userId: user.id
     })
 
-    return await revertSnippetToVersion(projectId, snippetId, version, user.id)
+    const revertedSnippet = await revertSnippetToVersion(projectId, snippetId, version, user.id)
+    return await withSignedImageUrl(revertedSnippet, context.logger)
   },
 
   // Bulk update snippet positions (for canvas drag operations)
@@ -199,7 +203,7 @@ export const snippetMutations = {
       userId: user.id
     })
 
-    return updatedSnippets
+    return await withSignedImageUrls(updatedSnippets, context.logger)
   },
 
   // Combine connected snippets' textField2 values
@@ -240,6 +244,6 @@ export const snippetMutations = {
       newTextLength: updatedSnippet.textField2.length
     })
 
-    return updatedSnippet
+    return await withSignedImageUrl(updatedSnippet, context.logger)
   }
 }

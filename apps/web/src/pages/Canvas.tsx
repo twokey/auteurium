@@ -45,6 +45,13 @@ interface Snippet {
   tags?: string[]
   categories?: string[]
   version: number
+  imageUrl?: string | null
+  imageS3Key?: string | null
+  imageMetadata?: {
+    width: number
+    height: number
+    aspectRatio: string
+  } | null
   connections?: ProjectConnection[]
 }
 
@@ -235,6 +242,17 @@ export const Canvas = () => {
     const result = rawSnippets ?? EMPTY_SNIPPET_LIST
     return result
   }, [rawSnippets])
+
+  useEffect(() => {
+    if (!editingSnippet) {
+      return
+    }
+
+    const latest = snippets.find(s => s.id === editingSnippet.id)
+    if (latest && latest !== editingSnippet) {
+      setEditingSnippet(latest)
+    }
+  }, [snippets, editingSnippet])
 
   // Modal handlers
   const handleEditSnippet = useCallback((snippetId: string) => {

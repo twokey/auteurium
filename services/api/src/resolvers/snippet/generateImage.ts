@@ -1,14 +1,16 @@
 import { GenerationOrchestrator } from '@auteurium/genai-orchestrator'
-import type { Snippet, ImageMetadata } from '@auteurium/shared-types'
 import { Logger } from '@aws-lambda-powertools/logger'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
-import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { GetSecretValueCommand, SecretsManagerClient } from '@aws-sdk/client-secrets-manager'
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
-import type { AppSyncResolverHandler } from 'aws-lambda'
 
 import { createContext, type AppSyncEvent } from '../../middleware/auth'
 import { handleError } from '../../utils/errors'
+import { withSignedImageUrl } from '../../utils/snippetImages'
+
+import type { ImageMetadata, Snippet } from '@auteurium/shared-types'
+import type { AppSyncResolverHandler } from 'aws-lambda'
 
 const logger = new Logger({ serviceName: 'snippet-generate-image' })
 
@@ -180,8 +182,8 @@ export const handler: AppSyncResolverHandler<GenerateImageArgs, Snippet> = async
       }
     }))
 
-    // Generate public URL (assuming bucket has public read or using CloudFront)
-    const imageUrl = `https://${MEDIA_BUCKET_NAME}.s3.amazonaws.com/${s3Key}`
+    // Note: We don't store a public URL here. The S3 bucket is private.
+    // Presigned URLs are generated at query time by withSignedImageUrl() utility.
 
     // Extract image metadata with proper types
     const imageMetadata: ImageMetadata = {
@@ -195,7 +197,6 @@ export const handler: AppSyncResolverHandler<GenerateImageArgs, Snippet> = async
 
     logger.info('Updating snippet with image metadata', {
       snippetId,
-      imageUrl,
       s3Key
     })
 
@@ -205,9 +206,8 @@ export const handler: AppSyncResolverHandler<GenerateImageArgs, Snippet> = async
         projectId,
         id: snippetId
       },
-      UpdateExpression: 'SET imageUrl = :imageUrl, imageS3Key = :imageS3Key, imageMetadata = :imageMetadata, updatedAt = :updatedAt',
+      UpdateExpression: 'SET imageS3Key = :imageS3Key, imageMetadata = :imageMetadata, updatedAt = :updatedAt',
       ExpressionAttributeValues: {
-        ':imageUrl': imageUrl,
         ':imageS3Key': s3Key,
         ':imageMetadata': imageMetadata,
         ':updatedAt': updatedAt
@@ -236,7 +236,7 @@ export const handler: AppSyncResolverHandler<GenerateImageArgs, Snippet> = async
         ':modelProvider': 'gemini',
         ':modelId': 'imagen-4.0-fast-generate-001',
         ':prompt': snippet.textField1,
-        ':result': imageUrl,
+        ':result': s3Key, // Store S3 key instead of URL
         ':tokensUsed': 1,
         ':cost': imageResponse.cost,
         ':generationTimeMs': imageResponse.generationTimeMs,
@@ -249,17 +249,19 @@ export const handler: AppSyncResolverHandler<GenerateImageArgs, Snippet> = async
       snippetId,
       generationId,
       cost: imageResponse.cost,
-      imageUrl
+      s3Key
     })
 
-    // Return updated snippet
-    return {
+    // Return updated snippet with signed URL for immediate preview
+    const snippetWithImage = {
       ...snippet,
-      imageUrl,
       imageS3Key: s3Key,
       imageMetadata,
       updatedAt
     } as Snippet
+
+    // Generate presigned URL for immediate preview (valid for 1 hour)
+    return await withSignedImageUrl(snippetWithImage, logger)
   } catch (error) {
     logger.error('Image generation failed', {
       error: error instanceof Error ? error.message : String(error),

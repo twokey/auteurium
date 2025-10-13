@@ -8,6 +8,7 @@ import {
   getUserSnippets
 } from '../../database/snippets'
 import { enforceContentPrivacy, paginationValidation, requireAuth, validateInput } from '../../middleware/validation'
+import { withSignedImageUrl, withSignedImageUrls } from '../../utils/snippetImages'
 
 import type { GraphQLContext } from '../../types/context'
 
@@ -45,7 +46,7 @@ export const snippetQueries = {
       enforceContentPrivacy(user, snippet.userId)
     }
 
-    return snippet
+    return snippet ? await withSignedImageUrl(snippet, context.logger) : null
   },
 
   // Get all snippets for a project
@@ -74,7 +75,8 @@ export const snippetQueries = {
     context.logger.info('Getting project snippets', { projectId, userId: user.id })
 
     // Note: getProjectSnippets already filters by userId for privacy
-    return await getProjectSnippets(projectId, user.id)
+    const projectSnippets = await getProjectSnippets(projectId, user.id)
+    return await withSignedImageUrls(projectSnippets, context.logger)
   },
 
   // Get all snippets for the authenticated user
@@ -89,9 +91,10 @@ export const snippetQueries = {
     context.logger.info('Getting user snippets', { userId: user.id, limit, offset })
 
     const result = await getUserSnippets(user.id, limit, lastKey as Record<string, unknown> | undefined)
+    const snippetsWithImages = await withSignedImageUrls(result.snippets, context.logger)
 
     return {
-      snippets: result.snippets,
+      snippets: snippetsWithImages,
       lastKey: result.lastKey
     }
   },

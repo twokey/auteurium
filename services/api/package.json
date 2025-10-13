@@ -23,6 +23,7 @@
     "@aws-sdk/client-secrets-manager": "^3.705.0",
     "@aws-sdk/credential-provider-node": "^3.899.0",
     "@aws-sdk/lib-dynamodb": "^3.705.0",
+    "@aws-sdk/s3-request-presigner": "^3.908.0",
     "@aws-sdk/signature-v4": "^3.6.1",
     "@google/genai": "^1.0.0",
     "@smithy/protocol-http": "^5.2.1",

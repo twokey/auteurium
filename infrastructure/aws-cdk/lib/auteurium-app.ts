@@ -45,7 +45,8 @@ export class AuteuriumApp extends cdk.App {
       env,
       stage,
       userPool: authStack.userPool,
-      userPoolClient: authStack.userPoolClient
+      userPoolClient: authStack.userPoolClient,
+      mediaBucket: mediaStack.mediaBucket
     })
 
     // GenAI stack (LLM integration)

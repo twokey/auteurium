@@ -6,6 +6,7 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb'
 import * as iam from 'aws-cdk-lib/aws-iam'
 import * as lambda from 'aws-cdk-lib/aws-lambda'
 import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs'
+import * as s3 from 'aws-cdk-lib/aws-s3'
 
 import type * as cognito from 'aws-cdk-lib/aws-cognito'
 import type { Construct } from 'constructs'
@@ -14,6 +15,7 @@ interface AuteuriumApiStackProps extends cdk.StackProps {
   stage: string
   userPool: cognito.IUserPool
   userPoolClient: cognito.IUserPoolClient
+  mediaBucket: s3.IBucket
 }
 
 export class AuteuriumApiStack extends cdk.Stack {
@@ -22,7 +24,7 @@ export class AuteuriumApiStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: AuteuriumApiStackProps) {
     super(scope, id, props)
 
-    const { stage, userPool, userPoolClient } = props
+    const { stage, userPool, userPoolClient, mediaBucket } = props
 
     // Import DynamoDB tables from database stack
     const usersTable = dynamodb.Table.fromTableName(this, 'UsersTable', `auteurium-users-${stage}`)
@@ -72,9 +74,13 @@ export class AuteuriumApiStack extends cdk.Stack {
         CONNECTIONS_TABLE: connectionsTable.tableName,
         VERSIONS_TABLE: versionsTable.tableName,
         USER_POOL_ID: userPool.userPoolId,
-        USER_POOL_CLIENT_ID: userPoolClient.userPoolClientId
+        USER_POOL_CLIENT_ID: userPoolClient.userPoolClientId,
+        MEDIA_BUCKET_NAME: mediaBucket.bucketName
       }
     })
+
+    // Grant S3 read permissions for generating presigned URLs
+    mediaBucket.grantRead(apiFunction)
 
     // Grant DynamoDB permissions to Lambda
     usersTable.grantReadWriteData(apiFunction)

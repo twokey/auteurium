@@ -16,13 +16,13 @@ interface EditSnippetModalProps {
     textField2: string
     tags?: string[]
     categories?: string[]
-    imageUrl?: string
-    imageS3Key?: string
+    imageUrl?: string | null
+    imageS3Key?: string | null
     imageMetadata?: {
       width: number
       height: number
       aspectRatio: string
-    }
+    } | null
   }
 }
 
