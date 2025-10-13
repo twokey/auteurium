@@ -1,3 +1,6 @@
 export * from './ILLMProvider'
 export * from './ITextProvider'
 export * from './IImageProvider'
+export type { IImageProvider, ImageGenerationRequest, ImageGenerationResponse } from './IImageProvider'
+export type { ILLMProvider } from './ILLMProvider'
+export type { ITextProvider } from './ITextProvider'

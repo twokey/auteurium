@@ -7,6 +7,7 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb'
 import * as iam from 'aws-cdk-lib/aws-iam'
 import * as lambda from 'aws-cdk-lib/aws-lambda'
 import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs'
+import * as s3 from 'aws-cdk-lib/aws-s3'
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager'
 
 import type { Construct } from 'constructs'
@@ -16,6 +17,7 @@ interface AuteuriumGenAIStackProps extends cdk.StackProps {
   graphqlApi: appsync.IGraphqlApi
   userPool: cognito.IUserPool
   userPoolClient: cognito.IUserPoolClient
+  mediaBucket: s3.IBucket
 }
 
 export class AuteuriumGenAIStack extends cdk.Stack {
@@ -24,7 +26,7 @@ export class AuteuriumGenAIStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: AuteuriumGenAIStackProps) {
     super(scope, id, props)
 
-    const { stage, graphqlApi, userPool, userPoolClient } = props
+    const { stage, graphqlApi, userPool, userPoolClient, mediaBucket } = props
 
     // Import existing tables
     const snippetsTable = dynamodb.Table.fromTableName(this, 'SnippetsTable', `auteurium-snippets-${stage}`)
@@ -186,16 +188,46 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       }
     })
 
+    // Lambda function for generateSnippetImage mutation
+    const generateImageFunction = new lambdaNodejs.NodejsFunction(this, `GenerateImageFunction-${stage}`, {
+      functionName: `auteurium-genai-generate-image-${stage}`,
+      runtime: lambda.Runtime.NODEJS_22_X,
+      entry: path.join(__dirname, '../../../../services/api/src/resolvers/snippet/generateImage.ts'),
+      handler: 'handler',
+      timeout: cdk.Duration.seconds(120), // Longer timeout for image generation
+      memorySize: 1024,
+      bundling: {
+        format: lambdaNodejs.OutputFormat.CJS,
+        target: 'node22',
+        sourceMap: true,
+        tsconfig: path.join(__dirname, '../../../../services/api/tsconfig.json'),
+        nodeModules: ['@google/genai'] // Include Gemini SDK
+      },
+      environment: {
+        STAGE: stage,
+        SNIPPETS_TABLE: snippetsTable.tableName,
+        GENERATIONS_TABLE: this.generationsTable.tableName,
+        MEDIA_BUCKET_NAME: mediaBucket.bucketName,
+        LLM_API_KEYS_SECRET_ARN: llmApiKeysSecret.secretArn,
+        USER_POOL_ID: userPool.userPoolId,
+        USER_POOL_CLIENT_ID: userPoolClient.userPoolClientId
+      }
+    })
+
     // Grant permissions
     llmApiKeysSecret.grantRead(generateContentFunction)
     llmApiKeysSecret.grantRead(generateContentStreamFunction)
+    llmApiKeysSecret.grantRead(generateImageFunction)
     this.generationsTable.grantReadWriteData(generateContentFunction)
     this.generationsTable.grantReadWriteData(generateContentStreamFunction)
     this.generationsTable.grantReadWriteData(generationHistoryFunction)
+    this.generationsTable.grantReadWriteData(generateImageFunction)
     snippetsTable.grantReadData(generateContentFunction)
     snippetsTable.grantReadData(generateContentStreamFunction)
+    snippetsTable.grantReadWriteData(generateImageFunction)
     projectsTable.grantReadData(generateContentFunction)
     projectsTable.grantReadData(generateContentStreamFunction)
+    mediaBucket.grantReadWrite(generateImageFunction)
 
     // Grant GSI query permissions
     generateContentFunction.addToRolePolicy(new iam.PolicyStatement({
@@ -258,6 +290,12 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       lambdaFunction: generationHistoryFunction
     })
 
+    const generateImageDataSource = new appsync.LambdaDataSource(this, `GenerateImageDataSource-${stage}`, {
+      api: graphqlApi,
+      name: `genai-generate-image-${stage}`,
+      lambdaFunction: generateImageFunction
+    })
+
     const generationStreamEventsDataSource = new appsync.NoneDataSource(this, `GenerationStreamEventsDataSource-${stage}`, {
       api: graphqlApi,
       name: `genai-stream-events-${stage}`
@@ -290,6 +328,13 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       typeName: 'Query',
       fieldName: 'generationHistory',
       dataSource: generationHistoryDataSource
+    })
+
+    new appsync.Resolver(this, `GenerateSnippetImageResolver-${stage}`, {
+      api: graphqlApi,
+      typeName: 'Mutation',
+      fieldName: 'generateSnippetImage',
+      dataSource: generateImageDataSource
     })
 
     new appsync.Resolver(this, `PublishGenerationStreamEventResolver-${stage}`, {

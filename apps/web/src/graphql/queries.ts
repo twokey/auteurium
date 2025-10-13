@@ -50,6 +50,13 @@ export const GET_PROJECT = gql`
         version
         createdAt
         updatedAt
+        imageUrl
+        imageS3Key
+        imageMetadata {
+          width
+          height
+          aspectRatio
+        }
         connections {
           id
           targetSnippetId
@@ -85,6 +92,13 @@ export const GET_PROJECT_WITH_SNIPPETS = gql`
         version
         createdAt
         updatedAt
+        imageUrl
+        imageS3Key
+        imageMetadata {
+          width
+          height
+          aspectRatio
+        }
         connections {
           id
           sourceSnippetId
@@ -115,6 +129,13 @@ export const GET_SNIPPET = gql`
       version
       createdAt
       updatedAt
+      imageUrl
+      imageS3Key
+      imageMetadata {
+        width
+        height
+        aspectRatio
+      }
       connections {
         id
         sourceSnippetId

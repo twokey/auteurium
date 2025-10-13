@@ -23,6 +23,12 @@ type Project {
   snippets: [Snippet!]
 }
 
+type ImageMetadata {
+  width: Int!
+  height: Int!
+  aspectRatio: String!
+}
+
 type Snippet {
   id: ID!
   projectId: ID!
@@ -36,6 +42,9 @@ type Snippet {
   version: Int!
   createdAt: String!
   updatedAt: String!
+  imageUrl: String
+  imageS3Key: String
+  imageMetadata: ImageMetadata
   connections: [Connection!]!
   versions: [SnippetVersion!]!
 }
@@ -133,19 +142,20 @@ type Mutation {
   createProject(input: CreateProjectInput!): Project!
   updateProject(id: ID!, input: UpdateProjectInput!): Project!
   deleteProject(id: ID!): Boolean!
-  
+
   # Snippet mutations
   createSnippet(input: CreateSnippetInput!): Snippet!
   updateSnippet(projectId: ID!, id: ID!, input: UpdateSnippetInput!): Snippet!
   deleteSnippet(projectId: ID!, id: ID!): Boolean!
   revertSnippet(projectId: ID!, id: ID!, version: Int!): Snippet!
   combineSnippetConnections(projectId: ID!, snippetId: ID!): Snippet!
-  
+  generateSnippetImage(projectId: ID!, snippetId: ID!): Snippet!
+
   # Connection mutations
   createConnection(input: CreateConnectionInput!): Connection!
   updateConnection(id: ID!, input: UpdateConnectionInput!): Connection!
   deleteConnection(projectId: ID!, connectionId: ID!): Boolean!
-  
+
   # Admin mutations
   createUser(email: String!, name: String!, temporaryPassword: String!): User!
   deleteUser(id: ID!): Boolean!

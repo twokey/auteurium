@@ -3,6 +3,12 @@ export interface Position {
   y: number
 }
 
+export interface ImageMetadata {
+  width: number
+  height: number
+  aspectRatio: string
+}
+
 export interface Snippet {
   id: string
   projectId: string
@@ -16,6 +22,9 @@ export interface Snippet {
   version: number
   createdAt: string
   updatedAt: string
+  imageUrl?: string
+  imageS3Key?: string
+  imageMetadata?: ImageMetadata
 }
 
 export interface SnippetVersion {

@@ -108,6 +108,13 @@ export type GenerationStreamEventInput = {
   tokensUsed?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type ImageMetadata = {
+  __typename?: 'ImageMetadata';
+  aspectRatio: Scalars['String']['output'];
+  height: Scalars['Int']['output'];
+  width: Scalars['Int']['output'];
+};
+
 export type ModelConfig = {
   __typename?: 'ModelConfig';
   costPerToken?: Maybe<Scalars['Float']['output']>;
@@ -141,6 +148,7 @@ export type Mutation = {
   deleteUser: Scalars['Boolean']['output'];
   generateContent: GenerationResult;
   generateContentStream: GenerationResult;
+  generateSnippetImage: Snippet;
   publishGenerationStreamEvent: GenerationStreamEvent;
   resetUserPassword: Scalars['String']['output'];
   revertSnippet: Snippet;
@@ -209,6 +217,12 @@ export type MutationGenerateContentArgs = {
 
 export type MutationGenerateContentStreamArgs = {
   input: GenerateContentInput;
+  projectId: Scalars['ID']['input'];
+  snippetId: Scalars['ID']['input'];
+};
+
+
+export type MutationGenerateSnippetImageArgs = {
   projectId: Scalars['ID']['input'];
   snippetId: Scalars['ID']['input'];
 };
@@ -316,6 +330,9 @@ export type Snippet = {
   connections: Array<Connection>;
   createdAt: Scalars['String']['output'];
   id: Scalars['ID']['output'];
+  imageMetadata?: Maybe<ImageMetadata>;
+  imageS3Key?: Maybe<Scalars['String']['output']>;
+  imageUrl?: Maybe<Scalars['String']['output']>;
   position: Position;
   projectId: Scalars['ID']['output'];
   tags: Array<Scalars['String']['output']>;
@@ -477,6 +494,7 @@ export type ResolversTypes = ResolversObject<{
   GenerationStreamEvent: ResolverTypeWrapper<GenerationStreamEvent>;
   GenerationStreamEventInput: GenerationStreamEventInput;
   ID: ResolverTypeWrapper<Scalars['ID']['output']>;
+  ImageMetadata: ResolverTypeWrapper<ImageMetadata>;
   Int: ResolverTypeWrapper<Scalars['Int']['output']>;
   ModelConfig: ResolverTypeWrapper<ModelConfig>;
   ModelProvider: ModelProvider;
@@ -511,6 +529,7 @@ export type ResolversParentTypes = ResolversObject<{
   GenerationStreamEvent: GenerationStreamEvent;
   GenerationStreamEventInput: GenerationStreamEventInput;
   ID: Scalars['ID']['output'];
+  ImageMetadata: ImageMetadata;
   Int: Scalars['Int']['output'];
   ModelConfig: ModelConfig;
   Mutation: Record<PropertyKey, never>;
@@ -572,6 +591,12 @@ export type GenerationStreamEventResolvers<ContextType = GraphQLContext, ParentT
   tokensUsed?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
 }>;
 
+export type ImageMetadataResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['ImageMetadata'] = ResolversParentTypes['ImageMetadata']> = ResolversObject<{
+  aspectRatio?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  height?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  width?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+}>;
+
 export type ModelConfigResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['ModelConfig'] = ResolversParentTypes['ModelConfig']> = ResolversObject<{
   costPerToken?: Resolver<Maybe<ResolversTypes['Float']>, ParentType, ContextType>;
   description?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
@@ -596,6 +621,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   deleteUser?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationDeleteUserArgs, 'id'>>;
   generateContent?: Resolver<ResolversTypes['GenerationResult'], ParentType, ContextType, RequireFields<MutationGenerateContentArgs, 'input' | 'projectId' | 'snippetId'>>;
   generateContentStream?: Resolver<ResolversTypes['GenerationResult'], ParentType, ContextType, RequireFields<MutationGenerateContentStreamArgs, 'input' | 'projectId' | 'snippetId'>>;
+  generateSnippetImage?: Resolver<ResolversTypes['Snippet'], ParentType, ContextType, RequireFields<MutationGenerateSnippetImageArgs, 'projectId' | 'snippetId'>>;
   publishGenerationStreamEvent?: Resolver<ResolversTypes['GenerationStreamEvent'], ParentType, ContextType, RequireFields<MutationPublishGenerationStreamEventArgs, 'input'>>;
   resetUserPassword?: Resolver<ResolversTypes['String'], ParentType, ContextType, RequireFields<MutationResetUserPasswordArgs, 'id'>>;
   revertSnippet?: Resolver<ResolversTypes['Snippet'], ParentType, ContextType, RequireFields<MutationRevertSnippetArgs, 'id' | 'projectId' | 'version'>>;
@@ -637,6 +663,9 @@ export type SnippetResolvers<ContextType = GraphQLContext, ParentType extends Re
   connections?: Resolver<Array<ResolversTypes['Connection']>, ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  imageMetadata?: Resolver<Maybe<ResolversTypes['ImageMetadata']>, ParentType, ContextType>;
+  imageS3Key?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   position?: Resolver<ResolversTypes['Position'], ParentType, ContextType>;
   projectId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   tags?: Resolver<Array<ResolversTypes['String']>, ParentType, ContextType>;
@@ -684,6 +713,7 @@ export type Resolvers<ContextType = GraphQLContext> = ResolversObject<{
   GenerationRecord?: GenerationRecordResolvers<ContextType>;
   GenerationResult?: GenerationResultResolvers<ContextType>;
   GenerationStreamEvent?: GenerationStreamEventResolvers<ContextType>;
+  ImageMetadata?: ImageMetadataResolvers<ContextType>;
   ModelConfig?: ModelConfigResolvers<ContextType>;
   Mutation?: MutationResolvers<ContextType>;
   Position?: PositionResolvers<ContextType>;

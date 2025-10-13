@@ -40,6 +40,18 @@ export const MODEL_REGISTRY: ModelConfig[] = [
     enabled: true
   },
 
+  // Imagen Models - Image Generation
+  {
+    id: 'imagen-4.0-fast-generate-001',
+    provider: ModelProvider.GEMINI,
+    modelId: 'imagen-4.0-fast-generate-001',
+    modality: GenerationModality.TEXT_TO_IMAGE,
+    displayName: 'Imagen 4 Fast',
+    description: 'Fast, cost-effective image generation',
+    costPerToken: 0.02, // $0.02 per image
+    enabled: true
+  },
+
   // OpenAI Models (disabled until provider is implemented)
   {
     id: 'gpt-4-turbo',

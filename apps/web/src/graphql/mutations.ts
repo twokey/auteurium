@@ -124,6 +124,34 @@ export const COMBINE_SNIPPET_CONNECTIONS = gql`
   }
 `
 
+export const GENERATE_SNIPPET_IMAGE = gql`
+  mutation GenerateSnippetImage($projectId: ID!, $snippetId: ID!) {
+    generateSnippetImage(projectId: $projectId, snippetId: $snippetId) {
+      id
+      projectId
+      title
+      textField1
+      textField2
+      position {
+        x
+        y
+      }
+      tags
+      categories
+      version
+      createdAt
+      updatedAt
+      imageUrl
+      imageS3Key
+      imageMetadata {
+        width
+        height
+        aspectRatio
+      }
+    }
+  }
+`
+
 // Connection mutations
 export const CREATE_CONNECTION = gql`
   mutation CreateConnection($input: CreateConnectionInput!) {
