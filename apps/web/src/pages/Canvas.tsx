@@ -17,6 +17,7 @@ import { CanvasInfoPanel } from '../components/canvas/CanvasInfoPanel'
 import { CanvasToolbar } from '../components/canvas/CanvasToolbar'
 import { DeleteSnippetConfirmation } from '../components/modals/DeleteSnippetConfirmation'
 import { EditSnippetModal } from '../components/modals/EditSnippetModal'
+import { GeneratedSnippetPreviewModal } from '../components/modals/GeneratedSnippetPreviewModal'
 import { ManageConnectionsModal } from '../components/modals/ManageConnectionsModal'
 import { VersionHistoryModal } from '../components/modals/VersionHistoryModal'
 import { SnippetNode } from '../components/snippets/SnippetNode'
@@ -122,6 +123,7 @@ interface ConnectionEdgeData {
 
 const initialNodes: Node<SnippetNodeData>[] = []
 const initialEdges: Edge<ConnectionEdgeData>[] = []
+const GENERATED_SNIPPET_VERTICAL_OFFSET = 500
 
 const isViewport = (value: unknown): value is Viewport => {
   if (typeof value !== 'object' || value === null) {
@@ -150,6 +152,8 @@ export const Canvas = () => {
   const [deletingSnippet, setDeletingSnippet] = useState<Snippet | null>(null)
   const [managingConnectionsSnippet, setManagingConnectionsSnippet] = useState<Snippet | null>(null)
   const [viewingVersionsSnippet, setViewingVersionsSnippet] = useState<Snippet | null>(null)
+  const [generatedSnippetPreview, setGeneratedSnippetPreview] = useState<{ sourceSnippetId: string; content: string } | null>(null)
+  const [isCreatingGeneratedSnippet, setIsCreatingGeneratedSnippet] = useState(false)
 
   const queryVariables = projectId ? { projectId } : undefined
 
@@ -281,6 +285,77 @@ export const Canvas = () => {
     const snippet = snippets.find(s => s.id === snippetId)
     if (snippet) setEditingSnippet(snippet)
   }, [snippets])
+
+  const handlePreviewGeneratedSnippet = useCallback((payload: { sourceSnippetId: string; generatedText: string }) => {
+    setGeneratedSnippetPreview({
+      sourceSnippetId: payload.sourceSnippetId,
+      content: payload.generatedText
+    })
+  }, [])
+
+  const handleCancelGeneratedSnippet = useCallback(() => {
+    setGeneratedSnippetPreview(null)
+  }, [])
+
+  const handleCreateGeneratedSnippet = useCallback(async () => {
+    if (!generatedSnippetPreview) {
+      return
+    }
+
+    if (!projectId) {
+      console.error('Cannot create generated snippet: no project ID')
+      return
+    }
+
+    const sourceSnippet = snippets.find(s => s.id === generatedSnippetPreview.sourceSnippetId)
+    const baseX = sourceSnippet?.position?.x ?? 0
+    const baseY = sourceSnippet?.position?.y ?? 0
+    const targetPosition = {
+      x: baseX,
+      y: baseY + GENERATED_SNIPPET_VERTICAL_OFFSET
+    }
+
+    setIsCreatingGeneratedSnippet(true)
+    try {
+      const creationResult = await createSnippetMutation({
+        variables: {
+          input: {
+            projectId,
+            title: 'Generated snippet',
+            textField1: generatedSnippetPreview.content,
+            textField2: '',
+            position: targetPosition,
+            tags: [],
+            categories: []
+          }
+        }
+      })
+
+      const newSnippetId = creationResult.data?.createSnippet?.id
+      if (!newSnippetId) {
+        throw new Error('Failed to create snippet: missing snippet ID in response')
+      }
+
+      await createConnectionMutation({
+        variables: {
+          input: {
+            projectId,
+            sourceSnippetId: generatedSnippetPreview.sourceSnippetId,
+            targetSnippetId: newSnippetId,
+            label: ''
+          }
+        }
+      })
+
+      setGeneratedSnippetPreview(null)
+      setEditingSnippet(null)
+    } catch (error) {
+      console.error('Failed to create generated snippet:', error)
+      alert(`Failed to create snippet or connection: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setIsCreatingGeneratedSnippet(false)
+    }
+  }, [createSnippetMutation, createConnectionMutation, generatedSnippetPreview, projectId, snippets])
 
   const handleUpdateSnippetContent = useCallback(async (snippetId: string, changes: SnippetContentChanges) => {
     if (!projectId) {
@@ -812,7 +887,11 @@ export const Canvas = () => {
       {editingSnippet && (
         <EditSnippetModal
           isOpen={true}
-          onClose={() => setEditingSnippet(null)}
+          onClose={() => {
+            setEditingSnippet(null)
+            setGeneratedSnippetPreview(null)
+          }}
+          onPreviewGeneratedSnippet={handlePreviewGeneratedSnippet}
           snippet={editingSnippet}
         />
       )}
@@ -841,6 +920,14 @@ export const Canvas = () => {
           snippet={viewingVersionsSnippet}
         />
       )}
+
+      <GeneratedSnippetPreviewModal
+        isOpen={generatedSnippetPreview !== null}
+        content={generatedSnippetPreview?.content ?? ''}
+        onCancel={handleCancelGeneratedSnippet}
+        onCreate={handleCreateGeneratedSnippet}
+        isCreating={isCreatingGeneratedSnippet}
+      />
     </>
   )
 }

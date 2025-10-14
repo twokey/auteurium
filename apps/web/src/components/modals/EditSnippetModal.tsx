@@ -8,6 +8,7 @@ import { useGenAI } from '../../hooks/useGenAI'
 interface EditSnippetModalProps {
   isOpen: boolean
   onClose: () => void
+  onPreviewGeneratedSnippet: (payload: { sourceSnippetId: string; generatedText: string }) => void
   snippet: {
     id: string
     projectId: string
@@ -26,7 +27,7 @@ interface EditSnippetModalProps {
   }
 }
 
-export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalProps) => {
+export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, snippet }: EditSnippetModalProps) => {
   const normalisedTitle = snippet.title && snippet.title.trim() !== '' ? snippet.title : 'New snippet'
   const [title, setTitle] = useState(normalisedTitle)
   const [textField1, setTextField1] = useState(snippet.textField1 ?? '')
@@ -36,12 +37,16 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
   const [tagInput, setTagInput] = useState('')
   const [categoryInput, setCategoryInput] = useState('')
   const [isSaving, setIsSaving] = useState(false)
-  const [selectedModel, setSelectedModel] = useState('')
+  const [selectedModelPrimary, setSelectedModelPrimary] = useState('')
+  const [selectedModelSecondary, setSelectedModelSecondary] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
   const [isCombining, setIsCombining] = useState(false)
   const [isGeneratingImage, setIsGeneratingImage] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamError, setStreamError] = useState<string | null>(null)
+  const [isGeneratingSecondary, setIsGeneratingSecondary] = useState(false)
+  const [secondaryStreamError, setSecondaryStreamError] = useState<string | null>(null)
+  const [isGeneratingPrimary, setIsGeneratingPrimary] = useState(false)
 
   const {
     models,
@@ -49,7 +54,6 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
     modelsError,
     generateStream,
     subscribeToGenerationStream,
-    isGenerating,
     isStreamingSupported,
     streamingFallbackReason
   } = useGenAI({ enabled: isOpen })
@@ -67,10 +71,14 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
     setCategories(snippet.categories ?? [])
     setTagInput('')
     setCategoryInput('')
-    setSelectedModel('')
+    setSelectedModelPrimary('')
+    setSelectedModelSecondary('')
     setIsDeleting(false)
     setStreamError(null)
     setIsStreaming(false)
+    setIsGeneratingSecondary(false)
+    setSecondaryStreamError(null)
+    setIsGeneratingPrimary(false)
 
     if (streamSubscriptionRef.current) {
       streamSubscriptionRef.current.unsubscribe()
@@ -84,15 +92,19 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
       streamSubscriptionRef.current.unsubscribe()
       streamSubscriptionRef.current = null
       setIsStreaming(false)
+      setIsGeneratingPrimary(false)
     }
   }, [isOpen])
 
   useEffect(() => {
     if (!isOpen) return
-    if (!selectedModel && models.length > 0) {
-      setSelectedModel(models[0].id)
+    if (!selectedModelPrimary && models.length > 0) {
+      setSelectedModelPrimary(models[0].id)
     }
-  }, [isOpen, models, selectedModel])
+    if (!selectedModelSecondary && models.length > 0) {
+      setSelectedModelSecondary(models[0].id)
+    }
+  }, [isOpen, models, selectedModelPrimary, selectedModelSecondary])
 
   useEffect(() => () => {
     if (streamSubscriptionRef.current) {
@@ -206,10 +218,10 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
     }
   }, [handleAddCategory])
 
-  const isLlmBusy = isGenerating || isStreaming
+  const isPrimaryBusy = isGeneratingPrimary || isStreaming
 
   const handleGenerate = useCallback(async () => {
-    if (!selectedModel) {
+    if (!selectedModelPrimary) {
       alert('Please select an LLM model before generating.')
       return
     }
@@ -218,6 +230,8 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
       alert('Please provide input in Text Field 1 to send to the model.')
       return
     }
+
+    setIsGeneratingPrimary(true)
 
     if (streamSubscriptionRef.current) {
       streamSubscriptionRef.current.unsubscribe()
@@ -280,7 +294,7 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
       const { result: generation, usedStreaming, fallbackReason } = await generateStream(
         snippet.projectId,
         snippet.id,
-        selectedModel,
+        selectedModelPrimary,
         textField1
       )
 
@@ -307,16 +321,68 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
         streamSubscriptionRef.current = null
       }
       setIsStreaming(false)
+      setIsGeneratingPrimary(false)
     }
   }, [
     generateStream,
     isStreamingSupported,
-    selectedModel,
+    selectedModelPrimary,
     snippet.id,
     snippet.projectId,
     streamingFallbackReason,
     subscribeToGenerationStream,
     textField1
+  ])
+
+  const handleGenerateSnippetFromField2 = useCallback(async () => {
+    if (!selectedModelSecondary) {
+      alert('Please select an LLM model before generating.')
+      return
+    }
+
+    const trimmedPrompt = textField2.trim()
+    if (trimmedPrompt === '') {
+      alert('Please provide input in Text Field 2 to send to the model.')
+      return
+    }
+
+    setIsGeneratingSecondary(true)
+    setSecondaryStreamError(null)
+
+    try {
+      const { result, fallbackReason } = await generateStream(
+        snippet.projectId,
+        snippet.id,
+        selectedModelSecondary,
+        textField2
+      )
+
+      if (!result || result.content.trim() === '') {
+        alert('The selected model did not return any content. Please try again or choose another model.')
+        return
+      }
+
+      setSecondaryStreamError(fallbackReason ?? null)
+
+      onPreviewGeneratedSnippet({
+        sourceSnippetId: snippet.id,
+        generatedText: result.content
+      })
+    } catch (error) {
+      console.error('Failed to generate snippet from Text Field 2:', error)
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      setSecondaryStreamError(message)
+      alert(`Failed to generate snippet: ${message}`)
+    } finally {
+      setIsGeneratingSecondary(false)
+    }
+  }, [
+    generateStream,
+    onPreviewGeneratedSnippet,
+    selectedModelSecondary,
+    snippet.id,
+    snippet.projectId,
+    textField2
   ])
 
   const handleDelete = useCallback(async () => {
@@ -447,7 +513,7 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 rows={6}
                 placeholder="Enter text for field 1..."
-                disabled={isSaving || isDeleting || isLlmBusy}
+                disabled={isSaving || isDeleting || isPrimaryBusy}
               />
             </div>
 
@@ -459,10 +525,10 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
                 </label>
                 <select
                   id="llmModel"
-                  value={selectedModel}
-                  onChange={(e) => setSelectedModel(e.target.value)}
+                  value={selectedModelPrimary}
+                  onChange={(e) => setSelectedModelPrimary(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  disabled={isSaving || isLlmBusy || isDeleting || isLoadingModels}
+                  disabled={isSaving || isPrimaryBusy || isDeleting || isLoadingModels}
                 >
                   <option value="" disabled>
                     {isLoadingModels ? 'Loading models...' : 'Select a model...'}
@@ -481,20 +547,20 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:bg-green-400 flex items-center gap-2"
                 disabled={
                   isSaving ||
-                  isLlmBusy ||
+                  isPrimaryBusy ||
                   isDeleting ||
-                  !selectedModel ||
+                  !selectedModelPrimary ||
                   textField1.trim() === '' ||
                   isLoadingModels
                 }
               >
-                {isLlmBusy && (
+                {isPrimaryBusy && (
                   <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
                 )}
-                {isLlmBusy ? 'Generating...' : 'Generate'}
+                {isPrimaryBusy ? 'Generating...' : 'Generate'}
               </button>
               <button
                 onClick={() => {
@@ -549,12 +615,92 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 rows={6}
                 placeholder="Enter text for field 2... or use Generate to get AI-generated content"
-                disabled={isSaving || isDeleting || isLlmBusy}
+                disabled={isSaving || isDeleting || isPrimaryBusy || isGeneratingSecondary}
               />
               {streamError && (
                 <p className="text-sm text-red-600 mt-2">{streamError}</p>
               )}
             </div>
+            <div className="flex items-end gap-3">
+              <div className="flex-1 min-w-[200px]">
+                <label htmlFor="llmModelSecondary" className="block text-sm font-medium text-gray-700 mb-1">
+                  LLM Model 2
+                </label>
+                <select
+                  id="llmModelSecondary"
+                  value={selectedModelSecondary}
+                  onChange={(e) => setSelectedModelSecondary(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={isSaving || isDeleting || isGeneratingSecondary || isLoadingModels}
+                >
+                  <option value="" disabled>
+                    {isLoadingModels ? 'Loading models...' : 'Select a model...'}
+                  </option>
+                  {models.map((model) => (
+                    <option key={model.id} value={model.id} title={model.description ?? undefined}>
+                      {model.displayName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={() => {
+                  void handleGenerateSnippetFromField2()
+                }}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:bg-green-400 flex items-center gap-2"
+                disabled={
+                  isSaving ||
+                  isDeleting ||
+                  isGeneratingSecondary ||
+                  !selectedModelSecondary ||
+                  textField2.trim() === '' ||
+                  isLoadingModels
+                }
+              >
+                {isGeneratingSecondary && (
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                )}
+                {isGeneratingSecondary ? 'Generating...' : 'Generate Snippet'}
+              </button>
+              <button
+                onClick={() => {
+                  void handleCombine()
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-blue-400 flex items-center gap-2"
+                disabled={isSaving || isDeleting || isCombining}
+              >
+                {isCombining && (
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                )}
+                {isCombining ? 'Combining...' : 'Combine'}
+              </button>
+              <button
+                onClick={() => {
+                  void handleGenerateImage()
+                }}
+                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors disabled:bg-purple-400 flex items-center gap-2"
+                disabled={isSaving || isDeleting || isGeneratingImage || !textField1.trim()}
+              >
+                {isGeneratingImage && (
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                )}
+                {isGeneratingImage ? 'Generating...' : 'Image'}
+              </button>
+            </div>
+            {secondaryStreamError && (
+              <p className="text-sm text-red-600 mt-2">
+                {secondaryStreamError}
+              </p>
+            )}
 
             {/* Tags */}
             <div>
@@ -680,7 +826,7 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
               void handleDelete()
             }}
             className="px-4 py-2 text-red-700 bg-red-100 rounded-md hover:bg-red-200 transition-colors disabled:bg-red-50 disabled:text-red-300"
-            disabled={isSaving || isDeleting || isLlmBusy}
+            disabled={isSaving || isDeleting || isPrimaryBusy || isGeneratingSecondary}
           >
             {isDeleting ? 'Deleting...' : 'Delete'}
           </button>
