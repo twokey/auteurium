@@ -12,6 +12,13 @@ interface SnippetNodeProps {
       tags?: string[]
       categories?: string[]
       connectionCount: number
+      imageUrl?: string | null
+      imageS3Key?: string | null
+      imageMetadata?: {
+        width: number
+        height: number
+        aspectRatio: string
+      } | null
     }
     onEdit: (snippetId: string) => void
     onDelete: (snippetId: string) => void
@@ -19,6 +26,7 @@ interface SnippetNodeProps {
     onViewVersions: (snippetId: string) => void
     onUpdateContent: (snippetId: string, changes: Partial<Record<'textField1' | 'textField2', string>>) => Promise<void>
     onCombine: (snippetId: string) => Promise<void>
+    onGenerateImage: (snippetId: string) => void
   }
 }
 
@@ -43,7 +51,8 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
     onManageConnections,
     onViewVersions,
     onUpdateContent,
-    onCombine
+    onCombine,
+    onGenerateImage
   } = data
 
   const [showContextMenu, setShowContextMenu] = useState(false)
@@ -57,6 +66,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
   const textField1Ref = useRef<HTMLTextAreaElement | null>(null)
   const textField2Ref = useRef<HTMLTextAreaElement | null>(null)
   const [isCombining, setIsCombining] = useState(false)
+  const [isImageLoading, setIsImageLoading] = useState(true)
 
   useEffect(() => {
     if (activeField === 'textField1') return
@@ -366,6 +376,19 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
           )}
         </div>
 
+        {/* Large snippet indicator and expand button */}
+        {isLarge && (
+          <button
+            onClick={handleExpandToggle}
+            className="mt-2 w-full text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center justify-center gap-1 py-1 px-2 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
+            View Full ({wordCount} words)
+          </button>
+        )}
+
         <div className="mt-2 flex items-center gap-2">
           <button
             type="button"
@@ -388,6 +411,22 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
             )}
             {isCombining ? 'Combining...' : 'Combine'}
           </button>
+
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 rounded transition-colors"
+            onClick={(event) => {
+              event.stopPropagation()
+              onGenerateImage(snippet.id)
+            }}
+            title="Generate image for this snippet"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Generate
+          </button>
+
           {!hasConnections && (
             <span className="text-[11px] text-gray-400">
               Connect snippets to enable combine
@@ -399,19 +438,6 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
           <div className="text-[11px] text-gray-400 mt-1">
             {savingField ? 'Saving...' : 'Combining...'}
           </div>
-        )}
-
-        {/* Large snippet indicator and expand button */}
-        {isLarge && (
-          <button
-            onClick={handleExpandToggle}
-            className="mt-2 w-full text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center justify-center gap-1 py-1 px-2 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-            </svg>
-            View Full ({wordCount} words)
-          </button>
         )}
 
         {/* Tags */}
@@ -449,6 +475,36 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                 +{snippet.categories.length - 2}
               </span>
             )}
+          </div>
+        )}
+
+        {/* Image Preview */}
+        {snippet.imageUrl && (
+          <div className="mt-3">
+            {isImageLoading && (
+              <div className="w-full h-48 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 animate-pulse rounded-md" />
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onEdit(snippet.id)
+              }}
+              className="w-full rounded-md border border-gray-200 hover:border-blue-400 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+              title="Click to view full image and edit snippet"
+              style={{ display: isImageLoading ? 'none' : 'block' }}
+            >
+              <img
+                src={snippet.imageUrl}
+                alt={snippet.title ?? 'Snippet generated image'}
+                className="w-full h-auto rounded-md"
+                onLoad={() => setIsImageLoading(false)}
+                onError={(e) => {
+                  setIsImageLoading(false)
+                  e.currentTarget.parentElement!.style.display = 'none'
+                }}
+              />
+            </button>
           </div>
         )}
       </div>

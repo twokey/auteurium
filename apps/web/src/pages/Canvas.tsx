@@ -275,6 +275,11 @@ export const Canvas = () => {
     if (snippet) setViewingVersionsSnippet(snippet)
   }, [snippets])
 
+  const handleGenerateImage = useCallback((snippetId: string) => {
+    const snippet = snippets.find(s => s.id === snippetId)
+    if (snippet) setEditingSnippet(snippet)
+  }, [snippets])
+
   const handleUpdateSnippetContent = useCallback(async (snippetId: string, changes: SnippetContentChanges) => {
     if (!projectId) {
       console.error('Cannot update snippet content: no project ID')
@@ -421,14 +426,18 @@ export const Canvas = () => {
             textField2: snippet.textField2,
             tags: snippet.tags,
             categories: snippet.categories,
-            connectionCount: snippet.connections?.length ?? 0
+            connectionCount: snippet.connections?.length ?? 0,
+            imageUrl: snippet.imageUrl,
+            imageS3Key: snippet.imageS3Key,
+            imageMetadata: snippet.imageMetadata
           },
           onEdit: handleEditSnippet,
           onDelete: handleDeleteSnippet,
           onManageConnections: handleManageConnections,
           onViewVersions: handleViewVersions,
           onUpdateContent: handleUpdateSnippetContent,
-          onCombine: handleCombineSnippetContent
+          onCombine: handleCombineSnippetContent,
+          onGenerateImage: handleGenerateImage
         },
         style: {
           background: '#fff',
@@ -439,7 +448,7 @@ export const Canvas = () => {
         }
       } as Node<SnippetNodeData>
     })
-  }, [snippets, handleEditSnippet, handleDeleteSnippet, handleManageConnections, handleViewVersions, handleUpdateSnippetContent, handleCombineSnippetContent])
+  }, [snippets, handleEditSnippet, handleDeleteSnippet, handleManageConnections, handleViewVersions, handleUpdateSnippetContent, handleCombineSnippetContent, handleGenerateImage])
 
   useEffect(() => {
     setNodes(flowNodes)
