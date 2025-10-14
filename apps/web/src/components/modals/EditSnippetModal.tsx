@@ -5,6 +5,8 @@ import { COMBINE_SNIPPET_CONNECTIONS, DELETE_SNIPPET, GENERATE_SNIPPET_IMAGE, UP
 import { GET_PROJECT_WITH_SNIPPETS } from '../../graphql/queries'
 import { useGenAI } from '../../hooks/useGenAI'
 
+type EditableField = 'textField1' | 'textField2'
+
 interface EditSnippetModalProps {
   isOpen: boolean
   onClose: () => void
@@ -47,6 +49,8 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
   const [isGeneratingSecondary, setIsGeneratingSecondary] = useState(false)
   const [secondaryStreamError, setSecondaryStreamError] = useState<string | null>(null)
   const [isGeneratingPrimary, setIsGeneratingPrimary] = useState(false)
+  const [activeField, setActiveField] = useState<EditableField | null>(null)
+  const [savingField, setSavingField] = useState<EditableField | null>(null)
 
   const {
     models,
@@ -60,6 +64,12 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
 
   const streamSubscriptionRef = useRef<{ unsubscribe: () => void } | null>(null)
   const assistantContentRef = useRef<string>('')
+  const textField1Ref = useRef<HTMLTextAreaElement | null>(null)
+  const textField2Ref = useRef<HTMLTextAreaElement | null>(null)
+  const lastSavedValuesRef = useRef({
+    textField1: snippet.textField1 ?? '',
+    textField2: snippet.textField2 ?? ''
+  })
 
   // Reset form when snippet changes
   useEffect(() => {
@@ -79,6 +89,12 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
     setIsGeneratingSecondary(false)
     setSecondaryStreamError(null)
     setIsGeneratingPrimary(false)
+    setActiveField(null)
+    setSavingField(null)
+    lastSavedValuesRef.current = {
+      textField1: snippet.textField1 ?? '',
+      textField2: snippet.textField2 ?? ''
+    }
 
     if (streamSubscriptionRef.current) {
       streamSubscriptionRef.current.unsubscribe()
@@ -112,6 +128,24 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
       streamSubscriptionRef.current = null
     }
   }, [])
+
+  useEffect(() => {
+    if (activeField === 'textField1') {
+      const target = textField1Ref.current
+      if (target) {
+        const length = target.value.length
+        target.focus()
+        target.setSelectionRange(length, length)
+      }
+    } else if (activeField === 'textField2') {
+      const target = textField2Ref.current
+      if (target) {
+        const length = target.value.length
+        target.focus()
+        target.setSelectionRange(length, length)
+      }
+    }
+  }, [activeField])
 
   const [updateSnippetMutation] = useMutation(UPDATE_SNIPPET, {
     refetchQueries: [
@@ -458,6 +492,64 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
     }
   }, [generateImageMutation, snippet.projectId, snippet.id, textField1])
 
+  const handleFieldActivate = useCallback((field: EditableField) => {
+    if (isSaving || isDeleting) {
+      return
+    }
+
+    if (field === 'textField1' && (isPrimaryBusy || savingField === 'textField1')) {
+      return
+    }
+
+    if (field === 'textField2' && (savingField === 'textField2' || isPrimaryBusy || isGeneratingSecondary)) {
+      return
+    }
+
+    setActiveField(field)
+  }, [isSaving, isDeleting, isPrimaryBusy, isGeneratingSecondary, savingField])
+
+  const handleFieldBlur = useCallback(async (field: EditableField) => {
+    setActiveField((current) => (current === field ? null : current))
+
+    const currentValue = field === 'textField1' ? textField1 : textField2
+    const lastSavedValue = lastSavedValuesRef.current[field]
+
+    if (currentValue === lastSavedValue) {
+      return
+    }
+
+    setSavingField(field)
+
+    try {
+      await updateSnippetMutation({
+        variables: {
+          projectId: snippet.projectId,
+          id: snippet.id,
+          input: {
+            [field]: currentValue
+          }
+        }
+      })
+
+      lastSavedValuesRef.current = {
+        ...lastSavedValuesRef.current,
+        [field]: currentValue
+      }
+    } catch (error) {
+      console.error('Failed to save snippet field:', error)
+      alert('Failed to save changes. Please try again.')
+
+      const previousValue = lastSavedValuesRef.current[field]
+      if (field === 'textField1') {
+        setTextField1(previousValue)
+      } else {
+        setTextField2(previousValue)
+      }
+    } finally {
+      setSavingField(null)
+    }
+  }, [snippet.projectId, snippet.id, textField1, textField2, updateSnippetMutation])
+
   if (!isOpen) return null
 
   return (
@@ -508,13 +600,28 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
               </label>
               <textarea
                 id="textField1"
+                ref={textField1Ref}
                 value={textField1}
                 onChange={(e) => setTextField1(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onClick={() => {
+                  handleFieldActivate('textField1')
+                }}
+                onFocus={() => {
+                  handleFieldActivate('textField1')
+                }}
+                onBlur={() => {
+                  void handleFieldBlur('textField1')
+                }}
+                readOnly={activeField !== 'textField1'}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y overflow-auto ${
+                  activeField === 'textField1' ? '' : 'cursor-text'
+                }`}
                 rows={6}
                 placeholder="Enter text for field 1..."
-                disabled={isSaving || isDeleting || isPrimaryBusy}
               />
+              {savingField === 'textField1' && (
+                <p className="text-xs text-gray-500 mt-1">Saving changes…</p>
+              )}
             </div>
 
             {/* LLM Model Selector */}
@@ -610,13 +717,28 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
               </label>
               <textarea
                 id="textField2"
+                ref={textField2Ref}
                 value={textField2}
                 onChange={(e) => setTextField2(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onClick={() => {
+                  handleFieldActivate('textField2')
+                }}
+                onFocus={() => {
+                  handleFieldActivate('textField2')
+                }}
+                onBlur={() => {
+                  void handleFieldBlur('textField2')
+                }}
+                readOnly={activeField !== 'textField2'}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y overflow-auto ${
+                  activeField === 'textField2' ? '' : 'cursor-text'
+                }`}
                 rows={6}
                 placeholder="Enter text for field 2... or use Generate to get AI-generated content"
-                disabled={isSaving || isDeleting || isPrimaryBusy || isGeneratingSecondary}
               />
+              {savingField === 'textField2' && (
+                <p className="text-xs text-gray-500 mt-1">Saving changes…</p>
+              )}
               {streamError && (
                 <p className="text-sm text-red-600 mt-2">{streamError}</p>
               )}

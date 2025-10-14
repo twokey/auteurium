@@ -27,7 +27,8 @@ import {
   UPDATE_SNIPPET,
   CREATE_CONNECTION,
   DELETE_CONNECTION,
-  COMBINE_SNIPPET_CONNECTIONS
+  COMBINE_SNIPPET_CONNECTIONS,
+  GENERATE_SNIPPET_IMAGE
 } from '../graphql/mutations'
 import { GET_PROJECT_WITH_SNIPPETS } from '../graphql/queries'
 
@@ -115,6 +116,8 @@ interface SnippetNodeData {
   onViewVersions: (snippetId: string) => void
   onUpdateContent: (snippetId: string, changes: SnippetContentChanges) => Promise<void>
   onCombine: (snippetId: string) => Promise<void>
+  onGenerateImage: (snippetId: string) => void
+  isGeneratingImage: boolean
 }
 
 interface ConnectionEdgeData {
@@ -154,6 +157,7 @@ export const Canvas = () => {
   const [viewingVersionsSnippet, setViewingVersionsSnippet] = useState<Snippet | null>(null)
   const [generatedSnippetPreview, setGeneratedSnippetPreview] = useState<{ sourceSnippetId: string; content: string } | null>(null)
   const [isCreatingGeneratedSnippet, setIsCreatingGeneratedSnippet] = useState(false)
+  const [generatingImageSnippetIds, setGeneratingImageSnippetIds] = useState<Record<string, boolean>>({})
 
   const queryVariables = projectId ? { projectId } : undefined
 
@@ -242,6 +246,19 @@ export const Canvas = () => {
     }
   })
 
+  const [generateSnippetImageMutation] = useMutation(GENERATE_SNIPPET_IMAGE, {
+    refetchQueries: [
+      {
+        query: GET_PROJECT_WITH_SNIPPETS,
+        variables: { projectId }
+      }
+    ],
+    awaitRefetchQueries: true,
+    onError: (mutationError) => {
+      console.error('Error generating snippet image:', mutationError)
+    }
+  })
+
   const project: Project | null = data?.project ?? null
   const rawSnippets = project?.snippets
   const snippets = useMemo<Snippet[]>(() => {
@@ -283,8 +300,46 @@ export const Canvas = () => {
 
   const handleGenerateImage = useCallback((snippetId: string) => {
     const snippet = snippets.find(s => s.id === snippetId)
-    if (snippet) setEditingSnippet(snippet)
-  }, [snippets])
+    if (!snippet) {
+      return
+    }
+
+    if (!projectId) {
+      console.error('Cannot generate snippet image: no project ID')
+      return
+    }
+
+    const prompt = snippet.textField1?.trim() ?? ''
+    if (prompt === '') {
+      alert('Please provide input in Text Field 1 for image generation.')
+      return
+    }
+
+    setGeneratingImageSnippetIds((current) => ({
+      ...current,
+      [snippetId]: true
+    }))
+
+    generateSnippetImageMutation({
+      variables: {
+        projectId,
+        snippetId
+      }
+    })
+      .then(() => {
+        alert('Image generated successfully!')
+      })
+      .catch((error) => {
+        console.error('Failed to generate image from canvas:', error)
+        alert(`Failed to generate image: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      })
+      .finally(() => {
+        setGeneratingImageSnippetIds((current) => {
+          const { [snippetId]: _ignored, ...rest } = current
+          return rest
+        })
+      })
+  }, [generateSnippetImageMutation, projectId, snippets])
 
   const handlePreviewGeneratedSnippet = useCallback((payload: { sourceSnippetId: string; generatedText: string }) => {
     setGeneratedSnippetPreview({
@@ -523,7 +578,8 @@ export const Canvas = () => {
           onViewVersions: handleViewVersions,
           onUpdateContent: handleUpdateSnippetContent,
           onCombine: handleCombineSnippetContent,
-          onGenerateImage: handleGenerateImage
+          onGenerateImage: handleGenerateImage,
+          isGeneratingImage: Boolean(generatingImageSnippetIds[snippet.id])
         },
         style: {
           background: '#fff',
@@ -534,7 +590,7 @@ export const Canvas = () => {
         }
       } as Node<SnippetNodeData>
     })
-  }, [snippets, handleEditSnippet, handleDeleteSnippet, handleManageConnections, handleViewVersions, handleUpdateSnippetContent, handleCombineSnippetContent, handleGenerateImage])
+  }, [snippets, handleEditSnippet, handleDeleteSnippet, handleManageConnections, handleViewVersions, handleUpdateSnippetContent, handleCombineSnippetContent, handleGenerateImage, generatingImageSnippetIds])
 
   useEffect(() => {
     setNodes(flowNodes)
