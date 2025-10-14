@@ -45,6 +45,8 @@ interface Snippet {
   tags?: string[]
   categories?: string[]
   version: number
+  createdAt: string
+  updatedAt?: string
   imageUrl?: string | null
   imageS3Key?: string | null
   imageMetadata?: {
@@ -411,13 +413,22 @@ export const Canvas = () => {
   }), [])
 
   const flowNodes = useMemo(() => {
-    return snippets.map((snippet) => {
+    // Sort snippets by creation time to assign z-index based on creation order
+    // Newer snippets get higher z-index and appear on top
+    const sortedSnippets = [...snippets].sort((a, b) => {
+      const timeA = new Date(a.createdAt).getTime()
+      const timeB = new Date(b.createdAt).getTime()
+      return timeA - timeB
+    })
+
+    return sortedSnippets.map((snippet, index) => {
       const position = snippet.position ?? { x: 0, y: 0 }
 
       return {
         id: snippet.id,
         type: 'snippet',
         position,
+        zIndex: index + 1, // Newer snippets have higher z-index
         data: {
           snippet: {
             id: snippet.id,
