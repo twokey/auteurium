@@ -26,12 +26,6 @@ interface EditSnippetModalProps {
   }
 }
 
-type ChatMessage = {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-}
-
 export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalProps) => {
   const normalisedTitle = snippet.title && snippet.title.trim() !== '' ? snippet.title : 'New snippet'
   const [title, setTitle] = useState(normalisedTitle)
@@ -46,7 +40,6 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
   const [isDeleting, setIsDeleting] = useState(false)
   const [isCombining, setIsCombining] = useState(false)
   const [isGeneratingImage, setIsGeneratingImage] = useState(false)
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamError, setStreamError] = useState<string | null>(null)
 
@@ -63,7 +56,6 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
 
   const streamSubscriptionRef = useRef<{ unsubscribe: () => void } | null>(null)
   const assistantContentRef = useRef<string>('')
-  const activeAssistantMessageIdRef = useRef<string | null>(null)
 
   // Reset form when snippet changes
   useEffect(() => {
@@ -84,28 +76,13 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
       streamSubscriptionRef.current.unsubscribe()
       streamSubscriptionRef.current = null
     }
-    activeAssistantMessageIdRef.current = null
     assistantContentRef.current = snippet.textField2 ?? ''
-
-    const initialChat: ChatMessage[] = []
-    const initialPrompt = (snippet.textField1 ?? '').trim()
-    const initialResponse = (snippet.textField2 ?? '').trim()
-
-    if (initialPrompt) {
-      initialChat.push({ id: `user-initial-${snippet.id}`, role: 'user', content: initialPrompt })
-    }
-    if (initialResponse) {
-      initialChat.push({ id: `assistant-initial-${snippet.id}`, role: 'assistant', content: initialResponse })
-    }
-
-    setChatMessages(initialChat)
   }, [snippet])
 
   useEffect(() => {
     if (!isOpen && streamSubscriptionRef.current) {
       streamSubscriptionRef.current.unsubscribe()
       streamSubscriptionRef.current = null
-      activeAssistantMessageIdRef.current = null
       setIsStreaming(false)
     }
   }, [isOpen])
@@ -229,7 +206,6 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
     }
   }, [handleAddCategory])
 
-  const activeAssistantMessageId = activeAssistantMessageIdRef.current
   const isLlmBusy = isGenerating || isStreaming
 
   const handleGenerate = useCallback(async () => {
@@ -248,19 +224,8 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
       streamSubscriptionRef.current = null
     }
 
-    const timestamp = Date.now()
-    const userMessageId = `user-${timestamp}`
-    const assistantMessageId = `assistant-${timestamp}`
-
-    activeAssistantMessageIdRef.current = assistantMessageId
     assistantContentRef.current = ''
     setStreamError(null)
-
-    setChatMessages(prev => [
-      ...prev,
-      { id: userMessageId, role: 'user', content: textField1 },
-      { id: assistantMessageId, role: 'assistant', content: '' }
-    ])
 
     const shouldAttemptStreaming = isStreamingSupported
     if (shouldAttemptStreaming) {
@@ -275,17 +240,7 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
 
             if (event.content) {
               assistantContentRef.current += event.content
-            }
-
-            const currentAssistantId = activeAssistantMessageIdRef.current
-            if (currentAssistantId) {
-              setChatMessages(prev =>
-                prev.map(message =>
-                  message.id === currentAssistantId
-                    ? { ...message, content: assistantContentRef.current }
-                    : message
-                )
-              )
+              setTextField2(assistantContentRef.current)
             }
 
             if (event.isComplete) {
@@ -295,7 +250,6 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
                 streamSubscriptionRef.current.unsubscribe()
                 streamSubscriptionRef.current = null
               }
-              activeAssistantMessageIdRef.current = null
             }
           },
           onError: (error) => {
@@ -307,12 +261,10 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
               streamSubscriptionRef.current.unsubscribe()
               streamSubscriptionRef.current = null
             }
-            activeAssistantMessageIdRef.current = null
           },
           onComplete: () => {
             setIsStreaming(false)
             streamSubscriptionRef.current = null
-            activeAssistantMessageIdRef.current = null
           }
         })
       } catch (subscriptionError) {
@@ -344,17 +296,6 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
 
       assistantContentRef.current = generation.content
       setTextField2(generation.content)
-
-      const currentAssistantId = activeAssistantMessageIdRef.current
-      if (currentAssistantId) {
-        setChatMessages(prev =>
-          prev.map(message =>
-            message.id === currentAssistantId
-              ? { ...message, content: generation.content }
-              : message
-          )
-        )
-      }
     } catch (error) {
       console.error('Failed to generate content:', error)
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -365,7 +306,6 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
         streamSubscriptionRef.current.unsubscribe()
         streamSubscriptionRef.current = null
       }
-      activeAssistantMessageIdRef.current = null
       setIsStreaming(false)
     }
   }, [
@@ -419,24 +359,6 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
 
       // Update local state with new textField2
       setTextField2(updatedSnippet.textField2)
-
-      // Rebuild chat messages with combined content
-      const newChatMessages: ChatMessage[] = []
-      if (updatedSnippet.textField1.trim()) {
-        newChatMessages.push({
-          id: `user-combined-${Date.now()}`,
-          role: 'user',
-          content: updatedSnippet.textField1
-        })
-      }
-      if (updatedSnippet.textField2.trim()) {
-        newChatMessages.push({
-          id: `assistant-combined-${Date.now()}`,
-          role: 'assistant',
-          content: updatedSnippet.textField2
-        })
-      }
-      setChatMessages(newChatMessages)
 
       alert('Successfully combined connected snippets!')
     } catch (error) {
@@ -615,40 +537,20 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
               <p className="text-sm text-gray-500">No models available. Please contact your administrator.</p>
             )}
 
-            {/* Chat Window */}
+            {/* Text Field 2 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Text Field 2 (Chat)
+              <label htmlFor="textField2" className="block text-sm font-medium text-gray-700 mb-1">
+                Text Field 2
               </label>
-              <div className="w-full border border-gray-300 rounded-md bg-gray-50 p-3 h-60 overflow-y-auto space-y-3">
-                {chatMessages.length === 0 ? (
-                  <p className="text-sm text-gray-500">No conversation yet. Use Generate to ask the model for help.</p>
-                ) : (
-                  chatMessages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex ${message.role === 'assistant' ? 'justify-start' : 'justify-end'}`}
-                    >
-                      <div
-                        className={`max-w-[80%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap shadow-sm ${
-                          message.role === 'assistant'
-                            ? 'bg-white text-gray-900 border border-gray-200'
-                            : 'bg-blue-600 text-white'
-                        }`}
-                      >
-                        <p className="text-xs font-semibold uppercase tracking-wide mb-1 opacity-70">
-                          {message.role === 'assistant' ? 'Model' : 'You'}
-                        </p>
-                        {message.content !== ''
-                          ? message.content
-                          : message.role === 'assistant' && isLlmBusy && activeAssistantMessageId === message.id
-                            ? 'Generating response…'
-                            : ''}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+              <textarea
+                id="textField2"
+                value={textField2}
+                onChange={(e) => setTextField2(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                rows={6}
+                placeholder="Enter text for field 2... or use Generate to get AI-generated content"
+                disabled={isSaving || isDeleting || isLlmBusy}
+              />
               {streamError && (
                 <p className="text-sm text-red-600 mt-2">{streamError}</p>
               )}
@@ -704,9 +606,9 @@ export const EditSnippetModal = ({ isOpen, onClose, snippet }: EditSnippetModalP
             {/* Generated Image Display */}
             {snippet.imageUrl && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <p className="block text-sm font-medium text-gray-700 mb-2">
                   Generated Image
-                </label>
+                </p>
                 <div className="relative">
                   <img
                     src={snippet.imageUrl}

@@ -2,6 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+Never mention claude code in git commit messages.
+Never try to create git commit without me asking so.
+
 ## Project Overview
 
 **Auteurium** is a web application for creating text snippets and organizing them visually on a canvas with logical connections. The application is built with a complete AWS serverless architecture and React frontend, ready for development and testing.
@@ -38,12 +41,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Snippets, tags, and categories are project-specific
 - Project deletion cascades to all contained snippets
 
-### Snippet Management  
+### Snippet Management
 - Two text fields per snippet, no length limits (expected up to page length)
 - Unique alphanumeric IDs displayed on canvas
 - Large snippets (>100 words) shown minimized with expand modal
 - Version history with revert capability
 - Positioned freely on infinite canvas
+- AI-powered image generation using Google Imagen 4 Fast
+- Edit and combine snippets directly on canvas nodes (inline editing)
 
 ### Connection System
 - Directional relationships between snippets (A depends on B)
@@ -166,7 +171,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **packages/validation** - Zod schemas for request validation
 - **packages/graphql-schema** - GraphQL schema definitions and code generation
 - **services/api** - AWS Lambda GraphQL resolvers with PowerTools and comprehensive tests
-- **infrastructure/aws-cdk** - Infrastructure as Code with CDK stacks for 5 AWS services
+- **services/genai-orchestrator** - GenAI orchestration layer for LLM providers (Gemini, OpenAI)
+- **services/media** - Media upload and processing handlers
+- **services/genai** - GenAI-specific resolvers and business logic
+- **infrastructure/aws-cdk** - Infrastructure as Code with CDK stacks for 6 AWS services
 - **e2e/** - Playwright end-to-end tests
 - **tools/scripts/** - Build, deployment, and development automation scripts
 
@@ -188,32 +196,41 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Component structure: pages/, components/auth/, components/projects/, components/canvas/
 
 **Backend Architecture**:
-- GraphQL API via AWS AppSync with 20 Lambda resolvers
-- DynamoDB with 5 tables and 7 Global Secondary Indexes (designed for Neptune migration)
+- GraphQL API via AWS AppSync with Lambda resolvers organized by domain
+- Resolver organization: Each domain (project, snippet, connection, user, genai) has separate mutations.ts and queries.ts
+- DynamoDB with 6 tables (users, projects, snippets, connections, versions, generations) and Global Secondary Indexes
 - AWS Cognito for authentication with JWT validation using aws-jwt-verify
 - User data isolation: users can only access their own projects/snippets
-- S3 for media uploads with pre-signed URLs and upload completion handlers
+- S3 for media uploads with pre-signed URLs (private bucket) and upload completion handlers
+- GenAI integration with Google Gemini API for image generation (Imagen 4 Fast)
+- Secrets Manager for secure LLM API key storage
 - CloudWatch for logging (monitoring stack disabled for cost savings)
 
 **Critical Implementation Areas**:
 - **Authentication**: AWS Cognito integration, admin users cannot access snippet content
 - **Cascade Deletes**: Project deletion removes all snippets and connections
-- **Media Handling**: Direct S3 uploads via pre-signed URLs, backend registration on completion
+- **Media Handling**: Direct S3 uploads via pre-signed URLs (private bucket), backend registration on completion
+- **Image Generation**: Google Imagen 4 Fast integration for snippet images using genai-orchestrator
 - **Data Validation**: Zod schemas in packages/validation for consistent validation
 - **Error Handling**: Consistent API error format, comprehensive CloudWatch logging
 - **Infrastructure**: CDK stacks with app-specific resource naming for multi-app AWS accounts
 - **Cost Optimization**: Monitoring stack disabled during development (~$5-7/month savings)
+- **Resolver Pattern**: Domain-based organization with mutations.ts and queries.ts per feature area
 
-**AWS Infrastructure** (5 deployed stacks):
+**AWS Infrastructure** (6 deployed stacks):
 1. **Auteurium-Auth-dev** - Cognito User Pool with email/password authentication
-2. **Auteurium-Database-dev** - 5 DynamoDB tables: users, projects, snippets, connections, versions
+2. **Auteurium-Database-dev** - 6 DynamoDB tables: users, projects, snippets, connections, versions, generations
 3. **Auteurium-Api-dev** - AppSync GraphQL API with Lambda resolvers for all CRUD operations
-4. **Auteurium-Media-dev** - S3 bucket with presigned URL functions for media uploads
-5. **Auteurium-Web-dev** - S3 + CloudFront for hosting (CloudFront disabled for development security)
+4. **Auteurium-Media-dev** - S3 private bucket with presigned URL functions for media uploads
+5. **Auteurium-GenAI-dev** - GenAI integration with Secrets Manager for API keys, Lambda resolvers for image generation and content generation
+6. **Auteurium-Web-dev** - S3 + CloudFront for hosting (CloudFront disabled for development security)
 
 **Build Dependencies**:
-1. packages/shared-types → packages/validation → packages/graphql-schema → services/api → apps/web
-2. infrastructure/aws-cdk (independent, can be built separately)
+1. packages/shared-types → packages/validation → packages/graphql-schema
+2. services/genai-orchestrator (depends on shared-types, validation)
+3. services/api (depends on packages + genai-orchestrator)
+4. apps/web (depends on packages)
+5. infrastructure/aws-cdk (independent, can be built separately)
 
 ## Infrastructure Testing Framework
 
