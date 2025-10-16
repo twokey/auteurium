@@ -125,8 +125,8 @@ export const COMBINE_SNIPPET_CONNECTIONS = gql`
 `
 
 export const GENERATE_SNIPPET_IMAGE = gql`
-  mutation GenerateSnippetImage($projectId: ID!, $snippetId: ID!) {
-    generateSnippetImage(projectId: $projectId, snippetId: $snippetId) {
+  mutation GenerateSnippetImage($projectId: ID!, $snippetId: ID!, $modelId: ID) {
+    generateSnippetImage(projectId: $projectId, snippetId: $snippetId, modelId: $modelId) {
       id
       projectId
       title

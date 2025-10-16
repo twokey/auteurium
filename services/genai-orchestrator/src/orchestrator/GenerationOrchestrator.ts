@@ -1,9 +1,10 @@
 import { Logger } from '@aws-lambda-powertools/logger'
 import type { GenerationRequest, GenerationResponse, GenerationRecord, StreamingChunk } from '@auteurium/shared-types'
+import { GenerationModality } from '@auteurium/shared-types'
 import { ProviderRegistry } from '../providers/registry'
 import { getModelConfig } from '../config/models'
 import type { ImageGenerationRequest, ImageGenerationResponse } from '../providers/base/IImageProvider'
-import { GeminiImageProvider } from '../providers/gemini'
+import { GeminiImageProvider, GeminiFlashImageProvider } from '../providers/gemini'
 
 const logger = new Logger({ serviceName: 'generation-orchestrator' })
 
@@ -220,12 +221,13 @@ export class GenerationOrchestrator {
 
   /**
    * Generate image using specified model
+   * Supports both text-to-image (Imagen) and multimodal text+image-to-image (Gemini Flash Image)
    * @param request - Image generation parameters
    * @param context - User and snippet context
    * @returns Generated image with metadata
    */
   async generateImage(
-    request: ImageGenerationRequest,
+    request: ImageGenerationRequest & { inputImages?: Array<{ data: Buffer; mimeType: string }> },
     context: OrchestrationContext
   ): Promise<ImageGenerationResponse & { imageData: unknown }> {
     const startTime = Date.now()
@@ -246,16 +248,25 @@ export class GenerationOrchestrator {
         snippetId: context.snippetId,
         projectId: context.projectId,
         modelId: request.modelId,
-        provider: modelConfig.provider
+        provider: modelConfig.provider,
+        modality: modelConfig.modality,
+        inputImagesCount: request.inputImages?.length ?? 0
       })
 
-      // For now, only Gemini Imagen is supported
       const apiKey = this.apiKeys.get(modelConfig.provider)
       if (!apiKey) {
         throw new Error(`API key not configured for provider: ${modelConfig.provider}`)
       }
 
-      const provider = new GeminiImageProvider()
+      // Select provider based on modality
+      let provider
+      if (modelConfig.modality === GenerationModality.TEXT_AND_IMAGE_TO_IMAGE) {
+        provider = new GeminiFlashImageProvider()
+      } else {
+        // Default to standard image generation (Imagen)
+        provider = new GeminiImageProvider()
+      }
+
       await provider.initialize(apiKey)
 
       const response = await provider.generateImage(request)

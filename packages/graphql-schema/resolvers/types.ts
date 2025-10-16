@@ -223,6 +223,7 @@ export type MutationGenerateContentStreamArgs = {
 
 
 export type MutationGenerateSnippetImageArgs = {
+  modelId?: InputMaybe<Scalars['ID']['input']>;
   projectId: Scalars['ID']['input'];
   snippetId: Scalars['ID']['input'];
 };

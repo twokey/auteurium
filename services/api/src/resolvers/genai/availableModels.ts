@@ -14,7 +14,7 @@ import type { AppSyncResolverHandler } from 'aws-lambda'
 const logger = new Logger({ serviceName: 'genai-available-models' })
 
 type GraphQLModelProvider = 'GEMINI' | 'OPENAI' | 'ANTHROPIC' | 'CUSTOM'
-type GraphQLGenerationModality = 'TEXT_TO_TEXT' | 'TEXT_TO_IMAGE' | 'TEXT_TO_VIDEO' | 'TEXT_TO_AUDIO'
+type GraphQLGenerationModality = 'TEXT_TO_TEXT' | 'TEXT_TO_IMAGE' | 'TEXT_AND_IMAGE_TO_IMAGE' | 'TEXT_TO_VIDEO' | 'TEXT_TO_AUDIO'
 
 interface GraphQLModelConfig {
   id: string
@@ -38,6 +38,7 @@ const providerToGraphQL: Record<OrchestratorModelProvider, GraphQLModelProvider>
 const modalityToGraphQL: Record<OrchestratorGenerationModality, GraphQLGenerationModality> = {
   [GenerationModality.TEXT_TO_TEXT]: 'TEXT_TO_TEXT',
   [GenerationModality.TEXT_TO_IMAGE]: 'TEXT_TO_IMAGE',
+  [GenerationModality.TEXT_AND_IMAGE_TO_IMAGE]: 'TEXT_AND_IMAGE_TO_IMAGE',
   [GenerationModality.TEXT_TO_VIDEO]: 'TEXT_TO_VIDEO',
   [GenerationModality.TEXT_TO_AUDIO]: 'TEXT_TO_AUDIO'
 }
@@ -45,6 +46,7 @@ const modalityToGraphQL: Record<OrchestratorGenerationModality, GraphQLGeneratio
 const graphQLToModality: Record<GraphQLGenerationModality, OrchestratorGenerationModality> = {
   TEXT_TO_TEXT: GenerationModality.TEXT_TO_TEXT,
   TEXT_TO_IMAGE: GenerationModality.TEXT_TO_IMAGE,
+  TEXT_AND_IMAGE_TO_IMAGE: GenerationModality.TEXT_AND_IMAGE_TO_IMAGE,
   TEXT_TO_VIDEO: GenerationModality.TEXT_TO_VIDEO,
   TEXT_TO_AUDIO: GenerationModality.TEXT_TO_AUDIO
 }

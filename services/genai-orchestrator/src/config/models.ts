@@ -51,6 +51,16 @@ export const MODEL_REGISTRY: ModelConfig[] = [
     costPerToken: 0.02, // $0.02 per image
     enabled: true
   },
+  {
+    id: 'gemini-2.5-flash-image',
+    provider: ModelProvider.GEMINI,
+    modelId: 'gemini-2.5-flash-image',
+    modality: GenerationModality.TEXT_AND_IMAGE_TO_IMAGE,
+    displayName: 'Gemini 2.5 Flash Image',
+    description: 'Multimodal image generation from text and images (up to 3 input images)',
+    costPerToken: 0.0387, // $30 per 1M tokens × 1,290 tokens per image = $0.0387 per image
+    enabled: true
+  },
 
   // OpenAI Models (disabled until provider is implemented)
   {

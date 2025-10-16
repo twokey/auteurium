@@ -298,7 +298,7 @@ export const Canvas = () => {
     if (snippet) setViewingVersionsSnippet(snippet)
   }, [snippets])
 
-  const handleGenerateImage = useCallback((snippetId: string) => {
+  const handleGenerateImage = useCallback((snippetId: string, modelId?: string) => {
     const snippet = snippets.find(s => s.id === snippetId)
     if (!snippet) {
       return
@@ -323,14 +323,18 @@ export const Canvas = () => {
     generateSnippetImageMutation({
       variables: {
         projectId,
-        snippetId
+        snippetId,
+        modelId // Pass the selected model ID
       }
     })
-      .then(() => {
+      .then((result) => {
+        if (result.errors && result.errors.length > 0) {
+          throw new Error(result.errors[0].message)
+        }
         alert('Image generated successfully!')
       })
       .catch((error) => {
-        console.error('Failed to generate image from canvas:', error)
+        console.error('Error generating snippet image:', error)
         alert(`Failed to generate image: ${error instanceof Error ? error.message : 'Unknown error'}`)
       })
       .finally(() => {
@@ -554,6 +558,17 @@ export const Canvas = () => {
     return sortedSnippets.map((snippet, index) => {
       const position = snippet.position ?? { x: 0, y: 0 }
 
+      // Get incoming connections to find connected snippets
+      const incomingConnections = (snippet.connections || []).filter(
+        conn => conn.targetSnippetId === snippet.id
+      )
+
+      // Map source snippets for connected image counting
+      const connectedSnippets = incomingConnections
+        .map(conn => snippets.find(s => s.id === conn.sourceSnippetId))
+        .filter((s): s is Snippet => s !== undefined)
+        .map(s => ({ id: s.id, imageS3Key: s.imageS3Key }))
+
       return {
         id: snippet.id,
         type: 'snippet',
@@ -579,7 +594,8 @@ export const Canvas = () => {
           onUpdateContent: handleUpdateSnippetContent,
           onCombine: handleCombineSnippetContent,
           onGenerateImage: handleGenerateImage,
-          isGeneratingImage: Boolean(generatingImageSnippetIds[snippet.id])
+          isGeneratingImage: Boolean(generatingImageSnippetIds[snippet.id]),
+          connectedSnippets
         },
         style: {
           background: '#fff',

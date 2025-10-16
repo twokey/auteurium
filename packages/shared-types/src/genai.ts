@@ -8,6 +8,7 @@ export enum ModelProvider {
 export enum GenerationModality {
   TEXT_TO_TEXT = 'text-to-text',
   TEXT_TO_IMAGE = 'text-to-image',
+  TEXT_AND_IMAGE_TO_IMAGE = 'text-and-image-to-image',
   TEXT_TO_VIDEO = 'text-to-video',
   TEXT_TO_AUDIO = 'text-to-audio'
 }
@@ -31,6 +32,7 @@ export interface GenerationRequest {
   temperature?: number
   maxTokens?: number
   stream?: boolean
+  inputImages?: string[] // S3 keys or URLs for multimodal generation
 }
 
 export interface GenerationResponse {

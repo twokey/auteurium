@@ -1,13 +1,15 @@
 import { GenerationOrchestrator } from '@auteurium/genai-orchestrator'
 import { Logger } from '@aws-lambda-powertools/logger'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { GetSecretValueCommand, SecretsManagerClient } from '@aws-sdk/client-secrets-manager'
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 
 import { createContext, type AppSyncEvent } from '../../middleware/auth'
 import { handleError } from '../../utils/errors'
 import { withSignedImageUrl } from '../../utils/snippetImages'
+import { queryConnections } from '../../database/connections'
+import { batchGetSnippets } from '../../database/snippets'
 
 import type { ImageMetadata, Snippet } from '@auteurium/shared-types'
 import type { AppSyncResolverHandler } from 'aws-lambda'
@@ -26,6 +28,7 @@ const LLM_API_KEYS_SECRET_ARN = process.env.LLM_API_KEYS_SECRET_ARN!
 interface GenerateImageArgs {
   projectId: string
   snippetId: string
+  modelId?: string // Optional model selection, defaults to Imagen
 }
 
 interface SnippetRecord {
@@ -41,11 +44,22 @@ interface SnippetRecord {
   position: { x: number; y: number }
   createdAt: string
   updatedAt: string
+  imageS3Key?: string | null
+  imageMetadata?: ImageMetadata | null
+}
+
+/**
+ * Extract timestamp from S3 key pattern: snippets/{projectId}/{snippetId}/image-{timestamp}.png
+ */
+const extractTimestampFromS3Key = (s3Key: string): number => {
+  const match = s3Key.match(/image-(\d+)\.png$/)
+  return match ? parseInt(match[1], 10) : 0
 }
 
 /**
  * Mutation resolver: generateSnippetImage
- * Generates an image using Imagen based on snippet's textField1 and saves to S3
+ * Generates an image using specified model based on snippet's textField1
+ * For Gemini Flash Image model, also uses images from connected snippets (up to 3)
  */
 export const handler: AppSyncResolverHandler<GenerateImageArgs, Snippet> = async (event) => {
   try {
@@ -57,12 +71,13 @@ export const handler: AppSyncResolverHandler<GenerateImageArgs, Snippet> = async
     }
 
     const userId = context.user.id
-    const { projectId, snippetId } = event.arguments
+    const { projectId, snippetId, modelId = 'imagen-4.0-fast-generate-001' } = event.arguments
 
     logger.info('Starting image generation for snippet', {
       userId,
       projectId,
-      snippetId
+      snippetId,
+      modelId
     })
 
     // Get snippet from DynamoDB
@@ -85,6 +100,84 @@ export const handler: AppSyncResolverHandler<GenerateImageArgs, Snippet> = async
       throw new Error('Text Field 1 must have content for image generation')
     }
 
+    // Get connected snippet images if using multimodal model
+    const inputImages: Array<{ data: Buffer; mimeType: string }> = []
+
+    if (modelId === 'gemini-2.5-flash-image') {
+      logger.info('Fetching connected snippets for multimodal generation', { snippetId })
+
+      // Query incoming connections (where current snippet is target)
+      const incomingConnections = await queryConnections({
+        projectId,
+        targetSnippetId: snippetId
+      })
+
+      if (incomingConnections.length > 0) {
+        // Get source snippet IDs
+        const sourceSnippetIds = incomingConnections.map(conn => conn.sourceSnippetId)
+
+        // Batch fetch source snippets
+        const sourceSnippets = await batchGetSnippets(projectId, sourceSnippetIds)
+
+        // Filter snippets with images and sort by generation time (most recent first)
+        const snippetsWithImages = Array.from(sourceSnippets.values())
+          .filter(s => s.imageS3Key)
+          .sort((a, b) => {
+            const timestampA = a.imageS3Key ? extractTimestampFromS3Key(a.imageS3Key) : 0
+            const timestampB = b.imageS3Key ? extractTimestampFromS3Key(b.imageS3Key) : 0
+            return timestampB - timestampA // Most recent first
+          })
+
+        logger.info('Found connected snippets with images', {
+          snippetId,
+          totalConnections: incomingConnections.length,
+          snippetsWithImages: snippetsWithImages.length
+        })
+
+        // Validate image count
+        if (snippetsWithImages.length > 3) {
+          throw new Error(
+            `Too many connected images (${snippetsWithImages.length}). Maximum 3 images supported. ` +
+            `Remove connections to snippets to use 3 or fewer images.`
+          )
+        }
+
+        // Download images from S3
+        for (const sourceSnippet of snippetsWithImages.slice(0, 3)) {
+          try {
+            const getObjectResult = await s3Client.send(new GetObjectCommand({
+              Bucket: MEDIA_BUCKET_NAME,
+              Key: sourceSnippet.imageS3Key!
+            }))
+
+            if (getObjectResult.Body) {
+              const imageBytes = await getObjectResult.Body.transformToByteArray()
+              inputImages.push({
+                data: Buffer.from(imageBytes),
+                mimeType: getObjectResult.ContentType || 'image/png'
+              })
+
+              logger.info('Downloaded image from S3', {
+                s3Key: sourceSnippet.imageS3Key,
+                size: imageBytes.length
+              })
+            }
+          } catch (error) {
+            logger.error('Failed to download image from S3', {
+              error: error instanceof Error ? error.message : String(error),
+              s3Key: sourceSnippet.imageS3Key
+            })
+            // Continue with other images instead of failing
+          }
+        }
+      }
+
+      logger.info('Prepared input images for multimodal generation', {
+        snippetId,
+        inputImagesCount: inputImages.length
+      })
+    }
+
     // Get LLM API keys from Secrets Manager
     const secretResult = await secretsClient.send(new GetSecretValueCommand({
       SecretId: LLM_API_KEYS_SECRET_ARN
@@ -100,17 +193,20 @@ export const handler: AppSyncResolverHandler<GenerateImageArgs, Snippet> = async
     const orchestrator = new GenerationOrchestrator()
     orchestrator.setApiKey('gemini', apiKeys.gemini)
 
-    // Generate image using Imagen
-    logger.info('Calling Imagen API', {
+    // Generate image
+    logger.info('Calling image generation API', {
       snippetId,
-      promptLength: snippet.textField1.length
+      modelId,
+      promptLength: snippet.textField1.length,
+      inputImagesCount: inputImages.length
     })
 
     const imageResponse = await orchestrator.generateImage(
       {
-        modelId: 'imagen-4.0-fast-generate-001',
-        prompt: snippet.textField1
-      },
+        modelId,
+        prompt: snippet.textField1,
+        inputImages: inputImages.length > 0 ? inputImages : undefined
+      } as any, // Type assertion needed for extended image generation parameters
       {
         userId,
         snippetId,
@@ -234,10 +330,10 @@ export const handler: AppSyncResolverHandler<GenerateImageArgs, Snippet> = async
         ':snippetId': snippetId,
         ':projectId': projectId,
         ':modelProvider': 'gemini',
-        ':modelId': 'imagen-4.0-fast-generate-001',
+        ':modelId': modelId, // Use the actual modelId from arguments
         ':prompt': snippet.textField1,
         ':result': s3Key, // Store S3 key instead of URL
-        ':tokensUsed': 1,
+        ':tokensUsed': imageResponse.tokensUsed,
         ':cost': imageResponse.cost,
         ':generationTimeMs': imageResponse.generationTimeMs,
         ':createdAt': createdAt

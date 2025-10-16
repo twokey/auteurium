@@ -31,6 +31,7 @@ export class AuteuriumGenAIStack extends cdk.Stack {
     // Import existing tables
     const snippetsTable = dynamodb.Table.fromTableName(this, 'SnippetsTable', `auteurium-snippets-${stage}`)
     const projectsTable = dynamodb.Table.fromTableName(this, 'ProjectsTable', `auteurium-projects-${stage}`)
+    const connectionsTable = dynamodb.Table.fromTableName(this, 'ConnectionsTable', `auteurium-connections-${stage}`)
 
     // Create Secrets Manager secret for LLM API keys
     const llmApiKeysSecret = new secretsmanager.Secret(this, `LLMApiKeysSecret-${stage}`, {
@@ -206,6 +207,7 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       environment: {
         STAGE: stage,
         SNIPPETS_TABLE: snippetsTable.tableName,
+        CONNECTIONS_TABLE: connectionsTable.tableName, // Add connections table for multimodal image generation
         GENERATIONS_TABLE: this.generationsTable.tableName,
         MEDIA_BUCKET_NAME: mediaBucket.bucketName,
         LLM_API_KEYS_SECRET_ARN: llmApiKeysSecret.secretArn,
@@ -227,6 +229,7 @@ export class AuteuriumGenAIStack extends cdk.Stack {
     snippetsTable.grantReadWriteData(generateImageFunction)
     projectsTable.grantReadData(generateContentFunction)
     projectsTable.grantReadData(generateContentStreamFunction)
+    connectionsTable.grantReadData(generateImageFunction) // Need to query connections for multimodal image generation
     mediaBucket.grantReadWrite(generateImageFunction)
 
     // Grant GSI query permissions
@@ -262,6 +265,15 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       actions: ['dynamodb:Query'],
       resources: [
         `${this.generationsTable.tableArn}/index/*`
+      ]
+    }))
+
+    // Grant GSI query permissions for generateImageFunction
+    generateImageFunction.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['dynamodb:Query'],
+      resources: [
+        `${connectionsTable.tableArn}/index/*`, // Need to query connections by targetSnippetId
+        `${snippetsTable.tableArn}/index/*`
       ]
     }))
 

@@ -149,7 +149,7 @@ type Mutation {
   deleteSnippet(projectId: ID!, id: ID!): Boolean!
   revertSnippet(projectId: ID!, id: ID!, version: Int!): Snippet!
   combineSnippetConnections(projectId: ID!, snippetId: ID!): Snippet!
-  generateSnippetImage(projectId: ID!, snippetId: ID!): Snippet!
+  generateSnippetImage(projectId: ID!, snippetId: ID!, modelId: ID): Snippet!
 
   # Connection mutations
   createConnection(input: CreateConnectionInput!): Connection!
