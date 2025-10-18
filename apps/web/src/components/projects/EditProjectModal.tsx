@@ -1,7 +1,7 @@
-import { useMutation } from '@apollo/client'
 import { useEffect, useState } from 'react'
 
 import { UPDATE_PROJECT } from '../../graphql/mutations'
+import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
 
 interface Project {
   id: string
@@ -24,12 +24,12 @@ export const EditProjectModal = ({ isOpen, project, onClose, onUpdated }: EditPr
   const [description, setDescription] = useState('')
   const [error, setError] = useState('')
 
-  const [updateProject, { loading }] = useMutation(UPDATE_PROJECT, {
+  const { mutate: updateProject, loading } = useGraphQLMutation(UPDATE_PROJECT, {
     onCompleted: () => {
       onUpdated()
       setError('')
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error('Error updating project:', error)
       setError(error.message || 'Failed to update project')
     }

@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { ApolloError, useApolloClient, useMutation, useQuery } from '@apollo/client'
 
 import {
   GENERATE_CONTENT,
@@ -7,6 +6,9 @@ import {
   GENERATION_STREAM_SUBSCRIPTION,
   GET_AVAILABLE_MODELS
 } from '../graphql/genai'
+import { client } from '../services/graphql'
+import { useGraphQLMutation } from './useGraphQLMutation'
+import { useGraphQLQuery } from './useGraphQLQuery'
 
 type AvailableModel = {
   id: string
@@ -95,33 +97,7 @@ const collectErrorMessages = (error: unknown): string[] => {
     return messages
   }
 
-  if (error instanceof ApolloError) {
-    if (typeof error.message === 'string' && error.message.trim() !== '') {
-      messages.push(error.message)
-    }
-
-    for (const graphQLError of error.graphQLErrors ?? []) {
-      if (typeof graphQLError.message === 'string' && graphQLError.message.trim() !== '') {
-        messages.push(graphQLError.message)
-      }
-    }
-
-    const networkError = error.networkError as { message?: string; statusCode?: number; result?: { errors?: Array<{ message?: string }> } } | null
-    if (networkError) {
-      if (typeof networkError.message === 'string' && networkError.message.trim() !== '') {
-        messages.push(networkError.message)
-      }
-
-      const networkErrors = networkError.result?.errors
-      if (Array.isArray(networkErrors)) {
-        for (const entry of networkErrors) {
-          if (entry && typeof entry.message === 'string' && entry.message.trim() !== '') {
-            messages.push(entry.message)
-          }
-        }
-      }
-    }
-  } else if (error instanceof Error) {
+  if (error instanceof Error) {
     if (typeof error.message === 'string' && error.message.trim() !== '') {
       messages.push(error.message)
     }
@@ -170,7 +146,6 @@ const extractStreamingFallbackReason = (error: unknown): string | null => {
 
 export const useGenAI = (options: UseGenAIOptions = {}) => {
   const { enabled = true } = options
-  const client = useApolloClient()
   const streamingSupportedRef = useRef(true)
   const [isStreamingSupported, setIsStreamingSupported] = useState(true)
   const streamingFallbackReasonRef = useRef<string | null>(null)
@@ -181,17 +156,17 @@ export const useGenAI = (options: UseGenAIOptions = {}) => {
     loading: isLoadingModels,
     error: modelsError,
     refetch: refetchModels
-  } = useQuery<AvailableModelsData>(GET_AVAILABLE_MODELS, {
+  } = useGraphQLQuery<AvailableModelsData>(GET_AVAILABLE_MODELS, {
     variables: { modality: 'TEXT_TO_TEXT' },
     skip: !enabled
   })
 
-  const [generateContentMutation, { loading: isGeneratingMutation }] = useMutation<
+  const { mutate: generateContentMutation, loading: isGeneratingMutation } = useGraphQLMutation<
     GenerateContentData,
     GenerateContentVariables
   >(GENERATE_CONTENT)
 
-  const [generateContentStreamMutation, { loading: isStreamingMutation }] = useMutation<
+  const { mutate: generateContentStreamMutation, loading: isStreamingMutation } = useGraphQLMutation<
     GenerateContentStreamData,
     GenerateContentVariables
   >(GENERATE_CONTENT_STREAM)
@@ -209,7 +184,7 @@ export const useGenAI = (options: UseGenAIOptions = {}) => {
         }
       })
 
-      return result.data?.generateContent
+      return result?.generateContent
     },
     [generateContentMutation]
   )
@@ -269,7 +244,7 @@ export const useGenAI = (options: UseGenAIOptions = {}) => {
         })
 
         return {
-          result: result.data?.generateContentStream ?? null,
+          result: result?.generateContentStream ?? null,
           usedStreaming: true,
           fallbackReason: null
         }
@@ -293,33 +268,40 @@ export const useGenAI = (options: UseGenAIOptions = {}) => {
         }
       }
 
-      const observable = client.subscribe<GenerationStreamSubscriptionData>(
-        {
-          query: GENERATION_STREAM_SUBSCRIPTION,
-          variables: { snippetId }
-        }
-      )
-
-      return observable.subscribe({
-        next: ({ data }) => {
-          if (data?.onGenerationStream) {
-            handlers.onNext(data.onGenerationStream)
-          }
-        },
-        error: (error) => {
-          if (isStreamingUnsupportedError(error)) {
-            const reason = extractStreamingFallbackReason(error)
-            markStreamingUnsupported(reason)
-            handlers.onError?.(streamingFallbackReasonRef.current ?? DEFAULT_FALLBACK_MESSAGE)
-            return
-          }
-
-          handlers.onError?.(error)
-        },
-        complete: handlers.onComplete
+      // Using Amplify client for subscriptions
+      const subscription = client.graphql({
+        query: GENERATION_STREAM_SUBSCRIPTION,
+        variables: { snippetId }
       })
+
+      // Check if this is a subscription (has subscribe method)
+      if ('subscribe' in subscription && typeof subscription.subscribe === 'function') {
+        return subscription.subscribe({
+          next: (value: { data?: GenerationStreamSubscriptionData }) => {
+            if (value.data?.onGenerationStream) {
+              handlers.onNext(value.data.onGenerationStream)
+            }
+          },
+          error: (error: Error) => {
+            if (isStreamingUnsupportedError(error)) {
+              const reason = extractStreamingFallbackReason(error)
+              markStreamingUnsupported(reason)
+              handlers.onError?.(streamingFallbackReasonRef.current ?? DEFAULT_FALLBACK_MESSAGE)
+              return
+            }
+
+            handlers.onError?.(error)
+          },
+          complete: handlers.onComplete
+        })
+      }
+
+      // Fallback if not a subscription
+      return {
+        unsubscribe: () => {}
+      }
     },
-    [client, markStreamingUnsupported]
+    [markStreamingUnsupported]
   )
 
   const memoizedModels = useMemo(

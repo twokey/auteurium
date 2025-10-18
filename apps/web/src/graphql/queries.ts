@@ -1,7 +1,5 @@
-import { gql } from '@apollo/client'
-
 // User queries
-export const GET_ME = gql`
+export const GET_ME = /* GraphQL */ `
   query GetMe {
     me {
       id
@@ -15,7 +13,7 @@ export const GET_ME = gql`
 `
 
 // Project queries
-export const GET_PROJECTS = gql`
+export const GET_PROJECTS = /* GraphQL */ `
   query GetProjects {
     projects {
       id
@@ -28,7 +26,7 @@ export const GET_PROJECTS = gql`
   }
 `
 
-export const GET_PROJECT = gql`
+export const GET_PROJECT = /* GraphQL */ `
   query GetProject($id: ID!) {
     project(id: $id) {
       id
@@ -68,7 +66,7 @@ export const GET_PROJECT = gql`
   }
 `
 
-export const GET_PROJECT_WITH_SNIPPETS = gql`
+export const GET_PROJECT_WITH_SNIPPETS = /* GraphQL */ `
   query GetProjectWithSnippets($projectId: ID!) {
     project(id: $projectId) {
       id
@@ -113,7 +111,7 @@ export const GET_PROJECT_WITH_SNIPPETS = gql`
 `
 
 // Snippet queries
-export const GET_SNIPPET = gql`
+export const GET_SNIPPET = /* GraphQL */ `
   query GetSnippet($id: ID!) {
     snippet(id: $id) {
       id
@@ -154,7 +152,7 @@ export const GET_SNIPPET = gql`
   }
 `
 
-export const GET_SNIPPET_VERSIONS = gql`
+export const GET_SNIPPET_VERSIONS = /* GraphQL */ `
   query GetSnippetVersions($snippetId: ID!) {
     snippetVersions(snippetId: $snippetId) {
       id
@@ -167,7 +165,7 @@ export const GET_SNIPPET_VERSIONS = gql`
 `
 
 // Admin queries
-export const GET_SYSTEM_ANALYTICS = gql`
+export const GET_SYSTEM_ANALYTICS = /* GraphQL */ `
   query GetSystemAnalytics {
     systemAnalytics {
       totalUsers
@@ -178,7 +176,7 @@ export const GET_SYSTEM_ANALYTICS = gql`
   }
 `
 
-export const GET_ALL_USERS = gql`
+export const GET_ALL_USERS = /* GraphQL */ `
   query GetAllUsers {
     users {
       id

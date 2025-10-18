@@ -1,14 +1,18 @@
-import { ApolloProvider } from '@apollo/client'
+import { lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 
 import { Navigation } from './components/ui/Navigation'
 import { configureAmplify } from './config/amplify'
 import { AuthProvider } from './hooks/AuthProvider'
 import { useAuth } from './hooks/useAuth'
-import { AuthPage } from './pages/AuthPage'
-import { Canvas } from './pages/Canvas'
-import { Dashboard } from './pages/Dashboard'
-import { apolloClient } from './services/graphql'
+import { ErrorBoundary } from './shared/components/ErrorBoundary'
+import { LoadingSpinner } from './shared/components/ui/LoadingSpinner'
+import { ToastContainer } from './shared/components/ui/Toast'
+
+// Lazy load route components for code splitting
+const AuthPage = lazy(() => import('./pages/AuthPage').then(module => ({ default: module.AuthPage })))
+const Canvas = lazy(() => import('./pages/Canvas').then(module => ({ default: module.Canvas })))
+const Dashboard = lazy(() => import('./pages/Dashboard').then(module => ({ default: module.Dashboard })))
 
 // Configure Amplify
 configureAmplify()
@@ -17,61 +21,77 @@ const AppContent = () => {
   const { isAuthenticated, hasCheckedAuth } = useAuth()
 
   if (!hasCheckedAuth) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
-      </div>
-    )
+    return <LoadingSpinner fullScreen text="Loading..." size="xlarge" />
   }
 
   if (!isAuthenticated) {
-    return <AuthPage />
+    return (
+      <Suspense fallback={<LoadingSpinner fullScreen text="Loading..." size="xlarge" />}>
+        <AuthPage />
+      </Suspense>
+    )
   }
 
   return (
     <Router>
       <div className="min-h-screen bg-gray-50">
-        <Routes>
-          <Route path="/" element={
-            <>
-              <Navigation />
-              <main>
-                <Dashboard />
-              </main>
-            </>
-          } />
-          <Route path="/project/:id" element={<Canvas />} />
-          <Route path="/admin" element={
-            <>
-              <Navigation />
-              <main>
-                <div className="p-8">Admin Panel coming soon...</div>
-              </main>
-            </>
-          } />
-          <Route path="*" element={
-            <>
-              <Navigation />
-              <main>
-                <div className="p-8">Page not found</div>
-              </main>
-            </>
-          } />
-        </Routes>
+        <ErrorBoundary>
+          <Routes>
+            <Route 
+              path="/" 
+              element={
+                <Suspense fallback={<LoadingSpinner fullScreen text="Loading dashboard..." size="large" />}>
+                  <Navigation />
+                  <main>
+                    <Dashboard />
+                  </main>
+                </Suspense>
+              } 
+            />
+            <Route 
+              path="/project/:id" 
+              element={
+                <Suspense fallback={<LoadingSpinner fullScreen text="Loading canvas..." size="large" />}>
+                  <Canvas />
+                </Suspense>
+              } 
+            />
+            <Route 
+              path="/admin" 
+              element={
+                <Suspense fallback={<LoadingSpinner fullScreen text="Loading..." size="large" />}>
+                  <Navigation />
+                  <main>
+                    <div className="p-8">Admin Panel coming soon...</div>
+                  </main>
+                </Suspense>
+              } 
+            />
+            <Route 
+              path="*" 
+              element={
+                <>
+                  <Navigation />
+                  <main>
+                    <div className="p-8">Page not found</div>
+                  </main>
+                </>
+              } 
+            />
+          </Routes>
+        </ErrorBoundary>
       </div>
     </Router>
   )
 }
 
 const App = () => (
-  <ApolloProvider client={apolloClient}>
+  <ErrorBoundary>
     <AuthProvider>
       <AppContent />
+      <ToastContainer />
     </AuthProvider>
-  </ApolloProvider>
+  </ErrorBoundary>
 )
 
 export default App

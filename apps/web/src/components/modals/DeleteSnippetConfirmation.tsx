@@ -1,8 +1,8 @@
-import { useMutation } from '@apollo/client'
 import { useCallback, useState } from 'react'
 
 import { DELETE_SNIPPET } from '../../graphql/mutations'
-import { GET_PROJECT_WITH_SNIPPETS } from '../../graphql/queries'
+import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
+import { useToast } from '../../shared/store/toastStore'
 
 interface DeleteSnippetConfirmationProps {
   isOpen: boolean
@@ -12,38 +12,41 @@ interface DeleteSnippetConfirmationProps {
     projectId: string
     textField1: string
   }
+  onDeleted?: () => void
 }
 
-export const DeleteSnippetConfirmation = ({ isOpen, onClose, snippet }: DeleteSnippetConfirmationProps) => {
+export const DeleteSnippetConfirmation = ({ isOpen, onClose, snippet, onDeleted }: DeleteSnippetConfirmationProps) => {
+  const toast = useToast()
   const [isDeleting, setIsDeleting] = useState(false)
 
-  const [deleteSnippetMutation] = useMutation(DELETE_SNIPPET, {
-    refetchQueries: [
-      {
-        query: GET_PROJECT_WITH_SNIPPETS,
-        variables: { projectId: snippet.projectId }
-      }
-    ],
-    awaitRefetchQueries: true
-  })
+  const { mutate: deleteSnippet } = useGraphQLMutation<
+    { deleteSnippet: boolean },
+    { projectId: string; id: string }
+  >(DELETE_SNIPPET)
 
   const handleDelete = useCallback(async () => {
     setIsDeleting(true)
     try {
-      await deleteSnippetMutation({
+      const result = await deleteSnippet({
         variables: {
           projectId: snippet.projectId,
           id: snippet.id
         }
       })
-      onClose()
+
+      if (result) {
+        onClose()
+        if (onDeleted) {
+          onDeleted()
+        }
+      }
     } catch (error) {
       console.error('Failed to delete snippet:', error)
-      alert(`Failed to delete snippet: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      toast.error('Failed to delete snippet', error instanceof Error ? error.message : 'Unknown error')
     } finally {
       setIsDeleting(false)
     }
-  }, [deleteSnippetMutation, onClose, snippet.id, snippet.projectId])
+  }, [deleteSnippet, onClose, onDeleted, snippet.id, snippet.projectId, toast])
 
   if (!isOpen) return null
 

@@ -4,6 +4,8 @@ import { REVERT_SNIPPET } from '../../graphql/mutations'
 import { GET_SNIPPET_VERSIONS } from '../../graphql/queries'
 import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
 import { useGraphQLQuery } from '../../hooks/useGraphQLQuery'
+import { useToast } from '../../shared/store/toastStore'
+import { formatDetailedDateTime } from '../../shared/utils/dateFormatters'
 
 interface SnippetVersion {
   id: string
@@ -30,6 +32,7 @@ interface VersionHistoryModalProps {
 }
 
 export const VersionHistoryModal = ({ isOpen, onClose, snippet }: VersionHistoryModalProps) => {
+  const toast = useToast()
   const [selectedVersion, setSelectedVersion] = useState<SnippetVersion | null>(null)
   const [isReverting, setIsReverting] = useState(false)
 
@@ -46,11 +49,12 @@ export const VersionHistoryModal = ({ isOpen, onClose, snippet }: VersionHistory
   const { mutate: revertSnippetMutation } = useGraphQLMutation(REVERT_SNIPPET, {
     onCompleted: () => {
       // Refetch will be handled by parent component
+      toast.success('Snippet reverted successfully!')
       onClose()
     },
     onError: (error: Error) => {
       console.error('Failed to revert snippet:', error)
-      alert(`Failed to revert snippet: ${error.message}`)
+      toast.error('Failed to revert snippet', error.message)
     }
   })
 
@@ -74,27 +78,17 @@ export const VersionHistoryModal = ({ isOpen, onClose, snippet }: VersionHistory
       })
     } catch (error) {
       console.error('Failed to revert snippet:', error)
-      alert(`Failed to revert snippet: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      toast.error('Failed to revert snippet', error instanceof Error ? error.message : 'Unknown error')
     } finally {
       setIsReverting(false)
     }
-  }, [selectedVersion, snippet.id, snippet.projectId, revertSnippetMutation])
+  }, [selectedVersion, snippet.id, snippet.projectId, revertSnippetMutation, toast])
 
-  const formatDate = useCallback((dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }, [])
-
-  const getVersionLabel = useCallback((version: SnippetVersion, index: number) => {
+  const getVersionLabel = (version: SnippetVersion, index: number) => {
     if (version.version === snippet.version) return 'Current'
     if (index === 1) return 'Previous'
     return `Version -${index}`
-  }, [snippet.version])
+  }
 
   if (!isOpen) return null
 
@@ -161,7 +155,7 @@ export const VersionHistoryModal = ({ isOpen, onClose, snippet }: VersionHistory
                       </span>
                     </div>
                     <p className="text-xs text-gray-500">
-                      {formatDate(version.createdAt)}
+                      {formatDetailedDateTime(version.createdAt)}
                     </p>
                   </button>
                 ))}
@@ -183,7 +177,7 @@ export const VersionHistoryModal = ({ isOpen, onClose, snippet }: VersionHistory
                       Version {selectedVersion.version}
                     </h3>
                     <p className="text-sm text-gray-500">
-                      {formatDate(selectedVersion.createdAt)}
+                      {formatDetailedDateTime(selectedVersion.createdAt)}
                     </p>
                   </div>
                   {selectedVersion.version !== snippet.version && (

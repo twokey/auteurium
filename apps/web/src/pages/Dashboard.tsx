@@ -1,12 +1,10 @@
-import { useQuery } from '@apollo/client'
 import { useState } from 'react'
 
 import { CreateProjectModal } from '../components/projects/CreateProjectModal'
 import { ProjectCard } from '../components/projects/ProjectCard'
 import { GET_PROJECTS } from '../graphql/queries'
 import { useAuth } from '../hooks/useAuth'
-
-import type { GraphQLFormattedError } from 'graphql'
+import { useGraphQLQuery } from '../hooks/useGraphQLQuery'
 
 interface Project {
   id: string
@@ -21,24 +19,13 @@ interface ProjectsQueryData {
   projects: Project[] | null
 }
 
-export const Dashboard = () => {
+const Dashboard = () => {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const { user } = useAuth()
-  
-  const { data, loading, error, refetch } = useQuery<ProjectsQueryData>(GET_PROJECTS, {
-    errorPolicy: 'all'
-  })
 
-  const isNonBlockingProjectsError = error?.graphQLErrors?.some((graphQLError: GraphQLFormattedError) => {
-    const [firstPathSegment] = graphQLError.path ?? []
-    if (firstPathSegment !== 'projects') {
-      return false
-    }
+  const { data, loading, error, refetch } = useGraphQLQuery<ProjectsQueryData>(GET_PROJECTS)
 
-    return graphQLError.message.includes('type mismatch error')
-  })
-
-  const projects: Project[] = isNonBlockingProjectsError ? [] : data?.projects ?? []
+  const projects: Project[] = data?.projects ?? []
 
   const handleProjectCreated = () => {
     void refetch()
@@ -61,7 +48,7 @@ export const Dashboard = () => {
     )
   }
 
-  if (error && !isNonBlockingProjectsError) {
+  if (error) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -161,3 +148,6 @@ export const Dashboard = () => {
     </div>
   )
 }
+
+// Named export for lazy loading
+export { Dashboard }

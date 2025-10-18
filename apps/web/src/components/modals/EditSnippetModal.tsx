@@ -1,9 +1,9 @@
-import { useMutation } from '@apollo/client'
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 
 import { COMBINE_SNIPPET_CONNECTIONS, DELETE_SNIPPET, GENERATE_SNIPPET_IMAGE, UPDATE_SNIPPET } from '../../graphql/mutations'
-import { GET_PROJECT_WITH_SNIPPETS } from '../../graphql/queries'
 import { useGenAI } from '../../hooks/useGenAI'
+import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
+import { useToast } from '../../shared/store/toastStore'
 
 type EditableField = 'textField1' | 'textField2'
 
@@ -30,6 +30,7 @@ interface EditSnippetModalProps {
 }
 
 export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, snippet }: EditSnippetModalProps) => {
+  const toast = useToast()
   const normalisedTitle = snippet.title && snippet.title.trim() !== '' ? snippet.title : 'New snippet'
   const [title, setTitle] = useState(normalisedTitle)
   const [textField1, setTextField1] = useState(snippet.textField1 ?? '')
@@ -147,44 +148,30 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
     }
   }, [activeField])
 
-  const [updateSnippetMutation] = useMutation(UPDATE_SNIPPET, {
-    refetchQueries: [
-      {
-        query: GET_PROJECT_WITH_SNIPPETS,
-        variables: { projectId: snippet.projectId }
-      }
-    ],
-    awaitRefetchQueries: true
+  const { mutate: updateSnippetMutation } = useGraphQLMutation(UPDATE_SNIPPET)
+
+  const { mutate: deleteSnippetMutation } = useGraphQLMutation(DELETE_SNIPPET, {
+    onCompleted: () => {
+      onClose()
+    },
+    onError: (error: Error) => {
+      console.error('Failed to delete snippet:', error)
+      toast.error('Failed to delete snippet', error.message)
+    }
   })
 
-  const [deleteSnippetMutation] = useMutation(DELETE_SNIPPET, {
-    refetchQueries: [
-      {
-        query: GET_PROJECT_WITH_SNIPPETS,
-        variables: { projectId: snippet.projectId }
-      }
-    ],
-    awaitRefetchQueries: true
+  const { mutate: combineConnectionsMutation } = useGraphQLMutation(COMBINE_SNIPPET_CONNECTIONS, {
+    onError: (error: Error) => {
+      console.error('Failed to combine snippets:', error)
+      toast.error('Failed to combine', error.message)
+    }
   })
 
-  const [combineConnectionsMutation] = useMutation(COMBINE_SNIPPET_CONNECTIONS, {
-    refetchQueries: [
-      {
-        query: GET_PROJECT_WITH_SNIPPETS,
-        variables: { projectId: snippet.projectId }
-      }
-    ],
-    awaitRefetchQueries: true
-  })
-
-  const [generateImageMutation] = useMutation(GENERATE_SNIPPET_IMAGE, {
-    refetchQueries: [
-      {
-        query: GET_PROJECT_WITH_SNIPPETS,
-        variables: { projectId: snippet.projectId }
-      }
-    ],
-    awaitRefetchQueries: true
+  const { mutate: generateImageMutation } = useGraphQLMutation(GENERATE_SNIPPET_IMAGE, {
+    onError: (error: Error) => {
+      console.error('Failed to generate image:', error)
+      toast.error('Failed to generate image', error.message)
+    }
   })
 
   const handleSave = useCallback(async () => {
@@ -208,11 +195,11 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
       onClose()
     } catch (error) {
       console.error('Failed to update snippet:', error)
-      alert(`Failed to save snippet: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      toast.error('Failed to save snippet', error instanceof Error ? error.message : 'Unknown error')
     } finally {
       setIsSaving(false)
     }
-  }, [snippet.id, snippet.projectId, title, textField1, textField2, tags, categories, updateSnippetMutation, onClose])
+  }, [snippet.id, snippet.projectId, title, textField1, textField2, tags, categories, updateSnippetMutation, onClose, toast])
 
   const handleAddTag = useCallback(() => {
     const trimmedTag = tagInput.trim()
@@ -256,12 +243,12 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
 
   const handleGenerate = useCallback(async () => {
     if (!selectedModelPrimary) {
-      alert('Please select an LLM model before generating.')
+      toast.warning('Please select an LLM model before generating')
       return
     }
 
     if (textField1.trim() === '') {
-      alert('Please provide input in Text Field 1 to send to the model.')
+      toast.warning('Please provide input in Text Field 1 to send to the model')
       return
     }
 
@@ -333,7 +320,7 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
       )
 
       if (!generation || generation.content.trim() === '') {
-        alert('The selected model did not return any content. Please try again or choose another model.')
+        toast.warning('The selected model did not return any content', 'Please try again or choose another model')
         setIsStreaming(false)
         return
       }
@@ -348,7 +335,7 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
       console.error('Failed to generate content:', error)
       const message = error instanceof Error ? error.message : 'Unknown error'
       setStreamError(message)
-      alert(`Failed to generate content: ${message}`)
+      toast.error('Failed to generate content', message)
     } finally {
       if (streamSubscriptionRef.current) {
         streamSubscriptionRef.current.unsubscribe()
@@ -365,18 +352,19 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
     snippet.projectId,
     streamingFallbackReason,
     subscribeToGenerationStream,
-    textField1
+    textField1,
+    toast
   ])
 
   const handleGenerateSnippetFromField2 = useCallback(async () => {
     if (!selectedModelSecondary) {
-      alert('Please select an LLM model before generating.')
+      toast.warning('Please select an LLM model before generating')
       return
     }
 
     const trimmedPrompt = textField2.trim()
     if (trimmedPrompt === '') {
-      alert('Please provide input in Text Field 2 to send to the model.')
+      toast.warning('Please provide input in Text Field 2 to send to the model')
       return
     }
 
@@ -392,7 +380,7 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
       )
 
       if (!result || result.content.trim() === '') {
-        alert('The selected model did not return any content. Please try again or choose another model.')
+        toast.warning('The selected model did not return any content', 'Please try again or choose another model')
         return
       }
 
@@ -406,7 +394,7 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
       console.error('Failed to generate snippet from Text Field 2:', error)
       const message = error instanceof Error ? error.message : 'Unknown error'
       setSecondaryStreamError(message)
-      alert(`Failed to generate snippet: ${message}`)
+      toast.error('Failed to generate snippet', message)
     } finally {
       setIsGeneratingSecondary(false)
     }
@@ -416,7 +404,8 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
     selectedModelSecondary,
     snippet.id,
     snippet.projectId,
-    textField2
+    textField2,
+    toast
   ])
 
   const handleDelete = useCallback(async () => {
@@ -433,14 +422,10 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
           id: snippet.id
         }
       })
-      onClose()
-    } catch (error) {
-      console.error('Failed to delete snippet:', error)
-      alert(`Failed to delete snippet: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setIsDeleting(false)
     }
-  }, [deleteSnippetMutation, onClose, snippet.id, snippet.projectId])
+  }, [deleteSnippetMutation, snippet.id, snippet.projectId])
 
   const handleCombine = useCallback(async () => {
     setIsCombining(true)
@@ -452,7 +437,7 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
         }
       })
 
-      const updatedSnippet = result.data?.combineSnippetConnections
+      const updatedSnippet = result ? (result as { combineSnippetConnections: typeof snippet }).combineSnippetConnections : null
       if (!updatedSnippet) {
         throw new Error('No data returned from combine operation')
       }
@@ -460,18 +445,18 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
       // Update local state with new textField2
       setTextField2(updatedSnippet.textField2)
 
-      alert('Successfully combined connected snippets!')
+      toast.success('Successfully combined connected snippets!')
     } catch (error) {
       console.error('Failed to combine snippets:', error)
-      alert(`Failed to combine: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      toast.error('Failed to combine', error instanceof Error ? error.message : 'Unknown error')
     } finally {
       setIsCombining(false)
     }
-  }, [combineConnectionsMutation, snippet.projectId, snippet.id])
+  }, [combineConnectionsMutation, snippet.projectId, snippet.id, toast])
 
   const handleGenerateImage = useCallback(async () => {
     if (!textField1.trim()) {
-      alert('Please provide input in Text Field 1 for image generation.')
+      toast.warning('Please provide input in Text Field 1 for image generation')
       return
     }
 
@@ -483,14 +468,11 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
           snippetId: snippet.id
         }
       })
-      alert('Image generated successfully!')
-    } catch (error) {
-      console.error('Failed to generate image:', error)
-      alert(`Failed to generate image: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      toast.success('Image generated successfully!')
     } finally {
       setIsGeneratingImage(false)
     }
-  }, [generateImageMutation, snippet.projectId, snippet.id, textField1])
+  }, [generateImageMutation, snippet.projectId, snippet.id, textField1, toast])
 
   const handleFieldActivate = useCallback((field: EditableField) => {
     if (isSaving || isDeleting) {
@@ -537,7 +519,7 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
       }
     } catch (error) {
       console.error('Failed to save snippet field:', error)
-      alert('Failed to save changes. Please try again.')
+      toast.error('Failed to save changes', 'Please try again')
 
       const previousValue = lastSavedValuesRef.current[field]
       if (field === 'textField1') {
@@ -548,7 +530,7 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
     } finally {
       setSavingField(null)
     }
-  }, [snippet.projectId, snippet.id, textField1, textField2, updateSnippetMutation])
+  }, [snippet.projectId, snippet.id, textField1, textField2, updateSnippetMutation, toast])
 
   if (!isOpen) return null
 

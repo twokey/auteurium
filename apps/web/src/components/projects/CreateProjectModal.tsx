@@ -1,7 +1,7 @@
-import { useMutation } from '@apollo/client'
 import { useState } from 'react'
 
 import { CREATE_PROJECT } from '../../graphql/mutations'
+import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
 
 interface CreateProjectModalProps {
   isOpen: boolean
@@ -14,22 +14,22 @@ export const CreateProjectModal = ({ isOpen, onClose, onCreated }: CreateProject
   const [description, setDescription] = useState('')
   const [error, setError] = useState('')
 
-  const [createProject, { loading }] = useMutation(CREATE_PROJECT, {
+  const { mutate: createProject, loading } = useGraphQLMutation(CREATE_PROJECT, {
     onCompleted: () => {
       onCreated()
       setName('')
       setDescription('')
       setError('')
     },
-    onError: (error) => {
-      console.error('Error creating project:', error)
-      setError(error.message || 'Failed to create project')
+    onError: (err: Error) => {
+      console.error('Error creating project:', err)
+      setError(err.message || 'Failed to create project')
     }
   })
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    
+
     if (!name.trim()) {
       setError('Project name is required')
       return

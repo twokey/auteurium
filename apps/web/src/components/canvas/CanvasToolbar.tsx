@@ -1,5 +1,7 @@
 import { useState } from 'react'
 
+import { CANVAS_CONSTANTS } from '../../shared/constants'
+
 import type { ReactFlowInstance } from 'reactflow'
 
 interface CanvasToolbarProps {
@@ -23,7 +25,7 @@ export const CanvasToolbar = ({
     setIsCreating(true)
 
     // Calculate center position of current viewport
-    let centerPosition = { x: 200, y: 200 } // Default fallback
+    let centerPosition: { x: number; y: number } = { x: CANVAS_CONSTANTS.DEFAULT_NODE_POSITION.x, y: CANVAS_CONSTANTS.DEFAULT_NODE_POSITION.y }
 
     if (reactFlowInstance) {
       const viewport = reactFlowInstance.getViewport()

@@ -1,9 +1,11 @@
-import { useMutation } from '@apollo/client'
 import { useState, type KeyboardEventHandler } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { EditProjectModal } from './EditProjectModal'
 import { DELETE_PROJECT } from '../../graphql/mutations'
+import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
+import { useToast } from '../../shared/store/toastStore'
+import { formatDate, getTimeSince } from '../../shared/utils/dateFormatters'
 
 interface Project {
   id: string
@@ -21,19 +23,21 @@ interface ProjectCardProps {
 }
 
 export const ProjectCard = ({ project, onDeleted, onUpdated }: ProjectCardProps) => {
+  const toast = useToast()
   const [showMenu, setShowMenu] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const navigate = useNavigate()
 
-  const [deleteProject, { loading: isDeleting }] = useMutation(DELETE_PROJECT, {
+  const { mutate: deleteProject, loading: isDeleting } = useGraphQLMutation(DELETE_PROJECT, {
     onCompleted: () => {
+      toast.success('Project deleted successfully!')
       onDeleted()
       setShowDeleteConfirm(false)
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error('Error deleting project:', error)
-      alert('Failed to delete project. Please try again.')
+      toast.error('Failed to delete project', 'Please try again')
     }
   })
 
@@ -52,51 +56,6 @@ export const ProjectCard = ({ project, onDeleted, onUpdated }: ProjectCardProps)
     void deleteProject({
       variables: { id: project.id }
     })
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    })
-  }
-
-  const getTimeSince = (dateString: string) => {
-    const date = new Date(dateString)
-    const timestamp = date.getTime()
-
-    if (Number.isNaN(timestamp)) return 'Unknown'
-
-    const now = new Date()
-    const diffMs = now.getTime() - timestamp
-
-    if (diffMs <= 0) return 'Just now'
-
-    const diffMinutes = Math.floor(diffMs / (1000 * 60))
-    if (diffMinutes < 1) return 'Just now'
-    if (diffMinutes < 60) {
-      const label = diffMinutes === 1 ? 'minute' : 'minutes'
-      return `${diffMinutes} ${label} ago`
-    }
-
-    const diffHours = Math.floor(diffMinutes / 60)
-    if (diffHours < 24) {
-      const label = diffHours === 1 ? 'hour' : 'hours'
-      return `${diffHours} ${label} ago`
-    }
-
-    const diffDays = Math.floor(diffHours / 24)
-    if (diffDays === 1) return 'Yesterday'
-    if (diffDays < 7) return `${diffDays} days ago`
-
-    const diffWeeks = Math.floor(diffDays / 7)
-    if (diffWeeks < 5) {
-      const label = diffWeeks === 1 ? 'week' : 'weeks'
-      return `${diffWeeks} ${label} ago`
-    }
-
-    return formatDate(dateString)
   }
 
   return (

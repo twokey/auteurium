@@ -1,6 +1,10 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Handle, Position } from 'reactflow'
 
+import { CANVAS_CONSTANTS } from '../../shared/constants'
+import { useToast } from '../../shared/store/toastStore'
+import { countWords, truncateToWords } from '../../shared/utils/textUtils'
+
 interface SnippetNodeProps {
   id: string
   data: {
@@ -28,24 +32,14 @@ interface SnippetNodeProps {
     onCombine: (snippetId: string) => Promise<void>
     onGenerateImage: (snippetId: string, modelId?: string) => void
     isGeneratingImage: boolean
-    connectedSnippets?: Array<{ id: string; imageS3Key?: string | null }>
+    connectedSnippets?: { id: string; imageS3Key?: string | null }[]
   }
 }
 
-const WORD_LIMIT = 100
 type EditableField = 'textField1' | 'textField2'
 
-const countWords = (text: string): number => {
-  return text.trim().split(/\s+/).filter(word => word.length > 0).length
-}
-
-const truncateToWords = (text: string, wordLimit: number): string => {
-  const words = text.trim().split(/\s+/)
-  if (words.length <= wordLimit) return text
-  return words.slice(0, wordLimit).join(' ') + '...'
-}
-
 export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
+  const toast = useToast()
   const {
     snippet,
     onEdit,
@@ -133,7 +127,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
       await onUpdateContent(snippet.id, { [field]: newValue })
     } catch (error) {
       console.error('Failed to update snippet content:', error)
-      alert('Failed to save snippet changes. Please try again.')
+      toast.error('Failed to save snippet changes', 'Please try again')
       setDraftValues((prev) => ({
         ...prev,
         [field]: currentValue
@@ -141,7 +135,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
     } finally {
       setSavingField(null)
     }
-  }, [draftValues, onUpdateContent, snippet.id, snippet.textField1, snippet.textField2])
+  }, [draftValues, onUpdateContent, snippet.id, snippet.textField1, snippet.textField2, toast])
 
   const handleFieldActivate = useCallback(
     (field: EditableField) =>
@@ -242,14 +236,14 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
     setIsCombining(true)
     try {
       await onCombine(snippet.id)
-      alert('Successfully combined connected snippets!')
+      toast.success('Successfully combined connected snippets!')
     } catch (error) {
       console.error('Failed to combine snippets from canvas:', error)
-      alert('Failed to combine connected snippets. Please try again.')
+      toast.error('Failed to combine connected snippets', 'Please try again')
     } finally {
       setIsCombining(false)
     }
-  }, [activeField, commitField, isCombining, onCombine, savingField, snippet.connectionCount, snippet.id])
+  }, [activeField, commitField, isCombining, onCombine, savingField, snippet.connectionCount, snippet.id, toast])
 
   const hasConnections = snippet.connectionCount > 0
 
@@ -260,14 +254,14 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
 
   const combinedText = `${snippet.textField1} ${snippet.textField2}`.trim()
   const wordCount = countWords(combinedText)
-  const isLarge = wordCount > WORD_LIMIT
+  const isLarge = wordCount > CANVAS_CONSTANTS.WORD_LIMIT
 
   const displayText1 = isLarge
-    ? truncateToWords(snippet.textField1, Math.floor(WORD_LIMIT * 0.6))
+    ? truncateToWords(snippet.textField1, Math.floor(CANVAS_CONSTANTS.WORD_LIMIT * 0.6))
     : snippet.textField1
 
   const displayText2 = isLarge
-    ? truncateToWords(snippet.textField2, Math.floor(WORD_LIMIT * 0.4))
+    ? truncateToWords(snippet.textField2, Math.floor(CANVAS_CONSTANTS.WORD_LIMIT * 0.4))
     : snippet.textField2
 
   const displayTitle = snippet.title && snippet.title.trim() !== ''

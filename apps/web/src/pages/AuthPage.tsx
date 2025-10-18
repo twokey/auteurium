@@ -7,7 +7,7 @@ import { RegisterForm } from '../components/auth/RegisterForm'
 
 type AuthView = 'login' | 'register' | 'forgotPassword' | 'emailConfirmation'
 
-export const AuthPage = () => {
+const AuthPage = () => {
   const [currentView, setCurrentView] = useState<AuthView>(() => {
     // Try to restore view from sessionStorage
     try {
@@ -114,3 +114,6 @@ export const AuthPage = () => {
     </div>
   )
 }
+
+// Named export for lazy loading
+export { AuthPage }

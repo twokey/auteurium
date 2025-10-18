@@ -1,8 +1,8 @@
-import { useMutation } from '@apollo/client'
 import { useCallback, useMemo, useState } from 'react'
 
 import { CREATE_CONNECTION, DELETE_CONNECTION } from '../../graphql/mutations'
-import { GET_PROJECT_WITH_SNIPPETS } from '../../graphql/queries'
+import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
+import { useToast } from '../../shared/store/toastStore'
 
 interface Connection {
   id: string
@@ -30,29 +30,14 @@ interface ManageConnectionsModalProps {
 }
 
 export const ManageConnectionsModal = ({ isOpen, onClose, snippet, allSnippets }: ManageConnectionsModalProps) => {
+  const toast = useToast()
   const [targetSnippetId, setTargetSnippetId] = useState('')
   const [connectionLabel, setConnectionLabel] = useState('')
   const [isCreating, setIsCreating] = useState(false)
 
-  const [createConnectionMutation] = useMutation(CREATE_CONNECTION, {
-    refetchQueries: [
-      {
-        query: GET_PROJECT_WITH_SNIPPETS,
-        variables: { projectId: snippet.projectId }
-      }
-    ],
-    awaitRefetchQueries: true
-  })
+  const { mutate: createConnectionMutation } = useGraphQLMutation(CREATE_CONNECTION)
 
-  const [deleteConnectionMutation] = useMutation(DELETE_CONNECTION, {
-    refetchQueries: [
-      {
-        query: GET_PROJECT_WITH_SNIPPETS,
-        variables: { projectId: snippet.projectId }
-      }
-    ],
-    awaitRefetchQueries: true
-  })
+  const { mutate: deleteConnectionMutation } = useGraphQLMutation(DELETE_CONNECTION)
 
   // Get all connections where this snippet is the source
   const outgoingConnections = useMemo(() => snippet.connections ?? [], [snippet.connections])
@@ -77,7 +62,7 @@ export const ManageConnectionsModal = ({ isOpen, onClose, snippet, allSnippets }
     // Check if snippet exists
     const targetExists = allSnippets.some(s => s.id === trimmedId || s.id.startsWith(trimmedId))
     if (!targetExists) {
-      alert('Target snippet not found. Please check the snippet ID.')
+      toast.warning('Target snippet not found', 'Please check the snippet ID')
       return
     }
 
@@ -88,7 +73,7 @@ export const ManageConnectionsModal = ({ isOpen, onClose, snippet, allSnippets }
 
     // Don't allow self-connections
     if (fullTargetId === snippet.id) {
-      alert('Cannot create connection to the same snippet.')
+      toast.warning('Cannot create connection to the same snippet')
       return
     }
 
@@ -109,11 +94,11 @@ export const ManageConnectionsModal = ({ isOpen, onClose, snippet, allSnippets }
       setConnectionLabel('')
     } catch (error) {
       console.error('Failed to create connection:', error)
-      alert(`Failed to create connection: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      toast.error('Failed to create connection', error instanceof Error ? error.message : 'Unknown error')
     } finally {
       setIsCreating(false)
     }
-  }, [targetSnippetId, connectionLabel, allSnippets, snippet.id, snippet.projectId, createConnectionMutation])
+  }, [targetSnippetId, connectionLabel, allSnippets, snippet.id, snippet.projectId, createConnectionMutation, toast])
 
   const handleDeleteConnection = useCallback(async (connectionId: string) => {
     if (!confirm('Are you sure you want to delete this connection?')) return
@@ -127,9 +112,9 @@ export const ManageConnectionsModal = ({ isOpen, onClose, snippet, allSnippets }
       })
     } catch (error) {
       console.error('Failed to delete connection:', error)
-      alert(`Failed to delete connection: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      toast.error('Failed to delete connection', error instanceof Error ? error.message : 'Unknown error')
     }
-  }, [deleteConnectionMutation, snippet.projectId])
+  }, [deleteConnectionMutation, snippet.projectId, toast])
 
   const getSnippetPreview = useCallback((snippetId: string) => {
     const foundSnippet = allSnippets.find(s => s.id === snippetId)

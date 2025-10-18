@@ -1,6 +1,4 @@
-import { gql } from '@apollo/client'
-
-export const GET_AVAILABLE_MODELS = gql`
+export const GET_AVAILABLE_MODELS = /* GraphQL */ `
   query GetAvailableModels($modality: GenerationModality!) {
     availableModels(modality: $modality) {
       id
@@ -13,7 +11,7 @@ export const GET_AVAILABLE_MODELS = gql`
   }
 `
 
-export const GENERATE_CONTENT = gql`
+export const GENERATE_CONTENT = /* GraphQL */ `
   mutation GenerateContent($projectId: ID!, $snippetId: ID!, $input: GenerateContentInput!) {
     generateContent(projectId: $projectId, snippetId: $snippetId, input: $input) {
       content
@@ -24,7 +22,7 @@ export const GENERATE_CONTENT = gql`
     }
   }
 `
-export const GENERATE_CONTENT_STREAM = gql`
+export const GENERATE_CONTENT_STREAM = /* GraphQL */ `
   mutation GenerateContentStream($projectId: ID!, $snippetId: ID!, $input: GenerateContentInput!) {
     generateContentStream(projectId: $projectId, snippetId: $snippetId, input: $input) {
       content
@@ -36,7 +34,7 @@ export const GENERATE_CONTENT_STREAM = gql`
   }
 `
 
-export const GENERATION_STREAM_SUBSCRIPTION = gql`
+export const GENERATION_STREAM_SUBSCRIPTION = /* GraphQL */ `
   subscription OnGenerationStream($snippetId: ID!) {
     onGenerationStream(snippetId: $snippetId) {
       snippetId

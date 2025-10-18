@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint . --max-warnings 0",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },
@@ -15,28 +15,22 @@
     "react-dom": "^18.2.0",
     "reactflow": "^11.10.1",
     "react-router-dom": "^6.8.1",
-    "@aws-amplify/api-graphql": "^3.4.4",
-    "@aws-amplify/auth": "^5.6.5",
-    "@aws-amplify/core": "^6.3.6",
-    "aws-amplify": "^6.0.0",
-    "@apollo/client": "^3.8.8",
+    "@aws-amplify/api-graphql": "^4.8.0",
+    "@aws-amplify/auth": "^6.16.0",
+    "@aws-amplify/core": "^6.13.3",
+    "aws-amplify": "^6.15.7",
     "graphql": "^16.8.1",
     "zustand": "^4.4.7",
-    "aws-appsync-auth-link": "^3.0.4",
-    "aws-appsync-subscription-link": "^3.0.4",
     "buffer": "^6.0.3"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
-    "@vitejs/plugin-react": "^4.2.1",
-    "@typescript-eslint/eslint-plugin": "^8.8.0",
-    "@typescript-eslint/parser": "^8.8.0",
-    "eslint": "^9.9.0",
+    "@vitejs/plugin-react": "^4.7.0",
     "tailwindcss": "^3.3.6",
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.32",
     "typescript": "^5.2.2",
-    "vite": "^5.0.8"
+    "vite": "^7.1.10"
   }
 }

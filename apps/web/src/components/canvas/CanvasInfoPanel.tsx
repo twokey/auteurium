@@ -1,5 +1,7 @@
 import { useState } from 'react'
 
+import { formatDateTime } from '../../shared/utils/dateFormatters'
+
 interface Project {
   id: string
   name: string
@@ -15,16 +17,6 @@ interface CanvasInfoPanelProps {
 
 export const CanvasInfoPanel = ({ project, snippetCount, connectionCount }: CanvasInfoPanelProps) => {
   const [isExpanded, setIsExpanded] = useState(false)
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
 
   return (
     <div className="absolute top-4 right-4 z-10" data-testid="info-panel">
@@ -88,7 +80,7 @@ export const CanvasInfoPanel = ({ project, snippetCount, connectionCount }: Canv
             <div>
               <h4 className="text-xs font-medium text-gray-700 mb-1">Last Modified</h4>
               <p className="text-xs text-gray-600">
-                {formatDate(project.lastModified)}
+                {formatDateTime(project.lastModified)}
               </p>
             </div>
 
