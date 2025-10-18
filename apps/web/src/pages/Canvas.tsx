@@ -1,4 +1,3 @@
-import { useMutation, useQuery } from '@apollo/client'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
@@ -31,6 +30,8 @@ import {
   GENERATE_SNIPPET_IMAGE
 } from '../graphql/mutations'
 import { GET_PROJECT_WITH_SNIPPETS } from '../graphql/queries'
+import { useGraphQLMutation } from '../hooks/useGraphQLMutation'
+import { useGraphQLQuery } from '../hooks/useGraphQLQuery'
 
 import type { Connection, Edge, Node, NodeTypes, ReactFlowInstance, Viewport } from 'reactflow'
 
@@ -86,6 +87,33 @@ interface ProjectWithSnippetsQueryVariables {
 
 const EMPTY_SNIPPET_LIST: Snippet[] = []
 type SnippetContentChanges = Partial<Pick<Snippet, 'textField1' | 'textField2'>>
+
+// Helper function to compare snippets for deep equality
+const areSnippetsEqual = (a: Snippet[], b: Snippet[]): boolean => {
+  if (a.length !== b.length) return false
+
+  for (let i = 0; i < a.length; i++) {
+    const snippetA = a[i]
+    const snippetB = b[i]
+
+    // Compare key fields that would affect rendering
+    if (
+      snippetA.id !== snippetB.id ||
+      snippetA.textField1 !== snippetB.textField1 ||
+      snippetA.textField2 !== snippetB.textField2 ||
+      snippetA.version !== snippetB.version ||
+      snippetA.imageUrl !== snippetB.imageUrl ||
+      snippetA.imageS3Key !== snippetB.imageS3Key ||
+      snippetA.position?.x !== snippetB.position?.x ||
+      snippetA.position?.y !== snippetB.position?.y ||
+      (snippetA.connections?.length ?? 0) !== (snippetB.connections?.length ?? 0)
+    ) {
+      return false
+    }
+  }
+
+  return true
+}
 
 interface CombineSnippetConnectionsResponse {
   combineSnippetConnections: {
@@ -159,111 +187,80 @@ export const Canvas = () => {
   const [isCreatingGeneratedSnippet, setIsCreatingGeneratedSnippet] = useState(false)
   const [generatingImageSnippetIds, setGeneratingImageSnippetIds] = useState<Record<string, boolean>>({})
 
-  const queryVariables = projectId ? { projectId } : undefined
+  const queryVariables = useMemo(
+    () => (projectId ? { projectId } : undefined),
+    [projectId]
+  )
 
-  const { data, loading, error } = useQuery<
+  const { data, loading, error } = useGraphQLQuery<
     ProjectWithSnippetsQueryData,
     ProjectWithSnippetsQueryVariables
   >(GET_PROJECT_WITH_SNIPPETS, {
     variables: queryVariables,
-    skip: !projectId,
-    errorPolicy: 'all',
-    fetchPolicy: 'cache-and-network',
-    notifyOnNetworkStatusChange: true
+    skip: !projectId
   })
 
-  useEffect(() => {
-    // Query data updated
-  }, [data, loading])
 
-  const [createSnippetMutation] = useMutation(CREATE_SNIPPET, {
-    refetchQueries: [
-      {
-        query: GET_PROJECT_WITH_SNIPPETS,
-        variables: { projectId }
-      }
-    ],
-    awaitRefetchQueries: true,
+  const { mutate: createSnippetMutation } = useGraphQLMutation(CREATE_SNIPPET, {
     onCompleted: () => {
       // Snippet created successfully
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error('Error creating snippet:', error)
-      console.error('Error details:', JSON.stringify(error, null, 2))
-      console.error('GraphQL errors:', error.graphQLErrors)
-      console.error('Network error:', error.networkError)
       alert(`Failed to create snippet: ${error.message}`)
     }
   })
 
-  const [updateSnippetMutation] = useMutation(UPDATE_SNIPPET, {
-    onError: (error) => {
+  const { mutate: updateSnippetMutation } = useGraphQLMutation(UPDATE_SNIPPET, {
+    onError: (error: Error) => {
       console.error('Error updating snippet position:', error)
     }
   })
 
-  const [createConnectionMutation] = useMutation(CREATE_CONNECTION, {
-    refetchQueries: [
-      {
-        query: GET_PROJECT_WITH_SNIPPETS,
-        variables: { projectId }
-      }
-    ],
-    awaitRefetchQueries: true,
-    onError: (error) => {
+  const { mutate: createConnectionMutation } = useGraphQLMutation(CREATE_CONNECTION, {
+    onError: (error: Error) => {
       console.error('Error creating connection:', error)
       alert(`Failed to create connection: ${error.message}`)
     }
   })
 
-  const [deleteConnectionMutation] = useMutation(DELETE_CONNECTION, {
-    refetchQueries: [
-      {
-        query: GET_PROJECT_WITH_SNIPPETS,
-        variables: { projectId }
-      }
-    ],
-    awaitRefetchQueries: true,
-    onError: (error) => {
+  const { mutate: deleteConnectionMutation } = useGraphQLMutation(DELETE_CONNECTION, {
+    onError: (error: Error) => {
       console.error('Error deleting connection:', error)
       alert(`Failed to delete connection: ${error.message}`)
     }
   })
 
-  const [combineConnectionsMutation] = useMutation<
+  const { mutate: combineConnectionsMutation } = useGraphQLMutation<
     CombineSnippetConnectionsResponse,
     CombineSnippetConnectionsVariables
   >(COMBINE_SNIPPET_CONNECTIONS, {
-    refetchQueries: [
-      {
-        query: GET_PROJECT_WITH_SNIPPETS,
-        variables: { projectId }
-      }
-    ],
-    awaitRefetchQueries: true,
-    onError: (mutationError) => {
-      console.error('Error combining snippets:', mutationError)
+    onError: (error: Error) => {
+      console.error('Error combining snippets:', error)
     }
   })
 
-  const [generateSnippetImageMutation] = useMutation(GENERATE_SNIPPET_IMAGE, {
-    refetchQueries: [
-      {
-        query: GET_PROJECT_WITH_SNIPPETS,
-        variables: { projectId }
-      }
-    ],
-    awaitRefetchQueries: true,
-    onError: (mutationError) => {
-      console.error('Error generating snippet image:', mutationError)
+  const { mutate: generateSnippetImageMutation } = useGraphQLMutation(GENERATE_SNIPPET_IMAGE, {
+    onError: (error: Error) => {
+      console.error('Error generating snippet image:', error)
     }
   })
 
   const project: Project | null = data?.project ?? null
   const rawSnippets = project?.snippets
+  const previousSnippetsRef = useRef<Snippet[]>(EMPTY_SNIPPET_LIST)
+
   const snippets = useMemo<Snippet[]>(() => {
-    const result = rawSnippets ?? EMPTY_SNIPPET_LIST
-    return result
+    const newSnippets = rawSnippets ?? EMPTY_SNIPPET_LIST
+
+    // Use deep equality to prevent unnecessary re-renders
+    // Only return a new reference if the content has actually changed
+    if (areSnippetsEqual(previousSnippetsRef.current, newSnippets)) {
+      return previousSnippetsRef.current
+    }
+
+    previousSnippetsRef.current = newSnippets
+    return newSnippets
   }, [rawSnippets])
 
   useEffect(() => {
@@ -272,7 +269,12 @@ export const Canvas = () => {
     }
 
     const latest = snippets.find(s => s.id === editingSnippet.id)
-    if (latest && latest !== editingSnippet) {
+    // Only update if snippet exists and content has changed (not just reference)
+    if (latest && (
+      latest.textField1 !== editingSnippet.textField1 ||
+      latest.textField2 !== editingSnippet.textField2 ||
+      latest.version !== editingSnippet.version
+    )) {
       setEditingSnippet(latest)
     }
   }, [snippets, editingSnippet])
@@ -327,15 +329,12 @@ export const Canvas = () => {
         modelId // Pass the selected model ID
       }
     })
-      .then((result) => {
-        if (result.errors && result.errors.length > 0) {
-          throw new Error(result.errors[0].message)
-        }
+      .then(() => {
         alert('Image generated successfully!')
       })
-      .catch((error) => {
+      .catch((error: Error) => {
         console.error('Error generating snippet image:', error)
-        alert(`Failed to generate image: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        alert(`Failed to generate image: ${error.message}`)
       })
       .finally(() => {
         setGeneratingImageSnippetIds((current) => {
@@ -390,7 +389,7 @@ export const Canvas = () => {
         }
       })
 
-      const newSnippetId = creationResult.data?.createSnippet?.id
+      const newSnippetId = creationResult ? (creationResult as { createSnippet: { id: string } }).createSnippet.id : null
       if (!newSnippetId) {
         throw new Error('Failed to create snippet: missing snippet ID in response')
       }
@@ -512,7 +511,7 @@ export const Canvas = () => {
         }
       })
 
-      const updatedSnippet = result.data?.combineSnippetConnections
+      const updatedSnippet = result?.combineSnippetConnections
       if (!updatedSnippet) {
         throw new Error('No data returned from combine operation')
       }
@@ -609,8 +608,13 @@ export const Canvas = () => {
   }, [snippets, handleEditSnippet, handleDeleteSnippet, handleManageConnections, handleViewVersions, handleUpdateSnippetContent, handleCombineSnippetContent, handleGenerateImage, generatingImageSnippetIds])
 
   useEffect(() => {
-    setNodes(flowNodes)
-  }, [flowNodes, setNodes])
+    // Use queueMicrotask to defer the update and prevent infinite loops
+    queueMicrotask(() => {
+      setNodes(flowNodes)
+    })
+    // setNodes is a stable function from useNodesState, safe to omit from deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flowNodes])
 
   const flowEdges = useMemo(() => {
     const edgesMap = new Map<string, Edge<ConnectionEdgeData>>()
@@ -647,8 +651,13 @@ export const Canvas = () => {
   }, [snippets])
 
   useEffect(() => {
-    setEdges(flowEdges)
-  }, [flowEdges, setEdges])
+    // Use queueMicrotask to defer the update and prevent infinite loops
+    queueMicrotask(() => {
+      setEdges(flowEdges)
+    })
+    // setEdges is a stable function from useEdgesState, safe to omit from deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flowEdges])
 
   const onConnect = useCallback(
     (params: Connection) => {

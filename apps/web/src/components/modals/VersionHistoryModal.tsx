@@ -1,8 +1,9 @@
-import { useMutation, useQuery } from '@apollo/client'
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 
 import { REVERT_SNIPPET } from '../../graphql/mutations'
-import { GET_PROJECT_WITH_SNIPPETS, GET_SNIPPET_VERSIONS } from '../../graphql/queries'
+import { GET_SNIPPET_VERSIONS } from '../../graphql/queries'
+import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
+import { useGraphQLQuery } from '../../hooks/useGraphQLQuery'
 
 interface SnippetVersion {
   id: string
@@ -32,20 +33,25 @@ export const VersionHistoryModal = ({ isOpen, onClose, snippet }: VersionHistory
   const [selectedVersion, setSelectedVersion] = useState<SnippetVersion | null>(null)
   const [isReverting, setIsReverting] = useState(false)
 
-  const { data, loading, error } = useQuery<SnippetVersionsQueryData, { snippetId: string }>(GET_SNIPPET_VERSIONS, {
-    variables: { snippetId: snippet.id },
-    skip: !isOpen,
-    fetchPolicy: 'cache-and-network'
+  const queryVariables = useMemo(
+    () => ({ snippetId: snippet.id }),
+    [snippet.id]
+  )
+
+  const { data, loading, error } = useGraphQLQuery<SnippetVersionsQueryData, { snippetId: string }>(GET_SNIPPET_VERSIONS, {
+    variables: queryVariables,
+    skip: !isOpen
   })
 
-  const [revertSnippetMutation] = useMutation(REVERT_SNIPPET, {
-    refetchQueries: [
-      {
-        query: GET_PROJECT_WITH_SNIPPETS,
-        variables: { projectId: snippet.projectId }
-      }
-    ],
-    awaitRefetchQueries: true
+  const { mutate: revertSnippetMutation } = useGraphQLMutation(REVERT_SNIPPET, {
+    onCompleted: () => {
+      // Refetch will be handled by parent component
+      onClose()
+    },
+    onError: (error: Error) => {
+      console.error('Failed to revert snippet:', error)
+      alert(`Failed to revert snippet: ${error.message}`)
+    }
   })
 
   const versions = data?.snippetVersions ?? []
@@ -66,14 +72,13 @@ export const VersionHistoryModal = ({ isOpen, onClose, snippet }: VersionHistory
           version: selectedVersion.version
         }
       })
-      onClose()
     } catch (error) {
       console.error('Failed to revert snippet:', error)
       alert(`Failed to revert snippet: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setIsReverting(false)
     }
-  }, [selectedVersion, snippet.id, snippet.projectId, revertSnippetMutation, onClose])
+  }, [selectedVersion, snippet.id, snippet.projectId, revertSnippetMutation])
 
   const formatDate = useCallback((dateString: string) => {
     return new Date(dateString).toLocaleString('en-US', {
