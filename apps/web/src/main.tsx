@@ -10,8 +10,15 @@ if (typeof globalObject.Buffer === 'undefined') {
   globalObject.Buffer = Buffer
 }
 
+// StrictMode disabled in development for performance
+// - StrictMode intentionally double-mounts components to detect side effects
+// - This causes 2x GraphQL queries, 2x renders, and slower dev experience
+// - Re-enable in production or when debugging side effects
+const isDevelopment = import.meta.env.DEV
+const AppWrapper = isDevelopment ? React.Fragment : React.StrictMode
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
+  <AppWrapper>
     <App />
-  </React.StrictMode>,
+  </AppWrapper>,
 )

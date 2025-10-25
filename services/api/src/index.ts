@@ -57,8 +57,7 @@ const resolverMap: Record<string, ResolverFunction> = {
   'Mutation.removeConnectionsBetweenSnippets': connectionMutations.removeConnectionsBetweenSnippets,
 
   // Field resolvers
-  'Project.snippets': snippetQueries.projectSnippets,
-  'Snippet.connections': connectionQueries.snippetConnections
+  'Project.snippets': snippetQueries.projectSnippets
 }
 
 const getRequestId = (event: AppSyncEvent): string => {

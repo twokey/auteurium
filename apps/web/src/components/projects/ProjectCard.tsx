@@ -1,5 +1,5 @@
 import { useState, type KeyboardEventHandler } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 import { EditProjectModal } from './EditProjectModal'
 import { DELETE_PROJECT } from '../../graphql/mutations'
@@ -115,17 +115,17 @@ export const ProjectCard = ({ project, onDeleted, onUpdated }: ProjectCardProps)
                   }}
                 ></div>
                 <div className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg z-20 border border-gray-200">
-                  <button
+                  <Link
+                    to={`/project/${project.id}`}
                     onClick={(event) => {
                       event.stopPropagation()
                       setShowMenu(false)
-                      handleOpenProject()
                     }}
                     className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     data-testid="project-card-open"
                   >
                     Open Canvas
-                  </button>
+                  </Link>
                   <button
                     onClick={(event) => {
                       event.stopPropagation()

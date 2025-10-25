@@ -36,12 +36,12 @@ export const EditProjectModal = ({ isOpen, project, onClose, onUpdated }: EditPr
   })
 
   useEffect(() => {
-    if (project) {
+    if (isOpen && project) {
       setName(project.name)
       setDescription(project.description ?? '')
       setError('')
     }
-  }, [project])
+  }, [project, isOpen])
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -86,11 +86,13 @@ export const EditProjectModal = ({ isOpen, project, onClose, onUpdated }: EditPr
       tabIndex={0}
       aria-label="Close edit project modal"
       onClick={(event) => {
+        event.stopPropagation()
         if (event.target === event.currentTarget) {
           handleClose()
         }
       }}
       onKeyDown={(event) => {
+        event.stopPropagation()
         if (event.key === 'Escape') {
           event.preventDefault()
           handleClose()
@@ -104,6 +106,7 @@ export const EditProjectModal = ({ isOpen, project, onClose, onUpdated }: EditPr
         aria-labelledby="edit-project-title"
         className="bg-white rounded-lg p-6 max-w-md w-full mx-4"
         data-testid="edit-project-modal-content"
+        onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
           <h2 id="edit-project-title" className="text-xl font-semibold text-gray-900">

@@ -16,6 +16,7 @@ interface Connection {
 interface ManageConnectionsModalProps {
   isOpen: boolean
   onClose: () => void
+  onConnectionChange?: () => Promise<void>
   snippet: {
     id: string
     projectId: string
@@ -29,7 +30,7 @@ interface ManageConnectionsModalProps {
   }[]
 }
 
-export const ManageConnectionsModal = ({ isOpen, onClose, snippet, allSnippets }: ManageConnectionsModalProps) => {
+export const ManageConnectionsModal = ({ isOpen, onClose, onConnectionChange, snippet, allSnippets }: ManageConnectionsModalProps) => {
   const toast = useToast()
   const [targetSnippetId, setTargetSnippetId] = useState('')
   const [connectionLabel, setConnectionLabel] = useState('')
@@ -92,13 +93,18 @@ export const ManageConnectionsModal = ({ isOpen, onClose, snippet, allSnippets }
       })
       setTargetSnippetId('')
       setConnectionLabel('')
+
+      // Trigger refetch after successful connection creation
+      if (onConnectionChange) {
+        await onConnectionChange()
+      }
     } catch (error) {
       console.error('Failed to create connection:', error)
       toast.error('Failed to create connection', error instanceof Error ? error.message : 'Unknown error')
     } finally {
       setIsCreating(false)
     }
-  }, [targetSnippetId, connectionLabel, allSnippets, snippet.id, snippet.projectId, createConnectionMutation, toast])
+  }, [targetSnippetId, connectionLabel, allSnippets, snippet.id, snippet.projectId, createConnectionMutation, onConnectionChange, toast])
 
   const handleDeleteConnection = useCallback(async (connectionId: string) => {
     if (!confirm('Are you sure you want to delete this connection?')) return
@@ -110,11 +116,16 @@ export const ManageConnectionsModal = ({ isOpen, onClose, snippet, allSnippets }
           connectionId
         }
       })
+
+      // Trigger refetch after successful connection deletion
+      if (onConnectionChange) {
+        await onConnectionChange()
+      }
     } catch (error) {
       console.error('Failed to delete connection:', error)
       toast.error('Failed to delete connection', error instanceof Error ? error.message : 'Unknown error')
     }
-  }, [deleteConnectionMutation, snippet.projectId, toast])
+  }, [deleteConnectionMutation, snippet.projectId, onConnectionChange, toast])
 
   const getSnippetPreview = useCallback((snippetId: string) => {
     const foundSnippet = allSnippets.find(s => s.id === snippetId)

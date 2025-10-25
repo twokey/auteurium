@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 
+import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisticUpdatesStore'
 import { DELETE_SNIPPET } from '../../graphql/mutations'
 import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
 import { useToast } from '../../shared/store/toastStore'
@@ -18,6 +19,7 @@ interface DeleteSnippetConfirmationProps {
 export const DeleteSnippetConfirmation = ({ isOpen, onClose, snippet, onDeleted }: DeleteSnippetConfirmationProps) => {
   const toast = useToast()
   const [isDeleting, setIsDeleting] = useState(false)
+  const { markSnippetDeleting, confirmDeletion, rollbackDeletion } = useOptimisticUpdatesStore()
 
   const { mutate: deleteSnippet } = useGraphQLMutation<
     { deleteSnippet: boolean },
@@ -26,6 +28,13 @@ export const DeleteSnippetConfirmation = ({ isOpen, onClose, snippet, onDeleted 
 
   const handleDelete = useCallback(async () => {
     setIsDeleting(true)
+
+    // Optimistically mark snippet as deleting (hides it immediately)
+    markSnippetDeleting(snippet.id)
+
+    // Close modal immediately for better UX
+    onClose()
+
     try {
       const result = await deleteSnippet({
         variables: {
@@ -35,7 +44,10 @@ export const DeleteSnippetConfirmation = ({ isOpen, onClose, snippet, onDeleted 
       })
 
       if (result) {
-        onClose()
+        // Confirm deletion (removes from deleting set)
+        confirmDeletion(snippet.id)
+        toast.success('Snippet deleted successfully!')
+
         if (onDeleted) {
           onDeleted()
         }
@@ -43,10 +55,12 @@ export const DeleteSnippetConfirmation = ({ isOpen, onClose, snippet, onDeleted 
     } catch (error) {
       console.error('Failed to delete snippet:', error)
       toast.error('Failed to delete snippet', error instanceof Error ? error.message : 'Unknown error')
+      // Rollback - show snippet again
+      rollbackDeletion(snippet.id)
     } finally {
       setIsDeleting(false)
     }
-  }, [deleteSnippet, onClose, onDeleted, snippet.id, snippet.projectId, toast])
+  }, [deleteSnippet, onClose, onDeleted, snippet.id, snippet.projectId, toast, markSnippetDeleting, confirmDeletion, rollbackDeletion])
 
   if (!isOpen) return null
 

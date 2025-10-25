@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 
+import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisticUpdatesStore'
 import { COMBINE_SNIPPET_CONNECTIONS, DELETE_SNIPPET, GENERATE_SNIPPET_IMAGE, UPDATE_SNIPPET } from '../../graphql/mutations'
 import { useGenAI } from '../../hooks/useGenAI'
 import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
@@ -11,6 +12,7 @@ interface EditSnippetModalProps {
   isOpen: boolean
   onClose: () => void
   onPreviewGeneratedSnippet: (payload: { sourceSnippetId: string; generatedText: string }) => void
+  onSave?: () => Promise<void>
   snippet: {
     id: string
     projectId: string
@@ -29,7 +31,7 @@ interface EditSnippetModalProps {
   }
 }
 
-export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, snippet }: EditSnippetModalProps) => {
+export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, onSave, snippet }: EditSnippetModalProps) => {
   const toast = useToast()
   const normalisedTitle = snippet.title && snippet.title.trim() !== '' ? snippet.title : 'New snippet'
   const [title, setTitle] = useState(normalisedTitle)
@@ -150,10 +152,9 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
 
   const { mutate: updateSnippetMutation } = useGraphQLMutation(UPDATE_SNIPPET)
 
+  const { markSnippetDeleting, confirmDeletion, rollbackDeletion } = useOptimisticUpdatesStore()
+
   const { mutate: deleteSnippetMutation } = useGraphQLMutation(DELETE_SNIPPET, {
-    onCompleted: () => {
-      onClose()
-    },
     onError: (error: Error) => {
       console.error('Failed to delete snippet:', error)
       toast.error('Failed to delete snippet', error.message)
@@ -192,6 +193,12 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
           }
         }
       })
+
+      // Call onSave callback to trigger refetch
+      if (onSave) {
+        await onSave()
+      }
+
       onClose()
     } catch (error) {
       console.error('Failed to update snippet:', error)
@@ -199,7 +206,7 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
     } finally {
       setIsSaving(false)
     }
-  }, [snippet.id, snippet.projectId, title, textField1, textField2, tags, categories, updateSnippetMutation, onClose, toast])
+  }, [snippet.id, snippet.projectId, title, textField1, textField2, tags, categories, updateSnippetMutation, onSave, onClose, toast])
 
   const handleAddTag = useCallback(() => {
     const trimmedTag = tagInput.trim()
@@ -415,17 +422,35 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, s
     }
 
     setIsDeleting(true)
+
+    // Optimistically mark snippet as deleting (hides it immediately)
+    markSnippetDeleting(snippet.id)
+
+    // Close modal immediately for better UX
+    onClose()
+
     try {
-      await deleteSnippetMutation({
+      const result = await deleteSnippetMutation({
         variables: {
           projectId: snippet.projectId,
           id: snippet.id
         }
       })
+
+      if (result) {
+        // Confirm deletion (removes from deleting set)
+        confirmDeletion(snippet.id)
+        toast.success('Snippet deleted successfully!')
+      }
+    } catch (error) {
+      console.error('Failed to delete snippet:', error)
+      // Rollback - show snippet again
+      rollbackDeletion(snippet.id)
+      toast.error('Failed to delete snippet', error instanceof Error ? error.message : 'Unknown error')
     } finally {
       setIsDeleting(false)
     }
-  }, [deleteSnippetMutation, snippet.id, snippet.projectId])
+  }, [deleteSnippetMutation, snippet.id, snippet.projectId, markSnippetDeleting, confirmDeletion, rollbackDeletion, onClose, toast])
 
   const handleCombine = useCallback(async () => {
     setIsCombining(true)

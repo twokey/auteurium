@@ -45,7 +45,6 @@ type Snippet {
   imageUrl: String
   imageS3Key: String
   imageMetadata: ImageMetadata
-  connections: [Connection!]!
   versions: [SnippetVersion!]!
 }
 
@@ -64,11 +63,57 @@ type Connection {
   projectId: ID!
   sourceSnippetId: ID!
   targetSnippetId: ID!
-  sourceSnippet: Snippet!
-  targetSnippet: Snippet!
+  connectionType: ConnectionType!
   label: String
   createdAt: String!
   updatedAt: String!
+}
+
+enum ConnectionType {
+  RELATED
+  DEPENDS_ON
+  SUPPORTS
+  CONTRADICTS
+  EXTENDS
+  CONTAINS
+  REFERENCES
+  SIMILAR
+  CUSTOM
+}
+
+enum ConnectionDirection {
+  OUTGOING
+  INCOMING
+  BOTH
+}
+
+type GraphNode {
+  snippetId: ID!
+  connections: [Connection!]!
+  depth: Int!
+}
+
+type GraphTraversalResult {
+  nodes: [GraphNode!]!
+  connections: [Connection!]!
+  totalNodes: Int!
+  maxDepthReached: Int!
+}
+
+type ConnectionTypeCount {
+  type: ConnectionType!
+  count: Int!
+}
+
+type SnippetConnectionStat {
+  snippetId: ID!
+  connectionCount: Int!
+}
+
+type ConnectionStats {
+  totalConnections: Int!
+  connectionsByType: [ConnectionTypeCount!]!
+  mostConnectedSnippets: [SnippetConnectionStat!]!
 }
 
 type Position {
@@ -127,6 +172,16 @@ type Query {
   project(id: ID!): Project
   snippet(id: ID!): Snippet
   snippetVersions(snippetId: ID!): [SnippetVersion!]!
+  projectConnections(projectId: ID!, limit: Int): [Connection!]!
+  snippetConnections(snippetId: ID!, direction: ConnectionDirection = BOTH, limit: Int): [Connection!]!
+  connectionsByType(projectId: ID!, connectionType: ConnectionType!, limit: Int): [Connection!]!
+  exploreGraph(
+    snippetId: ID!,
+    direction: ConnectionDirection = BOTH,
+    maxDepth: Int,
+    connectionTypes: [ConnectionType!]
+  ): GraphTraversalResult!
+  connectionStats(projectId: ID!): ConnectionStats!
 
   # Admin queries
   users: [User!]!

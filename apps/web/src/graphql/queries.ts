@@ -55,12 +55,6 @@ export const GET_PROJECT = /* GraphQL */ `
           height
           aspectRatio
         }
-        connections {
-          id
-          targetSnippetId
-          label
-          createdAt
-        }
       }
     }
   }
@@ -97,15 +91,22 @@ export const GET_PROJECT_WITH_SNIPPETS = /* GraphQL */ `
           height
           aspectRatio
         }
-        connections {
-          id
-          sourceSnippetId
-          targetSnippetId
-          label
-          createdAt
-          updatedAt
-        }
       }
+    }
+  }
+`
+
+export const GET_PROJECT_CONNECTIONS = /* GraphQL */ `
+  query GetProjectConnections($projectId: ID!, $limit: Int) {
+    projectConnections(projectId: $projectId, limit: $limit) {
+      id
+      projectId
+      sourceSnippetId
+      targetSnippetId
+      connectionType
+      label
+      createdAt
+      updatedAt
     }
   }
 `
@@ -133,13 +134,6 @@ export const GET_SNIPPET = /* GraphQL */ `
         width
         height
         aspectRatio
-      }
-      connections {
-        id
-        sourceSnippetId
-        targetSnippetId
-        label
-        createdAt
       }
       versions {
         id
