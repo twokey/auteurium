@@ -14,13 +14,13 @@ import type { GraphQLContext } from '../../types/context'
 // Validation schemas
 const projectConnectionsSchema = z.object({
   projectId: z.string(),
-  limit: z.number().min(1).max(100).optional().default(50)
+  limit: z.number().min(1).max(100).optional().nullable()
 })
 
 const connectionsByTypeSchema = z.object({
   projectId: z.string(),
   connectionType: z.nativeEnum(ConnectionType),
-  limit: z.number().min(1).max(100).optional().default(50)
+  limit: z.number().min(1).max(100).optional().nullable()
 })
 
 const graphTraversalSchema = z.object({
@@ -38,17 +38,18 @@ export const connectionQueries = {
     context: GraphQLContext
   ): Promise<Connection[]> => {
     const { projectId, limit } = validateInput(projectConnectionsSchema, args)
+    const effectiveLimit = limit ?? 50
     const user = requireAuth(context.user)
 
     context.logger.info('Getting project connections', {
       projectId,
       userId: user.id,
-      limit
+      limit: effectiveLimit
     })
 
     const options: ConnectionQueryOptions = {
       projectId,
-      limit
+      limit: effectiveLimit
     }
 
     const connections = await queryConnections(options)
@@ -70,7 +71,8 @@ export const connectionQueries = {
 
     const snippetId = parentObj?.id ?? parentObj?.snippetId ?? argsObj?.snippetId
     const projectId = parentObj?.projectId
-    const direction = argsObj?.direction ?? 'both'
+    const rawDirection = (argsObj?.direction ?? 'BOTH') as string
+    const direction = rawDirection.toLowerCase()
     const limit = argsObj?.limit ?? 100
 
     if (!snippetId) {
@@ -124,19 +126,20 @@ export const connectionQueries = {
     context: GraphQLContext
   ): Promise<Connection[]> => {
     const { projectId, connectionType, limit } = validateInput(connectionsByTypeSchema, args)
+    const effectiveLimit = limit ?? 50
     const user = requireAuth(context.user)
 
     context.logger.info('Getting connections by type', {
       projectId,
       connectionType,
       userId: user.id,
-      limit
+      limit: effectiveLimit
     })
 
     const options: ConnectionQueryOptions = {
       projectId,
       connectionType,
-      limit
+      limit: effectiveLimit
     }
 
     const connections = await queryConnections(options)

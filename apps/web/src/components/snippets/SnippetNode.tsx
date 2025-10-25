@@ -38,6 +38,12 @@ interface SnippetNodeProps {
 
 type EditableField = 'textField1' | 'textField2'
 
+// Extract inline styles outside component to prevent object recreation on every render
+// This is a critical performance fix for preventing unnecessary React Flow node updates
+const POINTER_EVENTS_STYLES = {
+  interactive: { pointerEvents: 'auto' as const }
+} as const
+
 export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
   const toast = useToast()
   const {
@@ -342,12 +348,14 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
               onMouseDown={(event) => event.stopPropagation()}
               rows={Math.min(6, Math.max(2, draftValues.textField1.split('\n').length))}
               placeholder="Input..."
+              style={POINTER_EVENTS_STYLES.interactive}
             />
           ) : (
             <button
               type="button"
               className="w-full text-left font-medium text-sm text-gray-900 break-words cursor-text bg-transparent border-none p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-1 focus-visible:ring-offset-white rounded-sm"
               onClick={handleFieldActivate('textField1')}
+              style={POINTER_EVENTS_STYLES.interactive}
             >
               {(displayText1 && displayText1.trim() !== '') ? displayText1 : 'Input...'}
             </button>
@@ -368,12 +376,14 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
               onMouseDown={(event) => event.stopPropagation()}
               rows={Math.min(6, Math.max(2, draftValues.textField2.split('\n').length))}
               placeholder="Output..."
+              style={POINTER_EVENTS_STYLES.interactive}
             />
           ) : (
             <button
               type="button"
               className="w-full text-left text-xs text-gray-600 break-words cursor-text bg-transparent border-none p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-1 focus-visible:ring-offset-white rounded-sm min-h-[16px]"
               onClick={handleFieldActivate('textField2')}
+              style={POINTER_EVENTS_STYLES.interactive}
             >
                 {(displayText2 && displayText2.trim() !== '') ? displayText2 : 'Output...'}
             </button>
@@ -385,6 +395,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
           <button
             onClick={handleExpandToggle}
             className="mt-2 w-full text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center justify-center gap-1 py-1 px-2 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+            style={POINTER_EVENTS_STYLES.interactive}
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
@@ -404,6 +415,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                 void handleCombine()
               }}
               disabled={!hasConnections || isCombining || savingField !== null}
+              style={POINTER_EVENTS_STYLES.interactive}
             >
               {isCombining && (
                 <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
@@ -437,6 +449,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
               onClick={(e) => e.stopPropagation()}
               className="w-full text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
               disabled={isGeneratingImage || isCombining || savingField !== null}
+              style={POINTER_EVENTS_STYLES.interactive}
             >
               <option value="imagen-4.0-fast-generate-001">Imagen 4 Fast</option>
               <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
@@ -452,6 +465,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
               }}
               title={tooManyImages ? `Too many connected images (${connectedImagesCount}). Remove connections to use ≤3.` : 'Generate image for this snippet'}
               disabled={isGeneratingImage || tooManyImages}
+              style={POINTER_EVENTS_STYLES.interactive}
             >
               {isGeneratingImage ? (
                 <>
@@ -477,7 +491,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
 
             {/* Warning for too many images */}
             {tooManyImages && (
-              <div className="text-[10px] text-red-600 flex items-start gap-1">
+              <div className="text-[10px] text-red-600 flex items-start gap-1" style={POINTER_EVENTS_STYLES.interactive}>
                 <svg className="w-3 h-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
@@ -487,7 +501,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
 
             {/* Info about multimodal support */}
             {hasMultimodalSupport && connectedImagesCount > 0 && !tooManyImages && (
-              <div className="text-[10px] text-gray-500 flex items-start gap-1">
+              <div className="text-[10px] text-gray-500 flex items-start gap-1" style={POINTER_EVENTS_STYLES.interactive}>
                 <svg className="w-3 h-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                 </svg>
@@ -555,7 +569,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
               }}
               className="w-full rounded-md border border-gray-200 hover:border-blue-400 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
               title="Click to view full image and edit snippet"
-              style={{ display: isImageLoading ? 'none' : 'block' }}
+              style={{ display: isImageLoading ? 'none' : 'block', pointerEvents: 'auto' }}
             >
               <img
                 src={snippet.imageUrl}

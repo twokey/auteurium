@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useRef, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Background,
@@ -21,6 +21,10 @@ import { useReactFlowSetup } from '../features/canvas/hooks/useReactFlowSetup'
 import { CanvasModals } from '../features/canvas/components/CanvasModals'
 import { useCanvasStore } from '../features/canvas/store/canvasStore'
 
+const NODE_TYPES: NodeTypes = {
+  snippet: SnippetNode
+}
+
 /**
  * Canvas Component - Refactored
  * Orchestrates canvas functionality using custom hooks
@@ -32,36 +36,53 @@ const Canvas = () => {
   const { generatingImageSnippetIds } = useCanvasStore()
 
   // Data fetching
-  const { project, snippets, loading, error } = useCanvasData(projectId)
+  const { project, snippets, loading, error, refetch } = useCanvasData(projectId)
+
+  // Create a ref for setNodes that will be populated after ReactFlow setup
+  const setNodesRef = useRef<any>(() => {})
 
   // Event handlers and mutations
-  const handlers = useCanvasHandlers({ 
-    projectId, 
+  const handlers = useCanvasHandlers({
+    projectId,
     snippets,
-    setNodes: () => {} // Temporary - will be updated
+    setNodes: (updateFn: any) => setNodesRef.current(updateFn),
+    refetch
   })
+
+  // Create handlers object for flow nodes
+  // Handlers are now stable from useCanvasHandlers (using useCallback with stable deps)
+  const nodeHandlers = useMemo(() => ({
+    onEdit: handlers.handleEditSnippet,
+    onDelete: handlers.handleDeleteSnippet,
+    onManageConnections: handlers.handleManageConnections,
+    onViewVersions: handlers.handleViewVersions,
+    onUpdateContent: handlers.handleUpdateSnippetContent,
+    onCombine: handlers.handleCombineSnippetContent,
+    onGenerateImage: handlers.handleGenerateImage
+  }), [
+    handlers.handleEditSnippet,
+    handlers.handleDeleteSnippet,
+    handlers.handleManageConnections,
+    handlers.handleViewVersions,
+    handlers.handleUpdateSnippetContent,
+    handlers.handleCombineSnippetContent,
+    handlers.handleGenerateImage
+  ])
 
   // Create flow nodes and edges
   const flowNodes = useFlowNodes(
     snippets,
-    {
-      onEdit: handlers.handleEditSnippet,
-      onDelete: handlers.handleDeleteSnippet,
-      onManageConnections: handlers.handleManageConnections,
-      onViewVersions: handlers.handleViewVersions,
-      onUpdateContent: handlers.handleUpdateSnippetContent,
-      onCombine: handlers.handleCombineSnippetContent,
-      onGenerateImage: handlers.handleGenerateImage
-    },
+    nodeHandlers,
     generatingImageSnippetIds
   )
 
   const flowEdges = useFlowEdges(snippets)
-  
+
   // ReactFlow setup
   const {
     nodes,
     edges,
+    setNodes,
     onNodesChange,
     onEdgesChange,
     onConnect,
@@ -71,19 +92,19 @@ const Canvas = () => {
     onZoomToFit,
     reactFlowInstance
   } = useReactFlowSetup({
-          projectId,
+    projectId,
     flowNodes,
     flowEdges,
     snippets,
-    updateSnippetMutation: {} as any,
+    updateSnippetMutation: handlers.updateSnippetMutation,
     createConnectionMutation: handlers.createConnectionMutation,
     deleteConnectionMutation: handlers.deleteConnectionMutation
   })
 
-  // Node types
-  const nodeTypes = useMemo<NodeTypes>(() => ({
-    snippet: SnippetNode
-  }), [])
+  // Update the ref with the actual setNodes function
+  useEffect(() => {
+    setNodesRef.current = setNodes
+  }, [setNodes])
 
   // Normalize project data
   const normalisedProject = project
@@ -170,7 +191,7 @@ const Canvas = () => {
             onInit={onInit}
             onNodeDragStop={onNodeDragStop}
             onMoveEnd={onMoveEnd}
-            nodeTypes={nodeTypes}
+            nodeTypes={NODE_TYPES}
             defaultEdgeOptions={{
               style: { stroke: '#6366f1', strokeWidth: 2 }
             }}
@@ -229,6 +250,7 @@ const Canvas = () => {
         snippets={snippets}
         onPreviewGeneratedSnippet={handlers.handlePreviewGeneratedSnippet}
         onCreateGeneratedSnippet={handlers.handleCreateGeneratedSnippet}
+        refetch={refetch}
       />
     </>
   )

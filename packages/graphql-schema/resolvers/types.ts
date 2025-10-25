@@ -19,15 +19,45 @@ export type Scalars = {
 
 export type Connection = {
   __typename?: 'Connection';
+  connectionType: ConnectionType;
   createdAt: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   label?: Maybe<Scalars['String']['output']>;
   projectId: Scalars['ID']['output'];
-  sourceSnippet: Snippet;
   sourceSnippetId: Scalars['ID']['output'];
-  targetSnippet: Snippet;
   targetSnippetId: Scalars['ID']['output'];
   updatedAt: Scalars['String']['output'];
+};
+
+export enum ConnectionDirection {
+  Both = 'BOTH',
+  Incoming = 'INCOMING',
+  Outgoing = 'OUTGOING'
+}
+
+export type ConnectionStats = {
+  __typename?: 'ConnectionStats';
+  connectionsByType: Array<ConnectionTypeCount>;
+  mostConnectedSnippets: Array<SnippetConnectionStat>;
+  totalConnections: Scalars['Int']['output'];
+};
+
+export enum ConnectionType {
+  Contains = 'CONTAINS',
+  Contradicts = 'CONTRADICTS',
+  Custom = 'CUSTOM',
+  DependsOn = 'DEPENDS_ON',
+  Extends = 'EXTENDS',
+  References = 'REFERENCES',
+  Related = 'RELATED',
+  Similar = 'SIMILAR',
+  Supports = 'SUPPORTS'
+}
+
+export type ConnectionTypeCount = {
+  __typename?: 'ConnectionTypeCount';
+  count: Scalars['Int']['output'];
+  type: ConnectionType;
 };
 
 export type CreateConnectionInput = {
@@ -106,6 +136,21 @@ export type GenerationStreamEventInput = {
   isComplete: Scalars['Boolean']['input'];
   snippetId: Scalars['ID']['input'];
   tokensUsed?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type GraphNode = {
+  __typename?: 'GraphNode';
+  connections: Array<Connection>;
+  depth: Scalars['Int']['output'];
+  snippetId: Scalars['ID']['output'];
+};
+
+export type GraphTraversalResult = {
+  __typename?: 'GraphTraversalResult';
+  connections: Array<Connection>;
+  maxDepthReached: Scalars['Int']['output'];
+  nodes: Array<GraphNode>;
+  totalNodes: Scalars['Int']['output'];
 };
 
 export type ImageMetadata = {
@@ -290,11 +335,16 @@ export type Project = {
 export type Query = {
   __typename?: 'Query';
   availableModels: Array<ModelConfig>;
+  connectionStats: ConnectionStats;
+  connectionsByType: Array<Connection>;
+  exploreGraph: GraphTraversalResult;
   generationHistory: Array<GenerationRecord>;
   me?: Maybe<User>;
   project?: Maybe<Project>;
+  projectConnections: Array<Connection>;
   projects: Array<Project>;
   snippet?: Maybe<Snippet>;
+  snippetConnections: Array<Connection>;
   snippetVersions: Array<SnippetVersion>;
   systemAnalytics: SystemAnalytics;
   users: Array<User>;
@@ -303,6 +353,26 @@ export type Query = {
 
 export type QueryAvailableModelsArgs = {
   modality?: InputMaybe<GenerationModality>;
+};
+
+
+export type QueryConnectionStatsArgs = {
+  projectId: Scalars['ID']['input'];
+};
+
+
+export type QueryConnectionsByTypeArgs = {
+  connectionType: ConnectionType;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  projectId: Scalars['ID']['input'];
+};
+
+
+export type QueryExploreGraphArgs = {
+  connectionTypes?: InputMaybe<Array<ConnectionType>>;
+  direction?: InputMaybe<ConnectionDirection>;
+  maxDepth?: InputMaybe<Scalars['Int']['input']>;
+  snippetId: Scalars['ID']['input'];
 };
 
 
@@ -316,8 +386,21 @@ export type QueryProjectArgs = {
 };
 
 
+export type QueryProjectConnectionsArgs = {
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  projectId: Scalars['ID']['input'];
+};
+
+
 export type QuerySnippetArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type QuerySnippetConnectionsArgs = {
+  direction?: InputMaybe<ConnectionDirection>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  snippetId: Scalars['ID']['input'];
 };
 
 
@@ -328,7 +411,6 @@ export type QuerySnippetVersionsArgs = {
 export type Snippet = {
   __typename?: 'Snippet';
   categories: Array<Scalars['String']['output']>;
-  connections: Array<Connection>;
   createdAt: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   imageMetadata?: Maybe<ImageMetadata>;
@@ -344,6 +426,12 @@ export type Snippet = {
   userId: Scalars['ID']['output'];
   version: Scalars['Int']['output'];
   versions: Array<SnippetVersion>;
+};
+
+export type SnippetConnectionStat = {
+  __typename?: 'SnippetConnectionStat';
+  connectionCount: Scalars['Int']['output'];
+  snippetId: Scalars['ID']['output'];
 };
 
 export type SnippetVersion = {
@@ -484,6 +572,10 @@ export type DirectiveResolverFn<TResult = Record<PropertyKey, never>, TParent = 
 export type ResolversTypes = ResolversObject<{
   Boolean: ResolverTypeWrapper<Scalars['Boolean']['output']>;
   Connection: ResolverTypeWrapper<Connection>;
+  ConnectionDirection: ConnectionDirection;
+  ConnectionStats: ResolverTypeWrapper<ConnectionStats>;
+  ConnectionType: ConnectionType;
+  ConnectionTypeCount: ResolverTypeWrapper<ConnectionTypeCount>;
   CreateConnectionInput: CreateConnectionInput;
   CreateProjectInput: CreateProjectInput;
   CreateSnippetInput: CreateSnippetInput;
@@ -494,6 +586,8 @@ export type ResolversTypes = ResolversObject<{
   GenerationResult: ResolverTypeWrapper<GenerationResult>;
   GenerationStreamEvent: ResolverTypeWrapper<GenerationStreamEvent>;
   GenerationStreamEventInput: GenerationStreamEventInput;
+  GraphNode: ResolverTypeWrapper<GraphNode>;
+  GraphTraversalResult: ResolverTypeWrapper<GraphTraversalResult>;
   ID: ResolverTypeWrapper<Scalars['ID']['output']>;
   ImageMetadata: ResolverTypeWrapper<ImageMetadata>;
   Int: ResolverTypeWrapper<Scalars['Int']['output']>;
@@ -505,6 +599,7 @@ export type ResolversTypes = ResolversObject<{
   Project: ResolverTypeWrapper<Project>;
   Query: ResolverTypeWrapper<Record<PropertyKey, never>>;
   Snippet: ResolverTypeWrapper<Snippet>;
+  SnippetConnectionStat: ResolverTypeWrapper<SnippetConnectionStat>;
   SnippetVersion: ResolverTypeWrapper<SnippetVersion>;
   String: ResolverTypeWrapper<Scalars['String']['output']>;
   Subscription: ResolverTypeWrapper<Record<PropertyKey, never>>;
@@ -520,6 +615,8 @@ export type ResolversTypes = ResolversObject<{
 export type ResolversParentTypes = ResolversObject<{
   Boolean: Scalars['Boolean']['output'];
   Connection: Connection;
+  ConnectionStats: ConnectionStats;
+  ConnectionTypeCount: ConnectionTypeCount;
   CreateConnectionInput: CreateConnectionInput;
   CreateProjectInput: CreateProjectInput;
   CreateSnippetInput: CreateSnippetInput;
@@ -529,6 +626,8 @@ export type ResolversParentTypes = ResolversObject<{
   GenerationResult: GenerationResult;
   GenerationStreamEvent: GenerationStreamEvent;
   GenerationStreamEventInput: GenerationStreamEventInput;
+  GraphNode: GraphNode;
+  GraphTraversalResult: GraphTraversalResult;
   ID: Scalars['ID']['output'];
   ImageMetadata: ImageMetadata;
   Int: Scalars['Int']['output'];
@@ -539,6 +638,7 @@ export type ResolversParentTypes = ResolversObject<{
   Project: Project;
   Query: Record<PropertyKey, never>;
   Snippet: Snippet;
+  SnippetConnectionStat: SnippetConnectionStat;
   SnippetVersion: SnippetVersion;
   String: Scalars['String']['output'];
   Subscription: Record<PropertyKey, never>;
@@ -550,15 +650,25 @@ export type ResolversParentTypes = ResolversObject<{
 }>;
 
 export type ConnectionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Connection'] = ResolversParentTypes['Connection']> = ResolversObject<{
+  connectionType?: Resolver<ResolversTypes['ConnectionType'], ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   label?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   projectId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
-  sourceSnippet?: Resolver<ResolversTypes['Snippet'], ParentType, ContextType>;
   sourceSnippetId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
-  targetSnippet?: Resolver<ResolversTypes['Snippet'], ParentType, ContextType>;
   targetSnippetId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+}>;
+
+export type ConnectionStatsResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['ConnectionStats'] = ResolversParentTypes['ConnectionStats']> = ResolversObject<{
+  connectionsByType?: Resolver<Array<ResolversTypes['ConnectionTypeCount']>, ParentType, ContextType>;
+  mostConnectedSnippets?: Resolver<Array<ResolversTypes['SnippetConnectionStat']>, ParentType, ContextType>;
+  totalConnections?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+}>;
+
+export type ConnectionTypeCountResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['ConnectionTypeCount'] = ResolversParentTypes['ConnectionTypeCount']> = ResolversObject<{
+  count?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  type?: Resolver<ResolversTypes['ConnectionType'], ParentType, ContextType>;
 }>;
 
 export type GenerationRecordResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['GenerationRecord'] = ResolversParentTypes['GenerationRecord']> = ResolversObject<{
@@ -590,6 +700,19 @@ export type GenerationStreamEventResolvers<ContextType = GraphQLContext, ParentT
   isComplete?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   snippetId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   tokensUsed?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
+}>;
+
+export type GraphNodeResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['GraphNode'] = ResolversParentTypes['GraphNode']> = ResolversObject<{
+  connections?: Resolver<Array<ResolversTypes['Connection']>, ParentType, ContextType>;
+  depth?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  snippetId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+}>;
+
+export type GraphTraversalResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['GraphTraversalResult'] = ResolversParentTypes['GraphTraversalResult']> = ResolversObject<{
+  connections?: Resolver<Array<ResolversTypes['Connection']>, ParentType, ContextType>;
+  maxDepthReached?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  nodes?: Resolver<Array<ResolversTypes['GraphNode']>, ParentType, ContextType>;
+  totalNodes?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
 }>;
 
 export type ImageMetadataResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['ImageMetadata'] = ResolversParentTypes['ImageMetadata']> = ResolversObject<{
@@ -649,11 +772,16 @@ export type ProjectResolvers<ContextType = GraphQLContext, ParentType extends Re
 
 export type QueryResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Query'] = ResolversParentTypes['Query']> = ResolversObject<{
   availableModels?: Resolver<Array<ResolversTypes['ModelConfig']>, ParentType, ContextType, Partial<QueryAvailableModelsArgs>>;
+  connectionStats?: Resolver<ResolversTypes['ConnectionStats'], ParentType, ContextType, RequireFields<QueryConnectionStatsArgs, 'projectId'>>;
+  connectionsByType?: Resolver<Array<ResolversTypes['Connection']>, ParentType, ContextType, RequireFields<QueryConnectionsByTypeArgs, 'connectionType' | 'projectId'>>;
+  exploreGraph?: Resolver<ResolversTypes['GraphTraversalResult'], ParentType, ContextType, RequireFields<QueryExploreGraphArgs, 'direction' | 'snippetId'>>;
   generationHistory?: Resolver<Array<ResolversTypes['GenerationRecord']>, ParentType, ContextType, RequireFields<QueryGenerationHistoryArgs, 'snippetId'>>;
   me?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
   project?: Resolver<Maybe<ResolversTypes['Project']>, ParentType, ContextType, RequireFields<QueryProjectArgs, 'id'>>;
+  projectConnections?: Resolver<Array<ResolversTypes['Connection']>, ParentType, ContextType, RequireFields<QueryProjectConnectionsArgs, 'projectId'>>;
   projects?: Resolver<Array<ResolversTypes['Project']>, ParentType, ContextType>;
   snippet?: Resolver<Maybe<ResolversTypes['Snippet']>, ParentType, ContextType, RequireFields<QuerySnippetArgs, 'id'>>;
+  snippetConnections?: Resolver<Array<ResolversTypes['Connection']>, ParentType, ContextType, RequireFields<QuerySnippetConnectionsArgs, 'direction' | 'snippetId'>>;
   snippetVersions?: Resolver<Array<ResolversTypes['SnippetVersion']>, ParentType, ContextType, RequireFields<QuerySnippetVersionsArgs, 'snippetId'>>;
   systemAnalytics?: Resolver<ResolversTypes['SystemAnalytics'], ParentType, ContextType>;
   users?: Resolver<Array<ResolversTypes['User']>, ParentType, ContextType>;
@@ -661,7 +789,6 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
 
 export type SnippetResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Snippet'] = ResolversParentTypes['Snippet']> = ResolversObject<{
   categories?: Resolver<Array<ResolversTypes['String']>, ParentType, ContextType>;
-  connections?: Resolver<Array<ResolversTypes['Connection']>, ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   imageMetadata?: Resolver<Maybe<ResolversTypes['ImageMetadata']>, ParentType, ContextType>;
@@ -677,6 +804,11 @@ export type SnippetResolvers<ContextType = GraphQLContext, ParentType extends Re
   userId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   version?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   versions?: Resolver<Array<ResolversTypes['SnippetVersion']>, ParentType, ContextType>;
+}>;
+
+export type SnippetConnectionStatResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['SnippetConnectionStat'] = ResolversParentTypes['SnippetConnectionStat']> = ResolversObject<{
+  connectionCount?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  snippetId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
 }>;
 
 export type SnippetVersionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['SnippetVersion'] = ResolversParentTypes['SnippetVersion']> = ResolversObject<{
@@ -711,9 +843,13 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
 
 export type Resolvers<ContextType = GraphQLContext> = ResolversObject<{
   Connection?: ConnectionResolvers<ContextType>;
+  ConnectionStats?: ConnectionStatsResolvers<ContextType>;
+  ConnectionTypeCount?: ConnectionTypeCountResolvers<ContextType>;
   GenerationRecord?: GenerationRecordResolvers<ContextType>;
   GenerationResult?: GenerationResultResolvers<ContextType>;
   GenerationStreamEvent?: GenerationStreamEventResolvers<ContextType>;
+  GraphNode?: GraphNodeResolvers<ContextType>;
+  GraphTraversalResult?: GraphTraversalResultResolvers<ContextType>;
   ImageMetadata?: ImageMetadataResolvers<ContextType>;
   ModelConfig?: ModelConfigResolvers<ContextType>;
   Mutation?: MutationResolvers<ContextType>;
@@ -721,6 +857,7 @@ export type Resolvers<ContextType = GraphQLContext> = ResolversObject<{
   Project?: ProjectResolvers<ContextType>;
   Query?: QueryResolvers<ContextType>;
   Snippet?: SnippetResolvers<ContextType>;
+  SnippetConnectionStat?: SnippetConnectionStatResolvers<ContextType>;
   SnippetVersion?: SnippetVersionResolvers<ContextType>;
   Subscription?: SubscriptionResolvers<ContextType>;
   SystemAnalytics?: SystemAnalyticsResolvers<ContextType>;

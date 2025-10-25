@@ -2,6 +2,11 @@ import { useCallback, useState } from 'react'
 
 import { client } from '../services/graphql'
 
+const getOperationName = (graphQLDocument: string): string => {
+  const match = graphQLDocument.match(/\b(mutation|query|subscription)\s+([A-Za-z_][A-Za-z0-9_]*)/)
+  return match?.[2] ?? 'anonymous'
+}
+
 interface UseGraphQLMutationOptions {
   onCompleted?: (data: unknown) => void
   onError?: (error: Error) => void
@@ -23,6 +28,7 @@ export const useGraphQLMutation = <TData = unknown, TVariables = Record<string, 
   const [data, setData] = useState<TData | null>(null)
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<Error | null>(null)
+  const operationName = getOperationName(mutation)
 
   const mutate = useCallback(
     async (mutationOptions: { variables: TVariables }): Promise<TData | null> => {
@@ -30,6 +36,13 @@ export const useGraphQLMutation = <TData = unknown, TVariables = Record<string, 
       setError(null)
 
       try {
+        const startedAt = performance.now()
+
+        console.info('[GraphQL Mutation] request', {
+          operation: operationName,
+          variables: mutationOptions.variables
+        })
+
         const result = await client.graphql({
           query: mutation,
           variables: mutationOptions.variables as Record<string, unknown>
@@ -49,11 +62,40 @@ export const useGraphQLMutation = <TData = unknown, TVariables = Record<string, 
           onCompleted(mutationData)
         }
 
+        const durationMs = Math.round((performance.now() - startedAt) * 100) / 100
+        console.info('[GraphQL Mutation] success', {
+          operation: operationName,
+          durationMs
+        })
+
         return mutationData
       } catch (err) {
-        const errorObj = err instanceof Error ? err : new Error('An unknown error occurred')
+        // Extract error message from various error formats
+        let errorMessage = 'An unknown error occurred'
+
+        if (err instanceof Error) {
+          errorMessage = err.message
+        } else if (err && typeof err === 'object') {
+          // Check for GraphQL errors property
+          if ('errors' in err && Array.isArray((err as any).errors)) {
+            errorMessage = (err as any).errors.map((e: any) => e.message || String(e)).join(', ')
+          } else if ('message' in err) {
+            errorMessage = String((err as any).message)
+          } else {
+            errorMessage = JSON.stringify(err)
+          }
+        } else if (err) {
+          errorMessage = String(err)
+        }
+
+        const errorObj = new Error(errorMessage)
         setError(errorObj)
-        console.error('GraphQL Mutation Error:', errorObj.message)
+        console.error('[GraphQL Mutation] error', {
+          operation: operationName,
+          message: errorMessage,
+          originalError: err,
+          errorType: err?.constructor?.name || typeof err
+        })
 
         if (onError) {
           onError(errorObj)
@@ -64,7 +106,7 @@ export const useGraphQLMutation = <TData = unknown, TVariables = Record<string, 
         setLoading(false)
       }
     },
-    [mutation, onCompleted, onError]
+    [mutation, onCompleted, onError, operationName]
   )
 
   const reset = useCallback(() => {

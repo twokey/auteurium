@@ -127,6 +127,11 @@ export class AuteuriumApiStack extends cdk.Stack {
       { typeName: 'Query', fieldName: 'project' },
       { typeName: 'Query', fieldName: 'snippet' },
       { typeName: 'Query', fieldName: 'snippetVersions' },
+      { typeName: 'Query', fieldName: 'projectConnections' },
+      { typeName: 'Query', fieldName: 'snippetConnections' },
+      { typeName: 'Query', fieldName: 'connectionsByType' },
+      { typeName: 'Query', fieldName: 'exploreGraph' },
+      { typeName: 'Query', fieldName: 'connectionStats' },
       { typeName: 'Query', fieldName: 'systemAnalytics' },
 
       // Mutation resolvers
@@ -146,8 +151,7 @@ export class AuteuriumApiStack extends cdk.Stack {
       { typeName: 'Mutation', fieldName: 'resetUserPassword' },
 
       // Field resolvers
-      { typeName: 'Project', fieldName: 'snippets' },
-      { typeName: 'Snippet', fieldName: 'connections' }
+      { typeName: 'Project', fieldName: 'snippets' }
     ]
 
     resolvers.forEach(({ typeName, fieldName }) => {
