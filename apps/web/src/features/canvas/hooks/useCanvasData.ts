@@ -242,6 +242,12 @@ export function useCanvasData(projectId: string | undefined): UseCanvasDataResul
   }
 }
 
+interface AvailableModel {
+  id: string
+  displayName: string
+  description?: string | null
+}
+
 /**
  * Transform snippets to ReactFlow nodes
  */
@@ -256,7 +262,9 @@ export function useFlowNodes(
     onCombine: (snippetId: string) => Promise<void>
     onGenerateImage: (snippetId: string, modelId?: string) => void
   },
-  generatingImageSnippetIds: Record<string, boolean>
+  generatingImageSnippetIds: Record<string, boolean>,
+  textModels?: AvailableModel[],
+  isLoadingTextModels?: boolean
 ): Node<SnippetNodeData>[] {
   return useMemo(() => {
     // Sort snippets by creation time to assign z-index
@@ -299,7 +307,9 @@ export function useFlowNodes(
           },
           ...handlers,
           isGeneratingImage: Boolean(generatingImageSnippetIds[snippet.id]),
-          connectedSnippets
+          connectedSnippets,
+          textModels,
+          isLoadingTextModels
         },
         style: {
           background: '#fff',
@@ -310,7 +320,7 @@ export function useFlowNodes(
         }
       } as Node<SnippetNodeData>
     })
-  }, [snippets, handlers, generatingImageSnippetIds])
+  }, [snippets, handlers, generatingImageSnippetIds, textModels, isLoadingTextModels])
 }
 
 /**
