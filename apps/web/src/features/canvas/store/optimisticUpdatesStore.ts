@@ -55,6 +55,9 @@ interface OptimisticUpdatesState {
   // Rollback deletion (if failed)
   rollbackDeletion: (snippetId: string) => void
 
+  // Update stored real snippet
+  updateRealSnippet: (snippet: Snippet) => void
+
   // Clear all optimistic updates
   clearAll: () => void
 }
@@ -117,6 +120,13 @@ export const useOptimisticUpdatesStore = create<OptimisticUpdatesState>((set) =>
     newSet.delete(snippetId)
     return { deletingSnippets: newSet }
   }),
+
+  updateRealSnippet: (snippet) => set((state) => ({
+    realSnippets: {
+      ...state.realSnippets,
+      [snippet.id]: snippet
+    }
+  })),
 
   clearAll: () => set({
     optimisticSnippets: {},

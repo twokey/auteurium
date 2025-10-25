@@ -23,12 +23,15 @@ import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
 import type {
   Snippet,
   CreateSnippetVariables,
+  CreateSnippetMutationData,
   UpdateSnippetVariables,
+  UpdateSnippetMutationData,
   CreateConnectionVariables,
   DeleteConnectionVariables,
   CombineSnippetConnectionsVariables,
   GenerateSnippetImageVariables,
-  CombineSnippetConnectionsMutationData
+  CombineSnippetConnectionsMutationData,
+  GenerateSnippetImageMutationData
 } from '../../../types'
 
 type SnippetContentChanges = Partial<Pick<Snippet, 'textField1'>>
@@ -88,11 +91,12 @@ export function useCanvasHandlers({
   const {
     addOptimisticSnippet,
     replaceOptimisticSnippet,
-    removeOptimisticSnippet
+    removeOptimisticSnippet,
+    updateRealSnippet
   } = useOptimisticUpdatesStore()
 
   // Mutations
-  const { mutate: createSnippetMutation } = useGraphQLMutation(CREATE_SNIPPET, {
+  const { mutate: createSnippetMutation } = useGraphQLMutation<CreateSnippetMutationData, CreateSnippetVariables>(CREATE_SNIPPET, {
     onCompleted: () => {
       toast.success('Snippet created successfully!')
       // No refetch needed - optimistic update already shows the snippet
@@ -103,7 +107,7 @@ export function useCanvasHandlers({
     }
   })
 
-  const { mutate: updateSnippetMutation } = useGraphQLMutation(UPDATE_SNIPPET, {
+  const { mutate: updateSnippetMutation } = useGraphQLMutation<UpdateSnippetMutationData, UpdateSnippetVariables>(UPDATE_SNIPPET, {
     onError: (error: Error) => {
       console.error('Error updating snippet:', error)
     }
@@ -138,7 +142,7 @@ export function useCanvasHandlers({
     }
   })
 
-  const { mutate: generateSnippetImageMutation } = useGraphQLMutation<any, GenerateSnippetImageVariables>(GENERATE_SNIPPET_IMAGE, {
+  const { mutate: generateSnippetImageMutation } = useGraphQLMutation<GenerateSnippetImageMutationData, GenerateSnippetImageVariables>(GENERATE_SNIPPET_IMAGE, {
     onError: (error: Error) => {
       console.error('Error generating snippet image:', error)
     }
@@ -296,40 +300,180 @@ export function useCanvasHandlers({
   }, [combineConnectionsMutation, projectId, setNodes])
 
   const handleGenerateImage = useCallback((snippetId: string, modelId?: string) => {
-    const snippet = snippetsRef.current.find(s => s.id === snippetId)
-    if (!snippet) return
-
-    if (!projectId) {
-      console.error('Cannot generate snippet image: no project ID')
-      return
-    }
-
-    const prompt = snippet.textField1?.trim() ?? ''
-    if (prompt === '') {
-      toast.warning('Please provide input in Text Field 1 for image generation')
-      return
-    }
-
-    setGeneratingImage(snippetId, true)
-
-    generateSnippetImageMutation({
-      variables: {
-        projectId,
-        snippetId,
-        modelId
+    void (async () => {
+      const snippet = snippetsRef.current.find(s => s.id === snippetId)
+      if (!snippet) {
+        return
       }
-    })
-      .then(() => {
+
+      if (!projectId) {
+        console.error('Cannot generate snippet image: no project ID')
+        return
+      }
+
+      const prompt = snippet.textField1?.trim() ?? ''
+      if (prompt === '') {
+        toast.warning('Please provide input in Text Field 1 for image generation')
+        return
+      }
+
+      setGeneratingImage(snippetId, true)
+
+      const baseX = snippet.position?.x ?? 0
+      const baseY = snippet.position?.y ?? 0
+
+      let sourceNodeHeight = CANVAS_CONSTANTS.ESTIMATED_SNIPPET_HEIGHT
+      if (reactFlowInstance && typeof reactFlowInstance.getNode === 'function') {
+        try {
+          const sourceNode = reactFlowInstance.getNode(snippetId)
+          if (sourceNode?.measured?.height) {
+            sourceNodeHeight = sourceNode.measured.height
+          } else if (sourceNode?.height) {
+            sourceNodeHeight = sourceNode.height
+          }
+        } catch (error) {
+          console.error('Failed to get node dimensions:', error)
+        }
+      }
+
+      const targetPosition = {
+        x: baseX,
+        y: baseY + sourceNodeHeight + CANVAS_CONSTANTS.GENERATED_SNIPPET_SPACING
+      }
+
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+      const now = new Date().toISOString()
+
+      addOptimisticSnippet({
+        id: tempId,
+        projectId,
+        title: 'Generated image snippet',
+        textField1: '',
+        position: targetPosition,
+        tags: [],
+        categories: [],
+        connections: [],
+        createdAt: now,
+        updatedAt: now,
+        version: 1,
+        isOptimistic: true
+      })
+
+      setGeneratingImage(tempId, true)
+
+      let createdSnippet: Snippet | null = null
+      try {
+        const creationResult = await createSnippetMutation({
+          variables: {
+            input: {
+              projectId,
+              title: 'Generated image snippet',
+              textField1: prompt,
+              position: targetPosition,
+              tags: [],
+              categories: []
+            }
+          }
+        })
+
+        const newSnippet = creationResult?.createSnippet
+        if (!newSnippet) {
+          throw new Error('Failed to create snippet for image generation')
+        }
+
+        createdSnippet = newSnippet
+
+        replaceOptimisticSnippet(tempId, {
+          ...newSnippet,
+          textField1: ''
+        })
+        setGeneratingImage(tempId, false)
+        setGeneratingImage(newSnippet.id, true)
+
+        try {
+          await createConnectionMutation({
+            variables: {
+              input: {
+                projectId,
+                sourceSnippetId: snippetId,
+                targetSnippetId: newSnippet.id,
+                label: ''
+              }
+            }
+          })
+          await refetch()
+        } catch (connectionError) {
+          console.error('Failed to connect generated image snippet:', connectionError)
+          toast.error('Failed to connect new image snippet', connectionError instanceof Error ? connectionError.message : 'Unknown error')
+        }
+
+        const generationResult = await generateSnippetImageMutation({
+          variables: {
+            projectId,
+            snippetId: newSnippet.id,
+            modelId
+          }
+        })
+
+        const generatedSnippet = generationResult?.generateSnippetImage
+        if (!generatedSnippet) {
+          throw new Error('Image generation request failed')
+        }
+
+        const sanitizedSnippet: Snippet = {
+          ...generatedSnippet,
+          textField1: ''
+        }
+
+        updateRealSnippet(sanitizedSnippet)
+
+        try {
+          await updateSnippetMutation({
+            variables: {
+              projectId,
+              id: generatedSnippet.id,
+              input: {
+                textField1: ''
+              }
+            }
+          })
+        } catch (clearError) {
+          console.error('Failed to clear generated image prompt:', clearError)
+        }
+
         toast.success('Image generated successfully!')
-      })
-      .catch((error: Error) => {
-        console.error('Error generating snippet image:', error)
-        toast.error('Failed to generate image', error.message)
-      })
-      .finally(() => {
+      } catch (error) {
+        console.error('Failed to generate image snippet:', error)
+
+        if (!createdSnippet) {
+          removeOptimisticSnippet(tempId)
+        }
+
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        toast.error('Failed to generate image snippet', message)
+      } finally {
         setGeneratingImage(snippetId, false)
-      })
-  }, [generateSnippetImageMutation, projectId, toast, setGeneratingImage])
+        if (createdSnippet) {
+          setGeneratingImage(createdSnippet.id, false)
+        } else {
+          setGeneratingImage(tempId, false)
+        }
+      }
+    })()
+  }, [
+    addOptimisticSnippet,
+    createConnectionMutation,
+    createSnippetMutation,
+    generateSnippetImageMutation,
+    projectId,
+    reactFlowInstance,
+    replaceOptimisticSnippet,
+    refetch,
+    setGeneratingImage,
+    toast,
+    updateSnippetMutation,
+    updateRealSnippet
+  ])
 
   // Canvas Operations
   const handleCreateSnippet = useCallback((position: { x: number; y: number }) => {
@@ -573,6 +717,23 @@ export function useCanvasHandlers({
       // Replace optimistic snippet with real one from server
       replaceOptimisticSnippet(tempId, createdSnippet)
 
+      try {
+        await createConnectionMutation({
+          variables: {
+            input: {
+              projectId,
+              sourceSnippetId,
+              targetSnippetId: newSnippetId,
+              label: ''
+            }
+          }
+        })
+        await refetch()
+      } catch (connectionError) {
+        console.error('Failed to connect generated text snippet:', connectionError)
+        toast.error('Failed to connect new text snippet', connectionError instanceof Error ? connectionError.message : 'Unknown error')
+      }
+
       toast.success('Generated text snippet created successfully!')
     } catch (error) {
       console.error('Failed to create generated text snippet:', error)
@@ -583,11 +744,13 @@ export function useCanvasHandlers({
   }, [
     projectId,
     createSnippetMutation,
+    createConnectionMutation,
     addOptimisticSnippet,
     replaceOptimisticSnippet,
     removeOptimisticSnippet,
     toast,
-    reactFlowInstance
+    reactFlowInstance,
+    refetch
   ])
 
   return {
