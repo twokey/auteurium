@@ -39,7 +39,6 @@ const areSnippetsEqual = (a: Snippet[], b: Snippet[]): boolean => {
     if (
       snippetA.id !== snippetB.id ||
       snippetA.textField1 !== snippetB.textField1 ||
-      snippetA.textField2 !== snippetB.textField2 ||
       snippetA.version !== snippetB.version ||
       snippetA.imageUrl !== snippetB.imageUrl ||
       snippetA.imageS3Key !== snippetB.imageS3Key ||
@@ -253,7 +252,7 @@ export function useFlowNodes(
     onDelete: (snippetId: string) => void
     onManageConnections: (snippetId: string) => void
     onViewVersions: (snippetId: string) => void
-    onUpdateContent: (snippetId: string, changes: Partial<Pick<Snippet, 'textField1' | 'textField2'>>) => Promise<void>
+    onUpdateContent: (snippetId: string, changes: Partial<Pick<Snippet, 'textField1'>>) => Promise<void>
     onCombine: (snippetId: string) => Promise<void>
     onGenerateImage: (snippetId: string, modelId?: string) => void
   },
@@ -291,7 +290,6 @@ export function useFlowNodes(
             id: snippet.id,
             title: snippet.title,
             textField1: snippet.textField1,
-            textField2: snippet.textField2,
             tags: snippet.tags,
             categories: snippet.categories,
             connectionCount: snippet.connections?.length ?? 0,

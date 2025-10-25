@@ -104,12 +104,7 @@ export const VersionTimeline = ({
                     <div className="mt-2 text-xs text-amber-600">
                       {version.textField1 !== nextVersion.textField1 && (
                         <span className="inline-block px-1.5 py-0.5 bg-amber-50 rounded">
-                          textField1 changed
-                        </span>
-                      )}
-                      {version.textField2 !== nextVersion.textField2 && (
-                        <span className="inline-block ml-1 px-1.5 py-0.5 bg-amber-50 rounded">
-                          textField2 changed
+                          Content changed
                         </span>
                       )}
                     </div>

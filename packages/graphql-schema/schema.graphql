@@ -35,7 +35,6 @@ type Snippet {
   userId: ID!
   title: String
   textField1: String!
-  textField2: String!
   position: Position!
   tags: [String!]!
   categories: [String!]!
@@ -54,7 +53,6 @@ type SnippetVersion {
   version: Int!
   title: String
   textField1: String!
-  textField2: String!
   createdAt: String!
 }
 
@@ -140,7 +138,6 @@ input CreateSnippetInput {
   projectId: ID!
   title: String
   textField1: String
-  textField2: String
   position: PositionInput!
   tags: [String!]
   categories: [String!]
@@ -149,7 +146,6 @@ input CreateSnippetInput {
 input UpdateSnippetInput {
   title: String
   textField1: String
-  textField2: String
   position: PositionInput
   tags: [String!]
   categories: [String!]
@@ -203,8 +199,8 @@ type Mutation {
   updateSnippet(projectId: ID!, id: ID!, input: UpdateSnippetInput!): Snippet!
   deleteSnippet(projectId: ID!, id: ID!): Boolean!
   revertSnippet(projectId: ID!, id: ID!, version: Int!): Snippet!
-  combineSnippetConnections(projectId: ID!, snippetId: ID!): Snippet!
   generateSnippetImage(projectId: ID!, snippetId: ID!, modelId: ID): Snippet!
+  combineSnippetConnections(projectId: ID!, snippetId: ID!): Snippet!
 
   # Connection mutations
   createConnection(input: CreateConnectionInput!): Connection!

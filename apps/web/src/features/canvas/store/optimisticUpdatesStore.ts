@@ -11,7 +11,6 @@ interface OptimisticSnippet {
   projectId: string
   title: string
   textField1: string
-  textField2: string
   position: { x: number; y: number }
   tags: string[]
   categories: string[]

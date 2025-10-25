@@ -191,7 +191,6 @@ mutation CreateTestSnippet {
       projectId: "YOUR_PROJECT_ID"
       title: "GenAI Test Snippet"
       textField1: "Write a haiku about programming"
-      textField2: ""
       position: { x: 100, y: 100 }
     }
   ) {

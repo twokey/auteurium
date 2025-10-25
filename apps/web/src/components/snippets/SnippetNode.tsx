@@ -12,7 +12,6 @@ interface SnippetNodeProps {
       id: string
       title?: string
       textField1: string
-      textField2: string
       tags?: string[]
       categories?: string[]
       connectionCount: number
@@ -28,7 +27,7 @@ interface SnippetNodeProps {
     onDelete: (snippetId: string) => void
     onManageConnections: (snippetId: string) => void
     onViewVersions: (snippetId: string) => void
-    onUpdateContent: (snippetId: string, changes: Partial<Record<'textField1' | 'textField2', string>>) => Promise<void>
+    onUpdateContent: (snippetId: string, changes: Partial<Record<'textField1', string>>) => Promise<void>
     onCombine: (snippetId: string) => Promise<void>
     onGenerateImage: (snippetId: string, modelId?: string) => void
     isGeneratingImage: boolean
@@ -36,7 +35,7 @@ interface SnippetNodeProps {
   }
 }
 
-type EditableField = 'textField1' | 'textField2'
+type EditableField = 'textField1'
 
 // Extract inline styles outside component to prevent object recreation on every render
 // This is a critical performance fix for preventing unnecessary React Flow node updates
@@ -63,12 +62,10 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 })
   const [activeField, setActiveField] = useState<EditableField | null>(null)
   const [draftValues, setDraftValues] = useState({
-    textField1: snippet.textField1,
-    textField2: snippet.textField2
+    textField1: snippet.textField1
   })
   const [savingField, setSavingField] = useState<EditableField | null>(null)
   const textField1Ref = useRef<HTMLTextAreaElement | null>(null)
-  const textField2Ref = useRef<HTMLTextAreaElement | null>(null)
   const [isCombining, setIsCombining] = useState(false)
   const [isImageLoading, setIsImageLoading] = useState(true)
   const [selectedImageModel, setSelectedImageModel] = useState<string>('imagen-4.0-fast-generate-001')
@@ -89,37 +86,17 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
   }, [snippet.textField1, activeField])
 
   useEffect(() => {
-    if (activeField === 'textField2') return
-
-    setDraftValues((prev) => {
-      if (prev.textField2 === snippet.textField2) {
-        return prev
-      }
-
-      return {
-        ...prev,
-        textField2: snippet.textField2
-      }
-    })
-  }, [snippet.textField2, activeField])
-
-  useEffect(() => {
     if (activeField === 'textField1') {
       const target = textField1Ref.current
-      target?.focus()
-      const length = target?.value.length ?? 0
-      target?.setSelectionRange(length, length)
-    } else if (activeField === 'textField2') {
-      const target = textField2Ref.current
       target?.focus()
       const length = target?.value.length ?? 0
       target?.setSelectionRange(length, length)
     }
   }, [activeField])
 
-  const commitField = useCallback(async (field: EditableField) => {
-    const newValue = draftValues[field]
-    const currentValue = field === 'textField1' ? snippet.textField1 : snippet.textField2
+  const commitField = useCallback(async (_field: EditableField) => {
+    const newValue = draftValues.textField1
+    const currentValue = snippet.textField1
 
     setActiveField(null)
 
@@ -127,21 +104,21 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
       return
     }
 
-    setSavingField(field)
+    setSavingField('textField1')
 
     try {
-      await onUpdateContent(snippet.id, { [field]: newValue })
+      await onUpdateContent(snippet.id, { textField1: newValue })
     } catch (error) {
       console.error('Failed to update snippet content:', error)
       toast.error('Failed to save snippet changes', 'Please try again')
       setDraftValues((prev) => ({
         ...prev,
-        [field]: currentValue
+        textField1: currentValue
       }))
     } finally {
       setSavingField(null)
     }
-  }, [draftValues, onUpdateContent, snippet.id, snippet.textField1, snippet.textField2, toast])
+  }, [draftValues, onUpdateContent, snippet.id, snippet.textField1, toast])
 
   const handleFieldActivate = useCallback(
     (field: EditableField) =>
@@ -159,10 +136,10 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
         setActiveField(field)
         setDraftValues((prev) => ({
           ...prev,
-          [field]: field === 'textField1' ? snippet.textField1 : snippet.textField2
+          textField1: snippet.textField1
         }))
       },
-    [activeField, commitField, snippet.textField1, snippet.textField2, isCombining]
+    [activeField, commitField, snippet.textField1, isCombining]
   )
 
   const handleDraftChange = useCallback(
@@ -191,7 +168,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
           event.preventDefault()
           setDraftValues((prev) => ({
             ...prev,
-            [field]: field === 'textField1' ? snippet.textField1 : snippet.textField2
+            textField1: snippet.textField1
           }))
           setActiveField(null)
           return
@@ -202,7 +179,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
           void commitField(field)
         }
       },
-    [commitField, snippet.textField1, snippet.textField2]
+    [commitField, snippet.textField1]
   )
 
   const handleSnippetClick = useCallback((e: React.MouseEvent) => {
@@ -258,17 +235,12 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
   const hasMultimodalSupport = selectedImageModel === 'gemini-2.5-flash-image'
   const tooManyImages = hasMultimodalSupport && connectedImagesCount > 3
 
-  const combinedText = `${snippet.textField1} ${snippet.textField2}`.trim()
-  const wordCount = countWords(combinedText)
+  const wordCount = countWords(snippet.textField1)
   const isLarge = wordCount > CANVAS_CONSTANTS.WORD_LIMIT
 
   const displayText1 = isLarge
-    ? truncateToWords(snippet.textField1, Math.floor(CANVAS_CONSTANTS.WORD_LIMIT * 0.6))
+    ? truncateToWords(snippet.textField1, CANVAS_CONSTANTS.WORD_LIMIT)
     : snippet.textField1
-
-  const displayText2 = isLarge
-    ? truncateToWords(snippet.textField2, Math.floor(CANVAS_CONSTANTS.WORD_LIMIT * 0.4))
-    : snippet.textField2
 
   const displayTitle = snippet.title && snippet.title.trim() !== ''
     ? snippet.title
@@ -358,34 +330,6 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
               style={POINTER_EVENTS_STYLES.interactive}
             >
               {(displayText1 && displayText1.trim() !== '') ? displayText1 : 'Input...'}
-            </button>
-          )}
-        </div>
-
-        {/* Text Field 2 - Always visible */}
-        <div className="min-h-[16px]">
-          {activeField === 'textField2' ? (
-            <textarea
-              ref={textField2Ref}
-              className="w-full text-xs text-gray-600 bg-white border border-blue-200 rounded-sm p-1 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
-              value={draftValues.textField2}
-              onChange={handleDraftChange('textField2')}
-              onBlur={handleBlur('textField2')}
-              onKeyDown={handleTextareaKeyDown('textField2')}
-              onClick={(event) => event.stopPropagation()}
-              onMouseDown={(event) => event.stopPropagation()}
-              rows={Math.min(6, Math.max(2, draftValues.textField2.split('\n').length))}
-              placeholder="Output..."
-              style={POINTER_EVENTS_STYLES.interactive}
-            />
-          ) : (
-            <button
-              type="button"
-              className="w-full text-left text-xs text-gray-600 break-words cursor-text bg-transparent border-none p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-1 focus-visible:ring-offset-white rounded-sm min-h-[16px]"
-              onClick={handleFieldActivate('textField2')}
-              style={POINTER_EVENTS_STYLES.interactive}
-            >
-                {(displayText2 && displayText2.trim() !== '') ? displayText2 : 'Output...'}
             </button>
           )}
         </div>

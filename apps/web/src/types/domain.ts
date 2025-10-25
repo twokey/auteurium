@@ -44,7 +44,6 @@ export interface Snippet {
   projectId: string
   title?: string
   textField1: string
-  textField2: string
   position?: Position | null
   tags?: string[]
   categories?: string[]
@@ -71,7 +70,6 @@ export interface SnippetVersion {
   id: string
   version: number
   textField1: string
-  textField2: string
   createdAt: string
 }
 
@@ -91,5 +89,4 @@ export interface GenerateContentResult {
   modelUsed: string
   generationTimeMs: number
 }
-
 

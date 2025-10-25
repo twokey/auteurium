@@ -46,7 +46,7 @@ export const useSnippetNodeActions = (): UseSnippetNodeActionsReturn => {
   // Handle combine
   const handleCombine = useCallback(
     async (onCombine: () => Promise<void>) => {
-      const confirmed = window.confirm('Combine this snippet with field2? This cannot be undone.')
+      const confirmed = window.confirm('Combine this snippet with its connected snippets? This cannot be undone.')
       if (!confirmed) return
 
       setIsCombining(true)
@@ -103,5 +103,4 @@ export const useSnippetNodeActions = (): UseSnippetNodeActionsReturn => {
     setIsImageLoading
   }
 }
-
 

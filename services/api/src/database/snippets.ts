@@ -67,7 +67,6 @@ const buildSnippet = (input: SnippetInput, userId: string, now: string): Snippet
   userId,
   title: input.title ?? 'New snippet',
   textField1: input.textField1 ?? '',
-  textField2: input.textField2 ?? '',
   position: input.position ?? { x: 0, y: 0 },
   tags: input.tags ?? [],
   categories: input.categories ?? [],
@@ -86,7 +85,6 @@ const createSnippetVersion = async (snippet: Snippet): Promise<void> => {
       version: snippet.version,
       title: snippet.title,
       textField1: snippet.textField1,
-      textField2: snippet.textField2,
       userId: snippet.userId,
       position: snippet.position,
       tags: snippet.tags,
@@ -254,7 +252,6 @@ const buildSnippetUpdate = (
 
   assignField('title', updates.title)
   assignField('textField1', updates.textField1)
-  assignField('textField2', updates.textField2)
   assignField('position', updates.position)
   assignField('tags', updates.tags)
   assignField('categories', updates.categories)
@@ -405,7 +402,6 @@ export const revertSnippetToVersion = async (
 
   const version = rawVersion as Record<string, unknown>
   const textField1 = typeof version.textField1 === 'string' ? version.textField1 : ''
-  const textField2 = typeof version.textField2 === 'string' ? version.textField2 : ''
   const position = toPosition(version.position)
   const tags = toStringArray(version.tags)
   const categories = toStringArray(version.categories)
@@ -415,7 +411,6 @@ export const revertSnippetToVersion = async (
     snippetId,
     {
       textField1,
-      textField2,
       position,
       tags,
       categories

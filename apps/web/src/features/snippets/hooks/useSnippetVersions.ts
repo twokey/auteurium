@@ -26,7 +26,6 @@ export const useSnippetVersions = (snippetId: string): UseSnippetVersionsReturn 
         id
         version
         textField1
-        textField2
         createdAt
       }
     }`,

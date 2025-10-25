@@ -15,8 +15,7 @@ test.describe('Project Canvas View', () => {
       {
         id: 'snippet-1',
         projectId: mockProject.id,
-        textField1: 'Act I',
-        textField2: 'Setup and exposition',
+        textField1: 'Act I – Setup and exposition',
         position: { x: 120, y: 180 },
         tags: ['setup', 'character'],
         categories: ['structure'],
@@ -37,8 +36,7 @@ test.describe('Project Canvas View', () => {
       {
         id: 'snippet-2',
         projectId: mockProject.id,
-        textField1: 'Act II',
-        textField2: 'Rising action',
+        textField1: 'Act II – Rising action',
         position: { x: 420, y: 320 },
         tags: ['conflict'],
         categories: ['structure'],

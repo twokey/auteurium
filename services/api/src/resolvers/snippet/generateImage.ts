@@ -36,7 +36,6 @@ interface SnippetRecord {
   projectId: string
   userId: string
   textField1: string
-  textField2: string
   title?: string
   tags?: string[]
   categories?: string[]

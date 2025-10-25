@@ -11,7 +11,6 @@ interface SnippetVersion {
   id: string
   version: number
   textField1: string
-  textField2: string
   createdAt: string
 }
 
@@ -26,7 +25,6 @@ interface VersionHistoryModalProps {
     id: string
     projectId: string
     textField1: string
-    textField2: string
     version: number
   }
 }
@@ -200,24 +198,13 @@ export const VersionHistoryModal = ({ isOpen, onClose, snippet }: VersionHistory
                 </div>
 
                 <div className="border-t border-gray-200 pt-4">
-                  <div className="mb-4">
+                  <div>
                     <p className="text-sm font-medium text-gray-700 mb-2">
-                      Text Field 1
+                      Content
                     </p>
                     <div className="bg-gray-50 rounded-md p-3 border border-gray-200 whitespace-pre-wrap break-words">
                       {selectedVersion.textField1 !== ''
                         ? selectedVersion.textField1
-                        : <span className="text-gray-400 italic">Empty</span>}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 mb-2">
-                      Text Field 2
-                    </p>
-                    <div className="bg-gray-50 rounded-md p-3 border border-gray-200 whitespace-pre-wrap break-words">
-                      {selectedVersion.textField2 !== ''
-                        ? selectedVersion.textField2
                         : <span className="text-gray-400 italic">Empty</span>}
                     </div>
                   </div>

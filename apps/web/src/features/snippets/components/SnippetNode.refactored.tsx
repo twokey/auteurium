@@ -6,7 +6,7 @@ import {
   SnippetNodeToolbar,
   SnippetNodeImage
 } from '.'
-import type { SnippetNodeProps } from '../../../types'
+import type { EditableField, SnippetNodeProps } from '../../../types'
 
 /**
  * SnippetNode - Refactored with extracted hooks and components
@@ -34,8 +34,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
 
   // Extract editing state
   const editing = useSnippetNodeEditing({
-    textField1: snippet.textField1,
-    textField2: snippet.textField2
+    textField1: snippet.textField1
   })
 
   // Extract actions
@@ -43,25 +42,25 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
 
   // Handle field blur with auto-save
   const handleFieldBlur = useCallback(
-    async (field: string, value: string) => {
-      if (value === snippet[field as keyof typeof snippet]) {
+    async (
+      field: EditableField,
+      value: string,
+      onSave: (field: EditableField, value: string) => Promise<void>
+    ) => {
+      if (value === snippet[field]) {
         editing.setActiveField(null)
         return
       }
 
-      editing.setSavingField(field as 'textField1' | 'textField2')
+      editing.setSavingField(field)
       try {
-        await actions.handleFieldSave(
-          field as 'textField1' | 'textField2',
-          value,
-          (changes) => onUpdateContent(snippet.id, changes)
-        )
+        await onSave(field, value)
       } finally {
         editing.setSavingField(null)
         editing.setActiveField(null)
       }
     },
-    [snippet, editing, actions, onUpdateContent]
+    [snippet, editing]
   )
 
   // Display title
@@ -94,11 +93,10 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
           draftValues={editing.draftValues}
           savingField={editing.savingField}
           textField1Ref={editing.textField1Ref}
-          textField2Ref={editing.textField2Ref}
           onFieldChange={(field, value) => editing.setDraftValue(field, value)}
           onFieldActivate={(field) => {
             editing.setActiveField(field)
-            editing.focusField(field)
+            editing.focusField()
           }}
           onFieldBlur={handleFieldBlur}
           onFieldSave={(field, value) =>

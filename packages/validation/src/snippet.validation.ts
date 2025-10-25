@@ -8,7 +8,6 @@ const positionSchema = z.object({
 export const createSnippetSchema = z.object({
   projectId: z.string().uuid(),
   textField1: z.string().max(50000).optional().default(''),
-  textField2: z.string().max(50000).optional().default(''),
   position: positionSchema,
   tags: z.array(z.string().min(1).max(50)).optional().default([]),
   categories: z.array(z.string().min(1).max(50)).optional().default([])
@@ -16,7 +15,6 @@ export const createSnippetSchema = z.object({
 
 export const updateSnippetSchema = z.object({
   textField1: z.string().max(50000).optional(),
-  textField2: z.string().max(50000).optional(),
   position: positionSchema.optional(),
   tags: z.array(z.string().min(1).max(50)).optional(),
   categories: z.array(z.string().min(1).max(50)).optional()

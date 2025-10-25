@@ -30,7 +30,6 @@ export interface BaseModalProps {
 
 export interface EditSnippetModalProps extends BaseModalProps {
   snippet: Snippet
-  onPreviewGeneratedSnippet: (payload: { sourceSnippetId: string; generatedText: string }) => void
 }
 
 export interface DeleteSnippetConfirmationProps extends BaseModalProps {
@@ -83,14 +82,13 @@ export interface CanvasInfoPanelProps {
 }
 
 // Snippet Node Types
-export type EditableField = 'textField1' | 'textField2'
+export type EditableField = 'textField1'
 
 export interface SnippetNodeData {
   snippet: {
     id: string
     title?: string
     textField1: string
-    textField2: string
     tags?: string[]
     categories?: string[]
     connectionCount: number
@@ -106,7 +104,7 @@ export interface SnippetNodeData {
   onDelete: (snippetId: string) => void
   onManageConnections: (snippetId: string) => void
   onViewVersions: (snippetId: string) => void
-  onUpdateContent: (snippetId: string, changes: Partial<Pick<Snippet, 'textField1' | 'textField2'>>) => Promise<void>
+  onUpdateContent: (snippetId: string, changes: Partial<Pick<Snippet, 'textField1'>>) => Promise<void>
   onCombine: (snippetId: string) => Promise<void>
   onGenerateImage: (snippetId: string, modelId?: string) => void
   isGeneratingImage: boolean
@@ -159,4 +157,3 @@ export interface UseGraphQLMutationResult<TData, TVariables> {
   error: Error | null
   reset: () => void
 }
-

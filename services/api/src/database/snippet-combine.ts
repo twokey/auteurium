@@ -144,7 +144,7 @@ const getAllRequiredSnippetIds = (branches: Branch[]): string[] => {
 }
 
 /**
- * Main function to combine connected snippets' textField2 values
+ * Main function to combine connected snippets' text values
  *
  * Algorithm:
  * 1. Get current snippet and all project connections
@@ -153,7 +153,7 @@ const getAllRequiredSnippetIds = (branches: Branch[]): string[] => {
  * 4. For each incoming connection, traverse to find root and build path
  * 5. Batch fetch all required snippets
  * 6. Sort branches by root creation time (oldest first)
- * 7. Concatenate all textField2 values in order, then append textField1
+ * 7. Concatenate all ancestor textField1 values in order, then append current textField1
  * 8. Update current snippet with combined text
  */
 export const combineSnippetConnectionsLogic = async (
@@ -270,10 +270,10 @@ export const combineSnippetConnectionsLogic = async (
 
   for (const branch of branchesWithCreatedAt) {
     // Add all snippets in the path (root → ... → last before current)
-    for (const snippetId of branch.path) {
-      const snippet = snippetMap.get(snippetId)
-      if (snippet && snippet.textField2.trim() !== '') {
-        textParts.push(snippet.textField2.trim())
+    for (const branchSnippetId of branch.path) {
+      const snippet = snippetMap.get(branchSnippetId)
+      if (snippet && snippet.textField1.trim() !== '') {
+        textParts.push(snippet.textField1.trim())
       }
     }
   }
@@ -295,7 +295,7 @@ export const combineSnippetConnectionsLogic = async (
   const updatedSnippet = await updateSnippet(
     projectId,
     snippetId,
-    { textField2: combinedText },
+    { textField1: combinedText },
     userId
   )
 

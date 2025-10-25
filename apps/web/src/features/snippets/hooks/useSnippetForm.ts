@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Snippet } from '../../../types'
 
-type EditableField = 'textField1' | 'textField2'
+type EditableField = 'textField1'
 
 export interface SnippetFormState {
   title: string
   textField1: string
-  textField2: string
   tags: string[]
   categories: string[]
   tagInput: string
@@ -18,50 +17,47 @@ export interface UseSnippetFormReturn {
   formState: SnippetFormState
   activeField: EditableField | null
   savingField: EditableField | null
-  
+
   // Field refs for focus management
   textField1Ref: React.MutableRefObject<HTMLTextAreaElement | null>
-  textField2Ref: React.MutableRefObject<HTMLTextAreaElement | null>
-  
+
   // Mutations
   setTitle: (title: string) => void
   setTextField1: (value: string) => void
-  setTextField2: (value: string) => void
   setTagInput: (value: string) => void
   setCategoryInput: (value: string) => void
-  
+
   // Tag/Category management
   addTag: () => void
   removeTag: (tag: string) => void
   addCategory: () => void
   removeCategory: (category: string) => void
-  
+
   // Field management
   handleFieldActivate: (field: EditableField) => void
   handleFieldBlur: (field: EditableField) => void
   setActiveField: (field: EditableField | null) => void
   setSavingField: (field: EditableField | null) => void
-  
+
   // Focus management
-  focusField: (field: EditableField) => void
+  focusField: () => void
 }
 
 /**
  * useSnippetForm - Manage snippet form state and interactions
  * Handles: form fields, tags, categories, field activation/blur, autosave
- * 
+ *
  * @param snippet - Initial snippet data
  * @param onFieldSave - Callback when a field is saved (for autosave)
  */
 export const useSnippetForm = (
-  snippet: Pick<Snippet, 'title' | 'textField1' | 'textField2' | 'tags' | 'categories'>,
+  snippet: Pick<Snippet, 'title' | 'textField1' | 'tags' | 'categories'>,
   onFieldSave?: (field: EditableField, value: string) => Promise<void>
 ): UseSnippetFormReturn => {
   // Form state
   const [formState, setFormState] = useState<SnippetFormState>({
     title: snippet.title && snippet.title.trim() !== '' ? snippet.title : 'New snippet',
     textField1: snippet.textField1 ?? '',
-    textField2: snippet.textField2 ?? '',
     tags: snippet.tags ?? [],
     categories: snippet.categories ?? [],
     tagInput: '',
@@ -74,10 +70,8 @@ export const useSnippetForm = (
 
   // Refs
   const textField1Ref = useRef<HTMLTextAreaElement | null>(null)
-  const textField2Ref = useRef<HTMLTextAreaElement | null>(null)
   const lastSavedValuesRef = useRef({
-    textField1: snippet.textField1 ?? '',
-    textField2: snippet.textField2 ?? ''
+    textField1: snippet.textField1 ?? ''
   })
 
   // Reset form when snippet changes
@@ -86,7 +80,6 @@ export const useSnippetForm = (
     setFormState({
       title: nextTitle,
       textField1: snippet.textField1 ?? '',
-      textField2: snippet.textField2 ?? '',
       tags: snippet.tags ?? [],
       categories: snippet.categories ?? [],
       tagInput: '',
@@ -95,8 +88,7 @@ export const useSnippetForm = (
     setActiveField(null)
     setSavingField(null)
     lastSavedValuesRef.current = {
-      textField1: snippet.textField1 ?? '',
-      textField2: snippet.textField2 ?? ''
+      textField1: snippet.textField1 ?? ''
     }
   }, [snippet])
 
@@ -107,10 +99,6 @@ export const useSnippetForm = (
 
   const setTextField1 = useCallback((value: string) => {
     setFormState(prev => ({ ...prev, textField1: value }))
-  }, [])
-
-  const setTextField2 = useCallback((value: string) => {
-    setFormState(prev => ({ ...prev, textField2: value }))
   }, [])
 
   const setTagInput = useCallback((value: string) => {
@@ -160,8 +148,8 @@ export const useSnippetForm = (
   }, [])
 
   // Field focus management for autosave
-  const focusField = useCallback((field: EditableField) => {
-    const target = field === 'textField1' ? textField1Ref.current : textField2Ref.current
+  const focusField = useCallback(() => {
+    const target = textField1Ref.current
     if (target) {
       const length = target.value.length
       target.focus()
@@ -173,14 +161,14 @@ export const useSnippetForm = (
   const handleFieldActivate = useCallback((field: EditableField) => {
     if (savingField === field || activeField === field) return
     setActiveField(field)
-    focusField(field)
+    focusField()
   }, [activeField, savingField, focusField])
 
   // Handle field blur with autosave
   const handleFieldBlur = useCallback(async (field: EditableField) => {
     setActiveField(current => (current === field ? null : current))
 
-    const currentValue = field === 'textField1' ? formState.textField1 : formState.textField2
+    const currentValue = formState.textField1
     const lastSavedValue = lastSavedValuesRef.current[field]
 
     if (currentValue === lastSavedValue || !onFieldSave) {
@@ -194,25 +182,19 @@ export const useSnippetForm = (
     } catch (error) {
       console.error('Failed to save field:', error)
       // Revert to last saved value
-      if (field === 'textField1') {
-        setTextField1(lastSavedValue)
-      } else {
-        setTextField2(lastSavedValue)
-      }
+      setTextField1(lastSavedValue)
     } finally {
       setSavingField(null)
     }
-  }, [formState.textField1, formState.textField2, onFieldSave, setTextField1, setTextField2])
+  }, [formState.textField1, onFieldSave, setTextField1])
 
   return {
     formState,
     activeField,
     savingField,
     textField1Ref,
-    textField2Ref,
     setTitle,
     setTextField1,
-    setTextField2,
     setTagInput,
     setCategoryInput,
     addTag,

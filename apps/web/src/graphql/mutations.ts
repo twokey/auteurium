@@ -39,7 +39,6 @@ export const CREATE_SNIPPET = /* GraphQL */ `
       projectId
       title
       textField1
-      textField2
       position {
         x
         y
@@ -60,7 +59,6 @@ export const UPDATE_SNIPPET = /* GraphQL */ `
       projectId
       title
       textField1
-      textField2
       position {
         x
         y
@@ -87,28 +85,6 @@ export const REVERT_SNIPPET = /* GraphQL */ `
       projectId
       title
       textField1
-      textField2
-      position {
-        x
-        y
-      }
-      tags
-      categories
-      version
-      createdAt
-      updatedAt
-    }
-  }
-`
-
-export const COMBINE_SNIPPET_CONNECTIONS = /* GraphQL */ `
-  mutation CombineSnippetConnections($projectId: ID!, $snippetId: ID!) {
-    combineSnippetConnections(projectId: $projectId, snippetId: $snippetId) {
-      id
-      projectId
-      title
-      textField1
-      textField2
       position {
         x
         y
@@ -129,7 +105,33 @@ export const GENERATE_SNIPPET_IMAGE = /* GraphQL */ `
       projectId
       title
       textField1
-      textField2
+      position {
+        x
+        y
+      }
+      tags
+      categories
+      version
+      createdAt
+      updatedAt
+      imageUrl
+      imageS3Key
+      imageMetadata {
+        width
+        height
+        aspectRatio
+      }
+    }
+  }
+`
+
+export const COMBINE_SNIPPET_CONNECTIONS = /* GraphQL */ `
+  mutation CombineSnippetConnections($projectId: ID!, $snippetId: ID!) {
+    combineSnippetConnections(projectId: $projectId, snippetId: $snippetId) {
+      id
+      projectId
+      title
+      textField1
       position {
         x
         y

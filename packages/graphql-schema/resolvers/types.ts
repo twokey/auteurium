@@ -78,7 +78,6 @@ export type CreateSnippetInput = {
   projectId: Scalars['ID']['input'];
   tags?: InputMaybe<Array<Scalars['String']['input']>>;
   textField1?: InputMaybe<Scalars['String']['input']>;
-  textField2?: InputMaybe<Scalars['String']['input']>;
   title?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -420,7 +419,6 @@ export type Snippet = {
   projectId: Scalars['ID']['output'];
   tags: Array<Scalars['String']['output']>;
   textField1: Scalars['String']['output'];
-  textField2: Scalars['String']['output'];
   title?: Maybe<Scalars['String']['output']>;
   updatedAt: Scalars['String']['output'];
   userId: Scalars['ID']['output'];
@@ -440,7 +438,6 @@ export type SnippetVersion = {
   id: Scalars['ID']['output'];
   snippetId: Scalars['ID']['output'];
   textField1: Scalars['String']['output'];
-  textField2: Scalars['String']['output'];
   title?: Maybe<Scalars['String']['output']>;
   version: Scalars['Int']['output'];
 };
@@ -477,7 +474,6 @@ export type UpdateSnippetInput = {
   position?: InputMaybe<PositionInput>;
   tags?: InputMaybe<Array<Scalars['String']['input']>>;
   textField1?: InputMaybe<Scalars['String']['input']>;
-  textField2?: InputMaybe<Scalars['String']['input']>;
   title?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -798,7 +794,6 @@ export type SnippetResolvers<ContextType = GraphQLContext, ParentType extends Re
   projectId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   tags?: Resolver<Array<ResolversTypes['String']>, ParentType, ContextType>;
   textField1?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
-  textField2?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   title?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   updatedAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   userId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
@@ -816,7 +811,6 @@ export type SnippetVersionResolvers<ContextType = GraphQLContext, ParentType ext
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   snippetId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   textField1?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
-  textField2?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   title?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   version?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
 }>;

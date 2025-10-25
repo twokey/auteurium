@@ -101,7 +101,6 @@ export interface CreateSnippetInput {
   projectId: string
   title?: string
   textField1: string
-  textField2: string
   position?: Position
   tags?: string[]
   categories?: string[]
@@ -114,7 +113,6 @@ export interface CreateSnippetVariables {
 export interface UpdateSnippetInput {
   title?: string
   textField1?: string
-  textField2?: string
   position?: Position
   tags?: string[]
   categories?: string[]
@@ -252,5 +250,4 @@ export interface GenerationStreamEvent {
 export interface GenerationStreamSubscriptionData {
   onGenerationStream: GenerationStreamEvent | null
 }
-
 

@@ -2,13 +2,13 @@ import { type Snippet } from '@auteurium/shared-types'
 import { z } from 'zod'
 
 import { getProjectById } from '../../database/projects'
-import { combineSnippetConnectionsLogic } from '../../database/snippet-combine'
 import {
   createSnippet,
   deleteSnippet,
   revertSnippetToVersion,
   updateSnippet
 } from '../../database/snippets'
+import { combineSnippetConnectionsLogic } from '../../database/snippet-combine'
 import { requireAuth, requireOwnership, validateInput } from '../../middleware/validation'
 import { createNotFoundError } from '../../utils/errors'
 import { withSignedImageUrl, withSignedImageUrls } from '../../utils/snippetImages'
@@ -21,7 +21,6 @@ const createSnippetSchema = z.object({
     projectId: z.string(),
     title: z.string().optional().default('New snippet'),
     textField1: z.string().optional().default(''),
-    textField2: z.string().optional().default(''),
     position: z.object({
       x: z.number(),
       y: z.number()
@@ -37,7 +36,6 @@ const updateSnippetSchema = z.object({
   input: z.object({
     title: z.string().optional(),
     textField1: z.string().optional(),
-    textField2: z.string().optional(),
     position: z.object({
       x: z.number(),
       y: z.number()
@@ -206,7 +204,7 @@ export const snippetMutations = {
     return await withSignedImageUrls(updatedSnippets, context.logger)
   },
 
-  // Combine connected snippets' textField2 values
+  // Combine connected snippets' content into the current snippet
   combineSnippetConnections: async (
     _parent: unknown,
     args: unknown,
@@ -241,7 +239,7 @@ export const snippetMutations = {
       projectId,
       snippetId,
       userId: user.id,
-      newTextLength: updatedSnippet.textField2.length
+      newTextLength: updatedSnippet.textField1.length
     })
 
     return await withSignedImageUrl(updatedSnippet, context.logger)

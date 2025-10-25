@@ -14,14 +14,12 @@ import type { Snippet } from '../../../types'
 
 interface CanvasModalsProps {
   snippets: Snippet[]
-  onPreviewGeneratedSnippet: (payload: { sourceSnippetId: string; generatedText: string }) => void
   onCreateGeneratedSnippet: () => Promise<void>
   refetch: () => Promise<void>
 }
 
 export const CanvasModals = ({
   snippets,
-  onPreviewGeneratedSnippet,
   onCreateGeneratedSnippet,
   refetch
 }: CanvasModalsProps) => {
@@ -64,7 +62,6 @@ export const CanvasModals = ({
           onClose={() => {
             closeEditSnippet()
           }}
-          onPreviewGeneratedSnippet={onPreviewGeneratedSnippet}
           onSave={refetch}
           snippet={currentEditSnippet}
         />
@@ -111,4 +108,3 @@ export const CanvasModals = ({
     </>
   )
 }
-

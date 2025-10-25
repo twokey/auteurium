@@ -98,7 +98,8 @@ const Canvas = () => {
     snippets,
     updateSnippetMutation: handlers.updateSnippetMutation,
     createConnectionMutation: handlers.createConnectionMutation,
-    deleteConnectionMutation: handlers.deleteConnectionMutation
+    deleteConnectionMutation: handlers.deleteConnectionMutation,
+    refetch
   })
 
   // Update the ref with the actual setNodes function
@@ -248,7 +249,6 @@ const Canvas = () => {
       {/* All Modals - Now managed centrally */}
       <CanvasModals
         snippets={snippets}
-        onPreviewGeneratedSnippet={handlers.handlePreviewGeneratedSnippet}
         onCreateGeneratedSnippet={handlers.handleCreateGeneratedSnippet}
         refetch={refetch}
       />

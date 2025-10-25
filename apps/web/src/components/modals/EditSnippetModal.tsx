@@ -6,19 +6,17 @@ import { useGenAI } from '../../hooks/useGenAI'
 import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
 import { useToast } from '../../shared/store/toastStore'
 
-type EditableField = 'textField1' | 'textField2'
+type EditableField = 'textField1'
 
 interface EditSnippetModalProps {
   isOpen: boolean
   onClose: () => void
-  onPreviewGeneratedSnippet: (payload: { sourceSnippetId: string; generatedText: string }) => void
   onSave?: () => Promise<void>
   snippet: {
     id: string
     projectId: string
     title?: string
     textField1: string
-    textField2: string
     tags?: string[]
     categories?: string[]
     imageUrl?: string | null
@@ -31,26 +29,22 @@ interface EditSnippetModalProps {
   }
 }
 
-export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, onSave, snippet }: EditSnippetModalProps) => {
+export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnippetModalProps) => {
   const toast = useToast()
   const normalisedTitle = snippet.title && snippet.title.trim() !== '' ? snippet.title : 'New snippet'
   const [title, setTitle] = useState(normalisedTitle)
   const [textField1, setTextField1] = useState(snippet.textField1 ?? '')
-  const [textField2, setTextField2] = useState(snippet.textField2 ?? '')
   const [tags, setTags] = useState<string[]>(snippet.tags ?? [])
   const [categories, setCategories] = useState<string[]>(snippet.categories ?? [])
   const [tagInput, setTagInput] = useState('')
   const [categoryInput, setCategoryInput] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [selectedModelPrimary, setSelectedModelPrimary] = useState('')
-  const [selectedModelSecondary, setSelectedModelSecondary] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
   const [isCombining, setIsCombining] = useState(false)
   const [isGeneratingImage, setIsGeneratingImage] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamError, setStreamError] = useState<string | null>(null)
-  const [isGeneratingSecondary, setIsGeneratingSecondary] = useState(false)
-  const [secondaryStreamError, setSecondaryStreamError] = useState<string | null>(null)
   const [isGeneratingPrimary, setIsGeneratingPrimary] = useState(false)
   const [activeField, setActiveField] = useState<EditableField | null>(null)
   const [savingField, setSavingField] = useState<EditableField | null>(null)
@@ -68,10 +62,8 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, o
   const streamSubscriptionRef = useRef<{ unsubscribe: () => void } | null>(null)
   const assistantContentRef = useRef<string>('')
   const textField1Ref = useRef<HTMLTextAreaElement | null>(null)
-  const textField2Ref = useRef<HTMLTextAreaElement | null>(null)
   const lastSavedValuesRef = useRef({
-    textField1: snippet.textField1 ?? '',
-    textField2: snippet.textField2 ?? ''
+    textField1: snippet.textField1 ?? ''
   })
 
   // Reset form when snippet changes
@@ -79,31 +71,26 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, o
     const nextTitle = snippet.title && snippet.title.trim() !== '' ? snippet.title : 'New snippet'
     setTitle(nextTitle)
     setTextField1(snippet.textField1 ?? '')
-    setTextField2(snippet.textField2 ?? '')
     setTags(snippet.tags ?? [])
     setCategories(snippet.categories ?? [])
     setTagInput('')
     setCategoryInput('')
     setSelectedModelPrimary('')
-    setSelectedModelSecondary('')
     setIsDeleting(false)
     setStreamError(null)
     setIsStreaming(false)
-    setIsGeneratingSecondary(false)
-    setSecondaryStreamError(null)
     setIsGeneratingPrimary(false)
     setActiveField(null)
     setSavingField(null)
     lastSavedValuesRef.current = {
-      textField1: snippet.textField1 ?? '',
-      textField2: snippet.textField2 ?? ''
+      textField1: snippet.textField1 ?? ''
     }
 
     if (streamSubscriptionRef.current) {
       streamSubscriptionRef.current.unsubscribe()
       streamSubscriptionRef.current = null
     }
-    assistantContentRef.current = snippet.textField2 ?? ''
+    assistantContentRef.current = snippet.textField1 ?? ''
   }, [snippet])
 
   useEffect(() => {
@@ -120,10 +107,7 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, o
     if (!selectedModelPrimary && models.length > 0) {
       setSelectedModelPrimary(models[0].id)
     }
-    if (!selectedModelSecondary && models.length > 0) {
-      setSelectedModelSecondary(models[0].id)
-    }
-  }, [isOpen, models, selectedModelPrimary, selectedModelSecondary])
+  }, [isOpen, models, selectedModelPrimary])
 
   useEffect(() => () => {
     if (streamSubscriptionRef.current) {
@@ -135,13 +119,6 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, o
   useEffect(() => {
     if (activeField === 'textField1') {
       const target = textField1Ref.current
-      if (target) {
-        const length = target.value.length
-        target.focus()
-        target.setSelectionRange(length, length)
-      }
-    } else if (activeField === 'textField2') {
-      const target = textField2Ref.current
       if (target) {
         const length = target.value.length
         target.focus()
@@ -187,7 +164,6 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, o
           input: {
             title: trimmedTitle === '' ? undefined : trimmedTitle,
             textField1,
-            textField2,
             tags,
             categories
           }
@@ -206,7 +182,7 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, o
     } finally {
       setIsSaving(false)
     }
-  }, [snippet.id, snippet.projectId, title, textField1, textField2, tags, categories, updateSnippetMutation, onSave, onClose, toast])
+  }, [snippet.id, snippet.projectId, title, textField1, tags, categories, updateSnippetMutation, onSave, onClose, toast])
 
   const handleAddTag = useCallback(() => {
     const trimmedTag = tagInput.trim()
@@ -280,18 +256,18 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, o
 
             if (event.snippetId !== snippet.id) return
 
-            if (event.content) {
-              assistantContentRef.current += event.content
-              setTextField2(assistantContentRef.current)
-            }
+          if (event.content) {
+            assistantContentRef.current += event.content
+            setTextField1(assistantContentRef.current)
+          }
 
-            if (event.isComplete) {
-              setTextField2(assistantContentRef.current)
-              setIsStreaming(false)
-              if (streamSubscriptionRef.current) {
-                streamSubscriptionRef.current.unsubscribe()
-                streamSubscriptionRef.current = null
-              }
+          if (event.isComplete) {
+            setTextField1(assistantContentRef.current)
+            setIsStreaming(false)
+            if (streamSubscriptionRef.current) {
+              streamSubscriptionRef.current.unsubscribe()
+              streamSubscriptionRef.current = null
+            }
             }
           },
           onError: (error) => {
@@ -337,7 +313,7 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, o
       }
 
       assistantContentRef.current = generation.content
-      setTextField2(generation.content)
+      setTextField1(generation.content)
     } catch (error) {
       console.error('Failed to generate content:', error)
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -360,58 +336,6 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, o
     streamingFallbackReason,
     subscribeToGenerationStream,
     textField1,
-    toast
-  ])
-
-  const handleGenerateSnippetFromField2 = useCallback(async () => {
-    if (!selectedModelSecondary) {
-      toast.warning('Please select an LLM model before generating')
-      return
-    }
-
-    const trimmedPrompt = textField2.trim()
-    if (trimmedPrompt === '') {
-      toast.warning('Please provide input in Text Field 2 to send to the model')
-      return
-    }
-
-    setIsGeneratingSecondary(true)
-    setSecondaryStreamError(null)
-
-    try {
-      const { result, fallbackReason } = await generateStream(
-        snippet.projectId,
-        snippet.id,
-        selectedModelSecondary,
-        textField2
-      )
-
-      if (!result || result.content.trim() === '') {
-        toast.warning('The selected model did not return any content', 'Please try again or choose another model')
-        return
-      }
-
-      setSecondaryStreamError(fallbackReason ?? null)
-
-      onPreviewGeneratedSnippet({
-        sourceSnippetId: snippet.id,
-        generatedText: result.content
-      })
-    } catch (error) {
-      console.error('Failed to generate snippet from Text Field 2:', error)
-      const message = error instanceof Error ? error.message : 'Unknown error'
-      setSecondaryStreamError(message)
-      toast.error('Failed to generate snippet', message)
-    } finally {
-      setIsGeneratingSecondary(false)
-    }
-  }, [
-    generateStream,
-    onPreviewGeneratedSnippet,
-    selectedModelSecondary,
-    snippet.id,
-    snippet.projectId,
-    textField2,
     toast
   ])
 
@@ -467,8 +391,8 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, o
         throw new Error('No data returned from combine operation')
       }
 
-      // Update local state with new textField2
-      setTextField2(updatedSnippet.textField2)
+      // Update local state with new text content
+      setTextField1(updatedSnippet.textField1)
 
       toast.success('Successfully combined connected snippets!')
     } catch (error) {
@@ -508,18 +432,14 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, o
       return
     }
 
-    if (field === 'textField2' && (savingField === 'textField2' || isPrimaryBusy || isGeneratingSecondary)) {
-      return
-    }
-
     setActiveField(field)
-  }, [isSaving, isDeleting, isPrimaryBusy, isGeneratingSecondary, savingField])
+  }, [isSaving, isDeleting, isPrimaryBusy, savingField])
 
   const handleFieldBlur = useCallback(async (field: EditableField) => {
     setActiveField((current) => (current === field ? null : current))
 
-    const currentValue = field === 'textField1' ? textField1 : textField2
-    const lastSavedValue = lastSavedValuesRef.current[field]
+    const currentValue = textField1
+    const lastSavedValue = lastSavedValuesRef.current.textField1
 
     if (currentValue === lastSavedValue) {
       return
@@ -533,29 +453,25 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, o
           projectId: snippet.projectId,
           id: snippet.id,
           input: {
-            [field]: currentValue
+            textField1: currentValue
           }
         }
       })
 
       lastSavedValuesRef.current = {
         ...lastSavedValuesRef.current,
-        [field]: currentValue
+        textField1: currentValue
       }
     } catch (error) {
       console.error('Failed to save snippet field:', error)
       toast.error('Failed to save changes', 'Please try again')
 
-      const previousValue = lastSavedValuesRef.current[field]
-      if (field === 'textField1') {
-        setTextField1(previousValue)
-      } else {
-        setTextField2(previousValue)
-      }
+      const previousValue = lastSavedValuesRef.current.textField1
+      setTextField1(previousValue)
     } finally {
       setSavingField(null)
     }
-  }, [snippet.projectId, snippet.id, textField1, textField2, updateSnippetMutation, toast])
+  }, [snippet.projectId, snippet.id, textField1, updateSnippetMutation, toast])
 
   if (!isOpen) return null
 
@@ -717,118 +633,8 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, o
               <p className="text-sm text-gray-500">No models available. Please contact your administrator.</p>
             )}
 
-            {/* Text Field 2 */}
-            <div>
-              <label htmlFor="textField2" className="block text-sm font-medium text-gray-700 mb-1">
-                Text Field 2
-              </label>
-              <textarea
-                id="textField2"
-                ref={textField2Ref}
-                value={textField2}
-                onChange={(e) => setTextField2(e.target.value)}
-                onClick={() => {
-                  handleFieldActivate('textField2')
-                }}
-                onFocus={() => {
-                  handleFieldActivate('textField2')
-                }}
-                onBlur={() => {
-                  void handleFieldBlur('textField2')
-                }}
-                readOnly={activeField !== 'textField2'}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y overflow-auto ${
-                  activeField === 'textField2' ? '' : 'cursor-text'
-                }`}
-                rows={6}
-                placeholder="Enter text for field 2... or use Generate to get AI-generated content"
-              />
-              {savingField === 'textField2' && (
-                <p className="text-xs text-gray-500 mt-1">Saving changes…</p>
-              )}
-              {streamError && (
-                <p className="text-sm text-red-600 mt-2">{streamError}</p>
-              )}
-            </div>
-            <div className="flex items-end gap-3">
-              <div className="flex-1 min-w-[200px]">
-                <label htmlFor="llmModelSecondary" className="block text-sm font-medium text-gray-700 mb-1">
-                  LLM Model 2
-                </label>
-                <select
-                  id="llmModelSecondary"
-                  value={selectedModelSecondary}
-                  onChange={(e) => setSelectedModelSecondary(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  disabled={isSaving || isDeleting || isGeneratingSecondary || isLoadingModels}
-                >
-                  <option value="" disabled>
-                    {isLoadingModels ? 'Loading models...' : 'Select a model...'}
-                  </option>
-                  {models.map((model) => (
-                    <option key={model.id} value={model.id} title={model.description ?? undefined}>
-                      {model.displayName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <button
-                onClick={() => {
-                  void handleGenerateSnippetFromField2()
-                }}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:bg-green-400 flex items-center gap-2"
-                disabled={
-                  isSaving ||
-                  isDeleting ||
-                  isGeneratingSecondary ||
-                  !selectedModelSecondary ||
-                  textField2.trim() === '' ||
-                  isLoadingModels
-                }
-              >
-                {isGeneratingSecondary && (
-                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                )}
-                {isGeneratingSecondary ? 'Generating...' : 'Generate Snippet'}
-              </button>
-              <button
-                onClick={() => {
-                  void handleCombine()
-                }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-blue-400 flex items-center gap-2"
-                disabled={isSaving || isDeleting || isCombining}
-              >
-                {isCombining && (
-                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                )}
-                {isCombining ? 'Combining...' : 'Combine'}
-              </button>
-              <button
-                onClick={() => {
-                  void handleGenerateImage()
-                }}
-                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors disabled:bg-purple-400 flex items-center gap-2"
-                disabled={isSaving || isDeleting || isGeneratingImage || !textField1.trim()}
-              >
-                {isGeneratingImage && (
-                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                )}
-                {isGeneratingImage ? 'Generating...' : 'Image'}
-              </button>
-            </div>
-            {secondaryStreamError && (
-              <p className="text-sm text-red-600 mt-2">
-                {secondaryStreamError}
-              </p>
+            {streamError && (
+              <p className="text-sm text-red-600 mt-2">{streamError}</p>
             )}
 
             {/* Tags */}
@@ -955,7 +761,7 @@ export const EditSnippetModal = ({ isOpen, onClose, onPreviewGeneratedSnippet, o
               void handleDelete()
             }}
             className="px-4 py-2 text-red-700 bg-red-100 rounded-md hover:bg-red-200 transition-colors disabled:bg-red-50 disabled:text-red-300"
-            disabled={isSaving || isDeleting || isPrimaryBusy || isGeneratingSecondary}
+            disabled={isSaving || isDeleting || isPrimaryBusy}
           >
             {isDeleting ? 'Deleting...' : 'Delete'}
           </button>

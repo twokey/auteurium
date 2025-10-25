@@ -31,7 +31,7 @@ import type {
   CombineSnippetConnectionsMutationData
 } from '../../../types'
 
-type SnippetContentChanges = Partial<Pick<Snippet, 'textField1' | 'textField2'>>
+type SnippetContentChanges = Partial<Pick<Snippet, 'textField1'>>
 
 export interface UseCanvasHandlersProps {
   projectId: string | undefined
@@ -60,8 +60,6 @@ export interface UseCanvasHandlersResult {
   deleteConnectionMutation: ReturnType<typeof useGraphQLMutation<any, DeleteConnectionVariables>>['mutate']
 
   // Generated Snippet Handlers
-  handlePreviewGeneratedSnippet: (payload: { sourceSnippetId: string; generatedText: string }) => void
-  handleCancelGeneratedSnippet: () => void
   handleCreateGeneratedSnippet: () => Promise<void>
 }
 
@@ -74,15 +72,14 @@ export function useCanvasHandlers({
   const toast = useToast()
   const {
     openEditSnippet,
-    openDeleteSnippet,
-    openManageConnections,
-    openVersionHistory,
-    openGeneratedSnippetPreview,
-    closeGeneratedSnippetPreview,
-    closeEditSnippet,
-    generatedSnippetPreview,
-    setGeneratedSnippetCreating
-  } = useModalStore()
+  openDeleteSnippet,
+  openManageConnections,
+  openVersionHistory,
+  closeGeneratedSnippetPreview,
+  closeEditSnippet,
+  generatedSnippetPreview,
+  setGeneratedSnippetCreating
+} = useModalStore()
 
   const { setLoading, setGeneratingImage } = useCanvasStore()
   const {
@@ -191,11 +188,6 @@ export function useCanvasHandlers({
       previousValues.textField1 = snippetBeforeUpdate.textField1
     }
 
-    if (Object.prototype.hasOwnProperty.call(changes, 'textField2')) {
-      updateInput.textField2 = changes.textField2 ?? ''
-      previousValues.textField2 = snippetBeforeUpdate.textField2
-    }
-
     if (Object.keys(updateInput).length === 0) {
       return
     }
@@ -287,7 +279,6 @@ export function useCanvasHandlers({
                   snippet: {
                     ...node.data.snippet,
                     textField1: updatedSnippet.textField1,
-                    textField2: updatedSnippet.textField2,
                     connectionCount: node.data.snippet.connectionCount
                   }
                 }
@@ -354,7 +345,6 @@ export function useCanvasHandlers({
       projectId,
       title: 'New snippet',
       textField1: '',
-      textField2: '',
       position,
       tags: [],
       categories: [],
@@ -370,7 +360,6 @@ export function useCanvasHandlers({
         projectId,
         title: 'New snippet',
         textField1: '',
-        textField2: '',
         position,
         tags: [],
         categories: []
@@ -402,14 +391,6 @@ export function useCanvasHandlers({
   }, [setLoading])
 
   // Generated Snippet Handlers
-  const handlePreviewGeneratedSnippet = useCallback((payload: { sourceSnippetId: string; generatedText: string }) => {
-    openGeneratedSnippetPreview(payload.sourceSnippetId, payload.generatedText)
-  }, [openGeneratedSnippetPreview])
-
-  const handleCancelGeneratedSnippet = useCallback(() => {
-    closeGeneratedSnippetPreview()
-  }, [closeGeneratedSnippetPreview])
-
   const handleCreateGeneratedSnippet = useCallback(async () => {
     if (!generatedSnippetPreview.isOpen || !generatedSnippetPreview.sourceSnippetId) {
       return
@@ -438,7 +419,6 @@ export function useCanvasHandlers({
       projectId,
       title: 'Generated snippet',
       textField1: generatedSnippetPreview.content,
-      textField2: '',
       position: targetPosition,
       tags: [],
       categories: [],
@@ -461,7 +441,6 @@ export function useCanvasHandlers({
             projectId,
             title: 'Generated snippet',
             textField1: generatedSnippetPreview.content,
-            textField2: '',
             position: targetPosition,
             tags: [],
             categories: []
@@ -535,9 +514,6 @@ export function useCanvasHandlers({
     deleteConnectionMutation,
 
     // Generated Snippet Handlers
-    handlePreviewGeneratedSnippet,
-    handleCancelGeneratedSnippet,
     handleCreateGeneratedSnippet
   }
 }
-

@@ -38,7 +38,6 @@ export const GET_PROJECT = /* GraphQL */ `
       snippets {
         id
         textField1
-        textField2
         position {
           x
           y
@@ -74,7 +73,6 @@ export const GET_PROJECT_WITH_SNIPPETS = /* GraphQL */ `
         projectId
         title
         textField1
-        textField2
         position {
           x
           y
@@ -118,7 +116,6 @@ export const GET_SNIPPET = /* GraphQL */ `
       id
       projectId
       textField1
-      textField2
       position {
         x
         y
@@ -139,7 +136,6 @@ export const GET_SNIPPET = /* GraphQL */ `
         id
         version
         textField1
-        textField2
         createdAt
       }
     }
@@ -152,7 +148,6 @@ export const GET_SNIPPET_VERSIONS = /* GraphQL */ `
       id
       version
       textField1
-      textField2
       createdAt
     }
   }

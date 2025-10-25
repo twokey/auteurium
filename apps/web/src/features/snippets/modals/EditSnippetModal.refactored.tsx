@@ -67,22 +67,11 @@ export const EditSnippetModal = ({
         </div>
 
         <div>
-          <label className="block text-sm text-gray-700 mb-2">Field 1</label>
+          <label className="block text-sm text-gray-700 mb-2">Content</label>
           <textarea
             ref={form.textField1Ref}
             value={form.formState.textField1}
             onChange={(e) => form.setTextField1(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
-            rows={4}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm text-gray-700 mb-2">Field 2</label>
-          <textarea
-            ref={form.textField2Ref}
-            value={form.formState.textField2}
-            onChange={(e) => form.setTextField2(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md"
             rows={4}
           />

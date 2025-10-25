@@ -15,7 +15,6 @@ export interface Snippet {
   userId: string
   title?: string
   textField1: string
-  textField2: string
   position: Position
   tags: string[]
   categories: string[]
@@ -34,7 +33,6 @@ export interface SnippetVersion {
   version: number
   title?: string
   textField1: string
-  textField2: string
   position?: Position
   tags?: string[]
   categories?: string[]
@@ -46,7 +44,6 @@ export interface SnippetInput {
   projectId: string
   title?: string
   textField1?: string
-  textField2?: string
   position?: Position
   tags?: string[]
   categories?: string[]
@@ -55,7 +52,6 @@ export interface SnippetInput {
 export interface UpdateSnippetInput {
   title?: string
   textField1?: string
-  textField2?: string
   position?: Position
   tags?: string[]
   categories?: string[]

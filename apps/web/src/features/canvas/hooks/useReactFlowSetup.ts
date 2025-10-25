@@ -47,7 +47,6 @@ const haveNodesChanged = (
       if (
         previousSnippet.title !== nextSnippet.title ||
         previousSnippet.textField1 !== nextSnippet.textField1 ||
-        previousSnippet.textField2 !== nextSnippet.textField2 ||
         previousSnippet.connectionCount !== nextSnippet.connectionCount ||
         previousSnippet.imageUrl !== nextSnippet.imageUrl ||
         previousSnippet.imageS3Key !== nextSnippet.imageS3Key
@@ -95,6 +94,7 @@ export interface UseReactFlowSetupProps {
   updateSnippetMutation: any
   createConnectionMutation: UseGraphQLMutationResult<any, CreateConnectionVariables>['mutate']
   deleteConnectionMutation: UseGraphQLMutationResult<any, DeleteConnectionVariables>['mutate']
+  refetch: () => Promise<void>
 }
 
 export interface UseReactFlowSetupResult {
@@ -119,7 +119,8 @@ export function useReactFlowSetup({
   snippets,
   updateSnippetMutation,
   createConnectionMutation,
-  deleteConnectionMutation
+  deleteConnectionMutation,
+  refetch
 }: UseReactFlowSetupProps): UseReactFlowSetupResult {
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null)
   const { saveViewportToStorage, loadViewportFromStorage } = useCanvasStore()
@@ -217,13 +218,20 @@ export function useReactFlowSetup({
             label: ''
           }
         }
-      }).catch((error) => {
-        console.error('Failed to save connection:', error)
-        // Remove edge if save failed
-        setEdges((eds) => eds.filter(e => !(e.source === params.source && e.target === params.target)))
       })
+        .then(() => {
+          // Refetch connections to ensure query cache is updated
+          refetch().catch((error) => {
+            console.error('Failed to refetch after creating connection:', error)
+          })
+        })
+        .catch((error) => {
+          console.error('Failed to save connection:', error)
+          // Remove edge if save failed
+          setEdges((eds) => eds.filter(e => !(e.source === params.source && e.target === params.target)))
+        })
     },
-    [projectId, setEdges, createConnectionMutation]
+    [projectId, setEdges, createConnectionMutation, refetch]
   )
 
   // Zoom to fit all nodes
@@ -249,14 +257,27 @@ export function useReactFlowSetup({
               return
             }
 
+            // Optimistically remove the edge from UI
+            setEdges((eds) => eds.filter(e => e.id !== edge.id))
+
+            // Delete from backend
             deleteConnectionMutation({
               variables: {
                 projectId,
                 connectionId
               }
-            }).catch((error) => {
-              console.error('Failed to delete connection:', error)
             })
+              .then(() => {
+                // Refetch connections to ensure query cache is updated
+                refetch().catch((error) => {
+                  console.error('Failed to refetch after deleting connection:', error)
+                })
+              })
+              .catch((error) => {
+                console.error('Failed to delete connection:', error)
+                // Restore edge if deletion failed
+                setEdges((eds) => [...eds, edge])
+              })
           })
         }
       }
@@ -264,7 +285,7 @@ export function useReactFlowSetup({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [projectId, deleteConnectionMutation])
+  }, [projectId, deleteConnectionMutation, setEdges, refetch])
 
   return {
     nodes,
