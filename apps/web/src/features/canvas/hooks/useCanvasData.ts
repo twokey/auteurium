@@ -28,6 +28,156 @@ interface ConnectionEdgeData {
   connectionId?: string
 }
 
+interface ConnectedContentEntry {
+  snippetId: string
+  text: string
+}
+
+const mergeConnectedEntries = (
+  base: ConnectedContentEntry[],
+  addition: ConnectedContentEntry[]
+): ConnectedContentEntry[] => {
+  if (addition.length === 0) {
+    return base
+  }
+
+  const merged = [...base]
+  const seen = new Set(base.map(entry => entry.snippetId))
+
+  for (const entry of addition) {
+    const trimmedText = entry.text.trim()
+    if (trimmedText === '' || seen.has(entry.snippetId)) {
+      continue
+    }
+
+    merged.push({
+      snippetId: entry.snippetId,
+      text: trimmedText
+    })
+    seen.add(entry.snippetId)
+  }
+
+  return merged
+}
+
+const analyzeSnippetConnections = (
+  snippets: Snippet[]
+): {
+  snippetMap: Map<string, Snippet>
+  incomingSourcesMap: Map<string, string[]>
+  connectedContentMap: Map<string, string[]>
+} => {
+  const snippetMap = new Map<string, Snippet>()
+  const snippetOrder = new Map<string, number>()
+
+  snippets.forEach((snippet, index) => {
+    snippetMap.set(snippet.id, snippet)
+    snippetOrder.set(snippet.id, index)
+  })
+
+  const rawIncomingMap = new Map<
+    string,
+    Array<{ sourceId: string; createdAt?: string | null; order: number }>
+  >()
+
+  snippets.forEach((snippet) => {
+    const outgoingConnections = snippet.connections ?? []
+
+    outgoingConnections.forEach((connection) => {
+      const targetId = connection.targetSnippetId
+      if (!targetId || !snippetMap.has(targetId)) {
+        return
+      }
+
+      const entry = {
+        sourceId: snippet.id,
+        createdAt: connection.createdAt ?? null,
+        order: snippetOrder.get(snippet.id) ?? Number.MAX_SAFE_INTEGER
+      }
+
+      const existing = rawIncomingMap.get(targetId)
+      if (existing) {
+        existing.push(entry)
+      } else {
+        rawIncomingMap.set(targetId, [entry])
+      }
+    })
+  })
+
+  const incomingSourcesMap = new Map<string, string[]>()
+
+  rawIncomingMap.forEach((entries, targetId) => {
+    entries.sort((a, b) => {
+      if (a.createdAt && b.createdAt && a.createdAt !== b.createdAt) {
+        return a.createdAt.localeCompare(b.createdAt)
+      }
+
+      return a.order - b.order
+    })
+
+    incomingSourcesMap.set(
+      targetId,
+      entries.map(entry => entry.sourceId)
+    )
+  })
+
+  const connectedEntriesMap = new Map<string, ConnectedContentEntry[]>()
+  const visiting = new Set<string>()
+
+  const computeConnectedContent = (snippetId: string): ConnectedContentEntry[] => {
+    if (connectedEntriesMap.has(snippetId)) {
+      return connectedEntriesMap.get(snippetId)!
+    }
+
+    if (visiting.has(snippetId)) {
+      return []
+    }
+
+    visiting.add(snippetId)
+
+    const sourceIds = incomingSourcesMap.get(snippetId) ?? []
+    let aggregated: ConnectedContentEntry[] = []
+
+    for (const sourceId of sourceIds) {
+      const sourceContent = computeConnectedContent(sourceId)
+      const sourceSnippet = snippetMap.get(sourceId)
+      const trimmedText = sourceSnippet?.textField1?.trim() ?? ''
+      const branchContent: ConnectedContentEntry[] =
+        trimmedText !== ''
+          ? [...sourceContent, { snippetId: sourceId, text: trimmedText }]
+          : [...sourceContent]
+
+      aggregated = mergeConnectedEntries(aggregated, branchContent)
+    }
+
+    connectedEntriesMap.set(snippetId, aggregated)
+    visiting.delete(snippetId)
+
+    return aggregated
+  }
+
+  snippets.forEach((snippet) => {
+    if (!connectedEntriesMap.has(snippet.id)) {
+      connectedEntriesMap.set(snippet.id, computeConnectedContent(snippet.id))
+    }
+  })
+
+  const connectedContentMap = new Map<string, string[]>()
+
+  connectedEntriesMap.forEach((entries, snippetId) => {
+    connectedContentMap.set(
+      snippetId,
+      entries.map(entry => entry.text)
+    )
+  })
+
+  return {
+    snippetMap,
+    incomingSourcesMap,
+    connectedContentMap
+  }
+}
+
 // Helper to compare snippets for deep equality
 const areSnippetsEqual = (a: Snippet[], b: Snippet[]): boolean => {
   if (a.length !== b.length) return false
@@ -268,6 +418,8 @@ export function useFlowNodes(
   isLoadingTextModels?: boolean
 ): Node<SnippetNodeData>[] {
   return useMemo(() => {
+    const { snippetMap, incomingSourcesMap, connectedContentMap } = analyzeSnippetConnections(snippets)
+
     // Sort snippets by creation time to assign z-index
     const sortedSnippets = [...snippets].sort((a, b) => {
       const timeA = new Date(a.createdAt).getTime()
@@ -278,16 +430,12 @@ export function useFlowNodes(
     return sortedSnippets.map((snippet, index) => {
       const position = snippet.position ?? { x: 0, y: 0 }
 
-      // Get incoming connections to find connected snippets
-      const incomingConnections = (snippet.connections ?? []).filter(
-        conn => conn.targetSnippetId === snippet.id
-      )
-
-      // Map source snippets for connected image counting
-      const connectedSnippets = incomingConnections
-        .map(conn => snippets.find(s => s.id === conn.sourceSnippetId))
+      const incomingSourceIds = incomingSourcesMap.get(snippet.id) ?? []
+      const connectedSnippets = incomingSourceIds
+        .map(sourceId => snippetMap.get(sourceId))
         .filter((s): s is Snippet => s !== undefined)
         .map(s => ({ id: s.id, imageS3Key: s.imageS3Key }))
+      const connectedContent = connectedContentMap.get(snippet.id) ?? []
 
       return {
         id: snippet.id,
@@ -304,7 +452,8 @@ export function useFlowNodes(
             connectionCount: snippet.connections?.length ?? 0,
             imageUrl: snippet.imageUrl,
             imageS3Key: snippet.imageS3Key,
-            imageMetadata: snippet.imageMetadata
+            imageMetadata: snippet.imageMetadata,
+            connectedContent
           },
           ...handlers,
           isGeneratingImage: Boolean(generatingImageSnippetIds[snippet.id]),

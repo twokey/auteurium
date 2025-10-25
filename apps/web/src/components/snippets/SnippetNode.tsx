@@ -30,6 +30,7 @@ interface SnippetNodeProps {
         height: number
         aspectRatio: string
       } | null
+      connectedContent?: string[]
     }
     onEdit: (snippetId: string) => void
     onDelete: (snippetId: string) => void
@@ -73,6 +74,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
     textModels = [],
     isLoadingTextModels = false
   } = data
+  const connectedContent: string[] = snippet.connectedContent ?? []
 
   const [showContextMenu, setShowContextMenu] = useState(false)
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 })
@@ -420,6 +422,32 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
             View Full ({wordCount} words)
           </button>
         )}
+
+        {/* Connected content aggregate */}
+        <div
+          className="mb-2"
+          style={POINTER_EVENTS_STYLES.interactive}
+          onClick={(event) => event.stopPropagation()}
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+            Connected Content
+          </p>
+          {connectedContent.length > 0 ? (
+            <div className="mt-1 space-y-1.5">
+              {connectedContent.map((content: string, index: number) => (
+                <div
+                  key={`${snippet.id}-connected-${index}`}
+                  className="text-xs text-gray-700 bg-gray-100 rounded px-2 py-1 whitespace-pre-wrap"
+                >
+                  {content}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400 italic mt-1">No upstream content</p>
+          )}
+        </div>
 
         <div className="mt-2 space-y-2">
           {/* Generation Section */}

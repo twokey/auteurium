@@ -42,12 +42,14 @@ Never try to create git commit without me asking so.
 - Project deletion cascades to all contained snippets
 
 ### Snippet Management
-- Two text fields per snippet, no length limits (expected up to page length)
+- One primary text field per snippet, no length limits (expected up to page length)
 - Unique alphanumeric IDs displayed on canvas
 - Large snippets (>100 words) shown minimized with expand modal
 - Version history with revert capability
 - Positioned freely on infinite canvas
-- AI-powered image generation using Google Imagen 4 Fast
+- AI-powered image generation using multiple models (Google Imagen 4 Fast, Gemini 2.5 Flash Image with multimodal support)
+- Text-to-text generation with snippet creation
+- Model selection for text and image generation on snippet nodes
 - Edit and combine snippets directly on canvas nodes (inline editing)
 
 ### Connection System
@@ -114,7 +116,7 @@ Never try to create git commit without me asking so.
 
 ### Infrastructure Testing
 **CDK TDD Framework** (from infrastructure/aws-cdk/):
-- `npm run test` - Run all infrastructure tests (93 tests, 100% coverage)
+- `npm run test` - Run all infrastructure tests with comprehensive coverage
 - `npm run test:unit` - Fast unit tests for individual stacks
 - `npm run test:integration` - Cross-stack dependency tests
 - `npm run test:validation` - Runtime validation against deployed infrastructure
@@ -122,7 +124,7 @@ Never try to create git commit without me asking so.
 - `npm run test:coverage` - Generate coverage reports
 
 **Test Organization**:
-- **Unit Tests**: `test/unit/stacks/` - Auth (20), Database (24), API (25), Media (24) tests
+- **Unit Tests**: `test/unit/stacks/` - Auth, Database, API, and Media stack tests
 - **Integration Tests**: `test/integration/cross-stack/` - Complete infrastructure synthesis
 - **Validation Tests**: `test/validation/deployment/` - Runtime version and security validation
 - **Critical Protection**: Node.js 22.x runtime enforcement, IAM permissions, security compliance
@@ -185,12 +187,12 @@ Never try to create git commit without me asking so.
 - Snippets have directional many-to-many connections with optional labels
 - Project-scoped tags/categories
 - Snippet versioning with revert capability
-- Two text fields per snippet, positioned on infinite canvas
+- One primary text field per snippet, positioned on infinite canvas
 
 **Frontend Architecture**:
-- React with React Flow for canvas interactions, React Router for navigation
-- AWS Amplify v6 for authentication integration with Cognito
-- Apollo Client for GraphQL operations with AppSync
+- React 19.2 with React Flow for canvas interactions, React Router for navigation
+- AWS Amplify v6 for authentication integration with Cognito and GraphQL operations with AppSync (recently migrated from Apollo Client)
+- Optimistic UI updates for improved user experience
 - Tailwind CSS for styling
 - Authentication context with useAuth hook
 - Component structure: pages/, components/auth/, components/projects/, components/canvas/
@@ -202,15 +204,16 @@ Never try to create git commit without me asking so.
 - AWS Cognito for authentication with JWT validation using aws-jwt-verify
 - User data isolation: users can only access their own projects/snippets
 - S3 for media uploads with pre-signed URLs (private bucket) and upload completion handlers
-- GenAI integration with Google Gemini API for image generation (Imagen 4 Fast)
+- GenAI integration with multiple LLM providers (Google Gemini, OpenAI) for image and text generation via genai-orchestrator service
 - Secrets Manager for secure LLM API key storage
 - CloudWatch for logging (monitoring stack disabled for cost savings)
 
 **Critical Implementation Areas**:
 - **Authentication**: AWS Cognito integration, admin users cannot access snippet content
-- **Cascade Deletes**: Project deletion removes all snippets and connections
+- **Cascade Deletes**: Project deletion removes all snippets and connections (complete cascade deletion implemented with fix 1bc0934)
 - **Media Handling**: Direct S3 uploads via pre-signed URLs (private bucket), backend registration on completion
-- **Image Generation**: Google Imagen 4 Fast integration for snippet images using genai-orchestrator
+- **Image Generation**: Multi-model support including Google Imagen 4 Fast, Gemini 2.5 Flash Image with multimodal capabilities using genai-orchestrator
+- **Text Generation**: LLM-powered text-to-text generation for snippet creation using configurable models
 - **Data Validation**: Zod schemas in packages/validation for consistent validation
 - **Error Handling**: Consistent API error format, comprehensive CloudWatch logging
 - **Infrastructure**: CDK stacks with app-specific resource naming for multi-app AWS accounts

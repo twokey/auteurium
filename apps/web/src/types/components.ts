@@ -99,6 +99,7 @@ export interface SnippetNodeData {
       height: number
       aspectRatio: string
     } | null
+    connectedContent?: string[]
   }
   onEdit: (snippetId: string) => void
   onDelete: (snippetId: string) => void
