@@ -7,6 +7,8 @@
 export const CANVAS_CONSTANTS = {
   WORD_LIMIT: 100,
   GENERATED_SNIPPET_VERTICAL_OFFSET: 500,
+  GENERATED_SNIPPET_SPACING: 20, // Spacing between snippet bottom and new snippet top
+  ESTIMATED_SNIPPET_HEIGHT: 280, // Estimated average snippet height
   DEFAULT_NODE_POSITION: { x: 200, y: 200 },
   MIN_NODE_WIDTH: 200,
   MAX_NODE_WIDTH: 300,

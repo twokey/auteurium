@@ -44,13 +44,15 @@ const Canvas = () => {
 
   // Create a ref for setNodes that will be populated after ReactFlow setup
   const setNodesRef = useRef<any>(() => {})
+  const reactFlowInstanceRef = useRef<any>(null)
 
   // Event handlers and mutations
   const handlers = useCanvasHandlers({
     projectId,
     snippets,
     setNodes: (updateFn: any) => setNodesRef.current(updateFn),
-    refetch
+    refetch,
+    reactFlowInstance: reactFlowInstanceRef.current
   })
 
   // Create handlers object for flow nodes
@@ -62,7 +64,8 @@ const Canvas = () => {
     onViewVersions: handlers.handleViewVersions,
     onUpdateContent: handlers.handleUpdateSnippetContent,
     onCombine: handlers.handleCombineSnippetContent,
-    onGenerateImage: handlers.handleGenerateImage
+    onGenerateImage: handlers.handleGenerateImage,
+    onGenerateText: handlers.handleGenerateTextSnippet
   }), [
     handlers.handleEditSnippet,
     handlers.handleDeleteSnippet,
@@ -70,7 +73,8 @@ const Canvas = () => {
     handlers.handleViewVersions,
     handlers.handleUpdateSnippetContent,
     handlers.handleCombineSnippetContent,
-    handlers.handleGenerateImage
+    handlers.handleGenerateImage,
+    handlers.handleGenerateTextSnippet
   ])
 
   // Create flow nodes and edges
@@ -108,10 +112,14 @@ const Canvas = () => {
     refetch
   })
 
-  // Update the ref with the actual setNodes function
+  // Update the refs with the actual functions
   useEffect(() => {
     setNodesRef.current = setNodes
   }, [setNodes])
+
+  useEffect(() => {
+    reactFlowInstanceRef.current = reactFlowInstance
+  }, [reactFlowInstance])
 
   // Normalize project data
   const normalisedProject = project

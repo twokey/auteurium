@@ -38,6 +38,7 @@ export interface UseCanvasHandlersProps {
   snippets: Snippet[]
   setNodes: (nodes: any) => void
   refetch: () => Promise<void>
+  reactFlowInstance?: any
 }
 
 export interface UseCanvasHandlersResult {
@@ -61,13 +62,15 @@ export interface UseCanvasHandlersResult {
 
   // Generated Snippet Handlers
   handleCreateGeneratedSnippet: () => Promise<void>
+  handleGenerateTextSnippet: (sourceSnippetId: string, generatedContent: string) => Promise<void>
 }
 
 export function useCanvasHandlers({
   projectId,
   snippets,
   setNodes,
-  refetch
+  refetch,
+  reactFlowInstance
 }: UseCanvasHandlersProps): UseCanvasHandlersResult {
   const toast = useToast()
   const {
@@ -494,6 +497,99 @@ export function useCanvasHandlers({
     refetch
   ])
 
+  // Handler for creating snippet from text generation
+  const handleGenerateTextSnippet = useCallback(async (sourceSnippetId: string, generatedContent: string) => {
+    if (!projectId) {
+      console.error('Cannot create generated text snippet: no project ID')
+      return
+    }
+
+    const sourceSnippet = snippetsRef.current.find(s => s.id === sourceSnippetId)
+    const baseX = sourceSnippet?.position?.x ?? 0
+    const baseY = sourceSnippet?.position?.y ?? 0
+
+    // Try to get actual node height from React Flow, fallback to estimated height
+    let sourceNodeHeight = CANVAS_CONSTANTS.ESTIMATED_SNIPPET_HEIGHT
+    if (reactFlowInstance && typeof reactFlowInstance.getNode === 'function') {
+      try {
+        const sourceNode = reactFlowInstance.getNode(sourceSnippetId)
+        if (sourceNode?.measured?.height) {
+          sourceNodeHeight = sourceNode.measured.height
+        } else if (sourceNode?.height) {
+          sourceNodeHeight = sourceNode.height
+        }
+      } catch (error) {
+        // If getting node fails, use estimated height
+        console.error('Failed to get node dimensions:', error)
+      }
+    }
+
+    // Position new snippet below source with 20px spacing
+    const targetPosition = {
+      x: baseX,
+      y: baseY + sourceNodeHeight + CANVAS_CONSTANTS.GENERATED_SNIPPET_SPACING
+    }
+
+    // Generate temporary ID for optimistic update
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+    const now = new Date().toISOString()
+
+    // Add optimistic snippet immediately
+    addOptimisticSnippet({
+      id: tempId,
+      projectId,
+      title: 'Generated text snippet',
+      textField1: generatedContent,
+      position: targetPosition,
+      tags: [],
+      categories: [],
+      connections: [],
+      createdAt: now,
+      updatedAt: now,
+      version: 1,
+      isOptimistic: true
+    })
+
+    try {
+      const creationResult = await createSnippetMutation({
+        variables: {
+          input: {
+            projectId,
+            title: 'Generated text snippet',
+            textField1: generatedContent,
+            position: targetPosition,
+            tags: [],
+            categories: []
+          }
+        }
+      })
+
+      const newSnippetId = creationResult ? (creationResult as any).createSnippet.id : null
+      if (!newSnippetId) {
+        throw new Error('Failed to create snippet: missing snippet ID in response')
+      }
+
+      const createdSnippet = (creationResult as any).createSnippet as Snippet
+      // Replace optimistic snippet with real one from server
+      replaceOptimisticSnippet(tempId, createdSnippet)
+
+      toast.success('Generated text snippet created successfully!')
+    } catch (error) {
+      console.error('Failed to create generated text snippet:', error)
+      // Remove optimistic snippet on failure
+      removeOptimisticSnippet(tempId)
+      toast.error('Failed to create snippet', error instanceof Error ? error.message : 'Unknown error')
+    }
+  }, [
+    projectId,
+    createSnippetMutation,
+    addOptimisticSnippet,
+    replaceOptimisticSnippet,
+    removeOptimisticSnippet,
+    toast,
+    reactFlowInstance
+  ])
+
   return {
     // Snippet Handlers
     handleEditSnippet,
@@ -514,6 +610,7 @@ export function useCanvasHandlers({
     deleteConnectionMutation,
 
     // Generated Snippet Handlers
-    handleCreateGeneratedSnippet
+    handleCreateGeneratedSnippet,
+    handleGenerateTextSnippet
   }
 }

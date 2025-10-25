@@ -261,6 +261,7 @@ export function useFlowNodes(
     onUpdateContent: (snippetId: string, changes: Partial<Pick<Snippet, 'textField1'>>) => Promise<void>
     onCombine: (snippetId: string) => Promise<void>
     onGenerateImage: (snippetId: string, modelId?: string) => void
+    onGenerateText: (snippetId: string, content: string) => Promise<void>
   },
   generatingImageSnippetIds: Record<string, boolean>,
   textModels?: AvailableModel[],

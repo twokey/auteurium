@@ -107,6 +107,7 @@ export interface SnippetNodeData {
   onUpdateContent: (snippetId: string, changes: Partial<Pick<Snippet, 'textField1'>>) => Promise<void>
   onCombine: (snippetId: string) => Promise<void>
   onGenerateImage: (snippetId: string, modelId?: string) => void
+  onGenerateText: (snippetId: string, content: string) => Promise<void>
   isGeneratingImage: boolean
   connectedSnippets?: Array<{ id: string; imageS3Key?: string | null }>
 }
