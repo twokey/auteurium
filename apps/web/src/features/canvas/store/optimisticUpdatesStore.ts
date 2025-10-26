@@ -58,6 +58,9 @@ interface OptimisticUpdatesState {
   // Update stored real snippet
   updateRealSnippet: (snippet: Snippet) => void
 
+  // Clear real snippets store (call after refetch completes)
+  clearRealSnippets: () => void
+
   // Clear all optimistic updates
   clearAll: () => void
 }
@@ -127,6 +130,10 @@ export const useOptimisticUpdatesStore = create<OptimisticUpdatesState>((set) =>
       [snippet.id]: snippet
     }
   })),
+
+  clearRealSnippets: () => set({
+    realSnippets: {}
+  }),
 
   clearAll: () => set({
     optimisticSnippets: {},

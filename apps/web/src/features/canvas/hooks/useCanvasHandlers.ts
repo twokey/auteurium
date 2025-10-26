@@ -92,7 +92,8 @@ export function useCanvasHandlers({
     addOptimisticSnippet,
     replaceOptimisticSnippet,
     removeOptimisticSnippet,
-    updateRealSnippet
+    updateRealSnippet,
+    clearRealSnippets
   } = useOptimisticUpdatesStore()
 
   // Mutations
@@ -250,10 +251,10 @@ export function useCanvasHandlers({
 
       console.log('[useCanvasHandlers] Mutation completed, result:', result)
 
-      // Refetch to ensure snippets array is updated with latest data
-      console.log('[useCanvasHandlers] Calling refetch...')
-      await refetch()
-      console.log('[useCanvasHandlers] Refetch completed')
+      // No refetch needed - the optimistic update already updated the UI
+      // Refetching here causes a race condition where snippet data gets refreshed
+      // while the SnippetNode component is still in edit mode, causing the
+      // useEffect to reset draftValues and lose the user's changes
     } catch (error) {
       console.error('Failed to update snippet content:', error)
       // Rollback optimistic update
@@ -275,7 +276,7 @@ export function useCanvasHandlers({
       )
       throw error
     }
-  }, [projectId, setNodes, updateSnippetMutation, refetch])
+  }, [projectId, setNodes, updateSnippetMutation])
 
   const handleCombineSnippetContent = useCallback(async (snippetId: string) => {
     if (!projectId) {
@@ -429,6 +430,8 @@ export function useCanvasHandlers({
             }
           })
           await refetch()
+          // Clear realSnippets now that cache is updated
+          clearRealSnippets()
         } catch (connectionError) {
           console.error('Failed to connect generated image snippet:', connectionError)
           toast.error('Failed to connect new image snippet', connectionError instanceof Error ? connectionError.message : 'Unknown error')
@@ -499,7 +502,9 @@ export function useCanvasHandlers({
     setGeneratingImage,
     toast,
     updateSnippetMutation,
-    updateRealSnippet
+    updateRealSnippet,
+    removeOptimisticSnippet,
+    clearRealSnippets
   ])
 
   // Canvas Operations
@@ -541,12 +546,17 @@ export function useCanvasHandlers({
     } as Record<string, unknown> & CreateSnippetVariables
 
     createSnippetMutation({ variables })
-      .then((result) => {
+      .then(async (result) => {
         if (result) {
           const createdSnippet = (result as any).createSnippet as Snippet
           // Replace optimistic snippet with real one from server
           replaceOptimisticSnippet(tempId, createdSnippet)
-          // No refetch needed - the real snippet is now in the store
+          // Refetch to update GraphQL cache with the new snippet
+          // This is necessary for creation (unlike updates) because we need the server data
+          await refetch()
+          // Clear realSnippets now that the GraphQL cache has been updated
+          // This prevents duplicate snippets and stale data issues
+          clearRealSnippets()
         }
       })
       .catch((error) => {
@@ -554,7 +564,7 @@ export function useCanvasHandlers({
         // Remove optimistic snippet on failure
         removeOptimisticSnippet(tempId)
       })
-  }, [projectId, createSnippetMutation, addOptimisticSnippet, replaceOptimisticSnippet, removeOptimisticSnippet])
+  }, [projectId, createSnippetMutation, addOptimisticSnippet, replaceOptimisticSnippet, removeOptimisticSnippet, refetch, clearRealSnippets])
 
   const handleSaveCanvas = useCallback(() => {
     setLoading(true)
@@ -642,8 +652,10 @@ export function useCanvasHandlers({
         }
       })
 
-      // Refetch only connections to update the edges
+      // Refetch to update GraphQL cache with new snippet and connections
       await refetch()
+      // Clear realSnippets now that cache is updated
+      clearRealSnippets()
       toast.success('Generated snippet created successfully!')
     } catch (error) {
       console.error('Failed to create generated snippet:', error)
@@ -665,7 +677,8 @@ export function useCanvasHandlers({
     addOptimisticSnippet,
     replaceOptimisticSnippet,
     removeOptimisticSnippet,
-    refetch
+    refetch,
+    clearRealSnippets
   ])
 
   // Handler for creating snippet from text generation
@@ -756,6 +769,8 @@ export function useCanvasHandlers({
           }
         })
         await refetch()
+        // Clear realSnippets now that cache is updated
+        clearRealSnippets()
       } catch (connectionError) {
         console.error('Failed to connect generated text snippet:', connectionError)
         toast.error('Failed to connect new text snippet', connectionError instanceof Error ? connectionError.message : 'Unknown error')
@@ -777,7 +792,8 @@ export function useCanvasHandlers({
     removeOptimisticSnippet,
     toast,
     reactFlowInstance,
-    refetch
+    refetch,
+    clearRealSnippets
   ])
 
   return {
