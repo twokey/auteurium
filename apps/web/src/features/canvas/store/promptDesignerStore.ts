@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 
+import type { ConnectedContentItem } from '../../../types/components'
+
 type PromptDesignerMode = 'text' | 'image' | 'video'
 
 interface PromptDesignerOpenPayload {
@@ -7,6 +9,7 @@ interface PromptDesignerOpenPayload {
   snippetTitle?: string | null
   mode: PromptDesignerMode
   initialPrompt: string
+  connectedContent?: ConnectedContentItem[]
   onGenerate?: (prompt: string) => Promise<void> | void
 }
 
@@ -17,6 +20,7 @@ interface PromptDesignerState {
   snippetTitle: string | null
   mode: PromptDesignerMode | null
   prompt: string
+  connectedContent: ConnectedContentItem[]
   onGenerate: ((prompt: string) => Promise<void> | void) | null
   open: (payload: PromptDesignerOpenPayload) => void
   close: () => void
@@ -34,12 +38,13 @@ const INITIAL_STATE: Omit<
   snippetTitle: null,
   mode: null,
   prompt: '',
+  connectedContent: [],
   onGenerate: null
 }
 
 export const usePromptDesignerStore = create<PromptDesignerState>((set, get) => ({
   ...INITIAL_STATE,
-  open: ({ snippetId, snippetTitle = null, mode, initialPrompt, onGenerate }) => {
+  open: ({ snippetId, snippetTitle = null, mode, initialPrompt, connectedContent = [], onGenerate }) => {
     set({
       isOpen: true,
       isGenerating: false,
@@ -47,6 +52,7 @@ export const usePromptDesignerStore = create<PromptDesignerState>((set, get) => 
       snippetTitle,
       mode,
       prompt: initialPrompt,
+      connectedContent,
       onGenerate: onGenerate ?? null
     })
   },

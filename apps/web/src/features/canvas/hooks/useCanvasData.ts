@@ -31,6 +31,7 @@ interface ConnectionEdgeData {
 
 interface ConnectedContentEntry {
   snippetId: string
+  snippetTitle?: string | null
   text?: string
   imageUrl?: string | null
   imageMetadata?: {
@@ -192,6 +193,7 @@ const analyzeSnippetConnections = (
           ...sourceContent,
           {
             snippetId: sourceId,
+            snippetTitle: sourceSnippet?.title ?? null,
             ...(hasText ? { text: trimmedText } : {}),
             ...(hasImage
               ? {
@@ -227,6 +229,7 @@ const analyzeSnippetConnections = (
       if (entry.text && entry.text.trim() !== '') {
         items.push({
           snippetId: entry.snippetId,
+          snippetTitle: entry.snippetTitle ?? null,
           type: 'text',
           value: entry.text
         })
@@ -235,6 +238,7 @@ const analyzeSnippetConnections = (
       if (entry.imageUrl) {
         items.push({
           snippetId: entry.snippetId,
+          snippetTitle: entry.snippetTitle ?? null,
           type: 'image',
           value: entry.imageUrl,
           imageMetadata: entry.imageMetadata ?? null

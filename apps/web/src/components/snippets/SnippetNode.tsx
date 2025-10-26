@@ -2,11 +2,12 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Handle, Position } from 'reactflow'
 
+import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
 import { useGenAI } from '../../hooks/useGenAI'
 import { CANVAS_CONSTANTS } from '../../shared/constants'
 import { useToast } from '../../shared/store/toastStore'
-import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
 import { countWords, truncateToWords } from '../../shared/utils/textUtils'
+
 import type { ConnectedContentItem } from '../../types'
 
 interface AvailableModel {
@@ -78,33 +79,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
     isLoadingTextModels = false
   } = data
   const connectedContent: ConnectedContentItem[] = snippet.connectedContent ?? []
-  const computePromptFromConnectedContent = useCallback(() => {
-    const lines = connectedContent
-      .map((item) => {
-        const value = item.value?.trim()
-        if (!value) {
-          return null
-        }
-
-        if (item.type === 'text') {
-          return value
-        }
-
-        return `Image: ${value}`
-      })
-      .filter((line): line is string => Boolean(line))
-
-    const connectedText = lines.join('\n')
-    const currentText = snippet.textField1.trim()
-
-    // Combine connected content with current snippet's text
-    if (connectedText && currentText) {
-      return `${connectedText}\n\n${currentText}`
-    }
-
-    return connectedText || currentText || ''
-  }, [connectedContent, snippet.textField1])
-  const hasImageAsset = Boolean(snippet.imageUrl || snippet.imageS3Key)
+  const hasImageAsset = Boolean(snippet.imageUrl ?? snippet.imageS3Key)
   const isTextFieldLocked = hasImageAsset
 
   const [showContextMenu, setShowContextMenu] = useState(false)
@@ -637,7 +612,8 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                     snippetId: snippet.id,
                     snippetTitle: displayTitle,
                     mode: 'text',
-                    initialPrompt: computePromptFromConnectedContent(),
+                    initialPrompt: snippet.textField1,
+                    connectedContent: connectedContent,
                     onGenerate: (nextPrompt) => runTextGeneration(nextPrompt)
                   })
                 }}
@@ -683,7 +659,8 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                     snippetId: snippet.id,
                     snippetTitle: displayTitle,
                     mode: 'image',
-                    initialPrompt: computePromptFromConnectedContent(),
+                    initialPrompt: snippet.textField1,
+                    connectedContent: connectedContent,
                     onGenerate: async (nextPrompt) => {
                       const trimmedPrompt = nextPrompt.trim()
                       if (trimmedPrompt === '') {
@@ -740,8 +717,9 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                     snippetId: snippet.id,
                     snippetTitle: displayTitle,
                     mode: 'video',
-                    initialPrompt: computePromptFromConnectedContent(),
-                    onGenerate: async () => {
+                    initialPrompt: snippet.textField1,
+                    connectedContent: connectedContent,
+                    onGenerate: () => {
                       toast.info('Video generation coming soon!')
                     }
                   })

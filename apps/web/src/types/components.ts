@@ -88,11 +88,13 @@ export type EditableField = 'textField1'
 export type ConnectedContentItem =
   | {
       snippetId: string
+      snippetTitle?: string | null
       type: 'text'
       value: string
     }
   | {
       snippetId: string
+      snippetTitle?: string | null
       type: 'image'
       value: string
       imageMetadata?: {
