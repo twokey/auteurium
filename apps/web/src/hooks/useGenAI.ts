@@ -1,23 +1,13 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 import {
   GENERATE_CONTENT,
   GENERATE_CONTENT_STREAM,
-  GENERATION_STREAM_SUBSCRIPTION,
-  GET_AVAILABLE_MODELS
+  GENERATION_STREAM_SUBSCRIPTION
 } from '../graphql/genai'
+import { useModels } from '../contexts/ModelsContext'
 import { client } from '../services/graphql'
 import { useGraphQLMutation } from './useGraphQLMutation'
-import { useGraphQLQuery } from './useGraphQLQuery'
-
-type AvailableModel = {
-  id: string
-  displayName: string
-  description?: string | null
-  provider: string
-  maxTokens?: number | null
-  costPerToken?: number | null
-}
 
 type GenerateContentResult = {
   content: string
@@ -34,10 +24,6 @@ type GenerateContentVariables = {
     modelId: string
     prompt: string
   }
-}
-
-type AvailableModelsData = {
-  availableModels: AvailableModel[]
 }
 
 type GenerateContentData = {
@@ -151,15 +137,13 @@ export const useGenAI = (options: UseGenAIOptions = {}) => {
   const streamingFallbackReasonRef = useRef<string | null>(null)
   const [streamingFallbackReason, setStreamingFallbackReason] = useState<string | null>(null)
 
+  // Get models from global Context instead of querying directly
   const {
-    data: modelsData,
-    loading: isLoadingModels,
-    error: modelsError,
-    refetch: refetchModels
-  } = useGraphQLQuery<AvailableModelsData>(GET_AVAILABLE_MODELS, {
-    variables: { modality: 'TEXT_TO_TEXT' },
-    skip: !enabled
-  })
+    textModels,
+    isLoadingTextModels: isLoadingModels,
+    textModelsError: modelsError,
+    refetchTextModels: refetchModels
+  } = useModels()
 
   const { mutate: generateContentMutation, loading: isGeneratingMutation } = useGraphQLMutation<
     GenerateContentData,
@@ -304,15 +288,10 @@ export const useGenAI = (options: UseGenAIOptions = {}) => {
     [markStreamingUnsupported]
   )
 
-  const memoizedModels = useMemo(
-    () => modelsData?.availableModels ?? [],
-    [modelsData?.availableModels]
-  )
-
   return {
-    models: memoizedModels,
-    isLoadingModels,
-    modelsError,
+    models: textModels,
+    isLoadingModels: enabled ? isLoadingModels : false,
+    modelsError: enabled ? modelsError : null,
     refetchModels,
     generate,
     generateStream,
