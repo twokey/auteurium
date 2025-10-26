@@ -1,3 +1,4 @@
+import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { Logger } from '@aws-lambda-powertools/logger'
 
 import {
@@ -21,6 +22,8 @@ import type {
 const logger = new Logger({ serviceName: 'snippets-db' })
 
 const DEFAULT_QUERY_LIMIT = 100
+const MEDIA_BUCKET_NAME = process.env.MEDIA_BUCKET_NAME ?? ''
+const s3Client = new S3Client({})
 
 const isConditionalCheckFailed = (error: unknown): boolean =>
   typeof error === 'object' &&
@@ -59,6 +62,39 @@ const runQuery = async (
 ): Promise<Snippet[]> => {
   const result = await dynamodb.query(params).promise()
   return (result.Items ?? []) as Snippet[]
+}
+
+const isMediaBucketConfigured = (): boolean => MEDIA_BUCKET_NAME.trim().length > 0
+
+const deleteSnippetMedia = async (snippet: Snippet | undefined): Promise<void> => {
+  if (!snippet || !snippet.imageS3Key) {
+    return
+  }
+
+  if (!isMediaBucketConfigured()) {
+    logger.info('Media bucket not configured, skipping snippet image deletion', {
+      snippetId: snippet.id
+    })
+    return
+  }
+
+  try {
+    await s3Client.send(new DeleteObjectCommand({
+      Bucket: MEDIA_BUCKET_NAME,
+      Key: snippet.imageS3Key
+    }))
+
+    logger.info('Snippet image deleted from S3', {
+      snippetId: snippet.id,
+      imageS3Key: snippet.imageS3Key
+    })
+  } catch (error) {
+    logger.warn('Failed to delete snippet image from S3', {
+      snippetId: snippet.id,
+      imageS3Key: snippet.imageS3Key,
+      error: error instanceof Error ? error.message : String(error)
+    })
+  }
 }
 
 const buildSnippet = (input: SnippetInput, userId: string, now: string): Snippet => ({
@@ -341,11 +377,15 @@ export const deleteSnippet = async (
     ConditionExpression: 'userId = :userId',
     ExpressionAttributeValues: {
       ':userId': userId
-    }
+    },
+    ReturnValues: 'ALL_OLD'
   }
 
   try {
-    await dynamodb.delete(params).promise()
+    const result = await dynamodb.delete(params).promise()
+    const deletedSnippet = result.Attributes as Snippet | undefined
+
+    await deleteSnippetMedia(deletedSnippet)
     await deleteSnippetConnections(snippetId, userId)
 
     logger.info('Snippet deleted', { snippetId, userId, projectId })
