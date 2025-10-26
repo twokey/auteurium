@@ -13,13 +13,20 @@ interface CanvasInfoPanelProps {
   project: Project
   snippetCount: number
   connectionCount: number
+  className?: string
 }
 
-export const CanvasInfoPanel = ({ project, snippetCount, connectionCount }: CanvasInfoPanelProps) => {
+export const CanvasInfoPanel = ({
+  project,
+  snippetCount,
+  connectionCount,
+  className
+}: CanvasInfoPanelProps) => {
   const [isExpanded, setIsExpanded] = useState(false)
+  const containerClassName = className ?? 'absolute top-4 right-4 z-10'
 
   return (
-    <div className="absolute top-4 right-4 z-10" data-testid="info-panel">
+    <div className={containerClassName} data-testid="info-panel">
       <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
         {/* Header - Always visible */}
         <div className="p-3 border-b border-gray-200">

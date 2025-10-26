@@ -5,6 +5,7 @@ import { Handle, Position } from 'reactflow'
 import { useGenAI } from '../../hooks/useGenAI'
 import { CANVAS_CONSTANTS } from '../../shared/constants'
 import { useToast } from '../../shared/store/toastStore'
+import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
 import { countWords, truncateToWords } from '../../shared/utils/textUtils'
 import type { ConnectedContentItem } from '../../types'
 
@@ -39,7 +40,7 @@ interface SnippetNodeProps {
     onViewVersions: (snippetId: string) => void
     onUpdateContent: (snippetId: string, changes: Partial<Record<'textField1', string>>) => Promise<void>
     onCombine: (snippetId: string) => Promise<void>
-    onGenerateImage: (snippetId: string, modelId?: string) => void
+    onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
     onGenerateText: (snippetId: string, content: string) => Promise<void>
     isGeneratingImage: boolean
     connectedSnippets?: { id: string; imageS3Key?: string | null }[]
@@ -60,6 +61,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
   const toast = useToast()
   const { id: projectId } = useParams<{ id: string }>()
   const { generateStream } = useGenAI({ enabled: true })
+  const openPromptDesigner = usePromptDesignerStore((state) => state.open)
 
   const {
     snippet,
@@ -76,6 +78,28 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
     isLoadingTextModels = false
   } = data
   const connectedContent: ConnectedContentItem[] = snippet.connectedContent ?? []
+  const computePromptFromConnectedContent = useCallback(() => {
+    if (connectedContent.length === 0) {
+      return ''
+    }
+
+    const lines = connectedContent
+      .map((item) => {
+        const value = item.value?.trim()
+        if (!value) {
+          return null
+        }
+
+        if (item.type === 'text') {
+          return value
+        }
+
+        return `Image: ${value}`
+      })
+      .filter((line): line is string => Boolean(line))
+
+    return lines.join('\n')
+  }, [connectedContent])
   const hasImageAsset = Boolean(snippet.imageUrl || snippet.imageS3Key)
   const isTextFieldLocked = hasImageAsset
 
@@ -290,24 +314,28 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
     }
   }, [isLarge, snippet.id, onEdit])
 
-  const handleTextGeneration = useCallback(async (event: React.MouseEvent) => {
-    event.stopPropagation()
+  const runTextGeneration = useCallback(async (rawPrompt: string) => {
+    const trimmedPrompt = rawPrompt.trim()
 
-    // Validation
-    const prompt = snippet.textField1?.trim()
-    if (!prompt || prompt === '') {
-      toast.warning('Please provide input text to generate from')
-      return
+    if (trimmedPrompt === '') {
+      toast.warning('Please provide prompt content before generating')
+      const handledError = new Error('Missing prompt content')
+      Object.assign(handledError, { handled: true })
+      throw handledError
     }
 
     if (!selectedTextModel || selectedTextModel === '') {
       toast.warning('Please select a text model')
-      return
+      const handledError = new Error('Missing text model selection')
+      Object.assign(handledError, { handled: true })
+      throw handledError
     }
 
     if (!projectId) {
       toast.error('Cannot generate: missing project ID')
-      return
+      const handledError = new Error('Missing project identifier')
+      Object.assign(handledError, { handled: true })
+      throw handledError
     }
 
     setIsGeneratingText(true)
@@ -319,7 +347,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
       // eslint-disable-next-line no-console
       console.log('Model ID:', selectedTextModel)
       // eslint-disable-next-line no-console
-      console.log('Prompt:', prompt)
+      console.log('Prompt:', trimmedPrompt)
       // eslint-disable-next-line no-console
       console.log('Snippet ID:', snippet.id)
       // eslint-disable-next-line no-console
@@ -330,7 +358,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
         projectId,
         snippet.id,
         selectedTextModel,
-        prompt
+        trimmedPrompt
       )
 
       // Log the result
@@ -346,7 +374,9 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
           'The selected model did not return any content',
           'Please try again or choose another model'
         )
-        return
+        const handledError = new Error('Empty generation result')
+        Object.assign(handledError, { handled: true })
+        throw handledError
       }
 
       // Create new snippet with generated content
@@ -358,12 +388,18 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
     } catch (error) {
       console.error('=== Text Generation Error ===')
       console.error('Error:', error)
-      const message = error instanceof Error ? error.message : 'Unknown error'
-      toast.error('Failed to generate text', message)
+      if (!(error instanceof Error && 'handled' in error && (error as { handled?: boolean }).handled)) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        toast.error('Failed to generate text', message)
+        if (error instanceof Error) {
+          Object.assign(error, { handled: true })
+        }
+      }
+      throw error
     } finally {
       setIsGeneratingText(false)
     }
-  }, [snippet.textField1, snippet.id, selectedTextModel, projectId, generateStream, onGenerateText, toast])
+  }, [selectedTextModel, projectId, generateStream, snippet.id, onGenerateText, toast])
 
   return (
     <>
@@ -573,10 +609,25 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
               <button
                 type="button"
                 className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
-                onClick={(e) => { void handleTextGeneration(e) }}
-                disabled={isGeneratingText || !selectedTextModel || savingField !== null}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  openPromptDesigner({
+                    snippetId: snippet.id,
+                    snippetTitle: displayTitle,
+                    mode: 'text',
+                    initialPrompt: computePromptFromConnectedContent(),
+                    onGenerate: (nextPrompt) => runTextGeneration(nextPrompt)
+                  })
+                }}
+                disabled={isGeneratingText || isLoadingTextModels || (!selectedTextModel && textModels.length > 0) || savingField !== null}
                 style={POINTER_EVENTS_STYLES.interactive}
-                title="Generate text content for this snippet"
+                title={
+                  isLoadingTextModels
+                    ? 'Loading models...'
+                    : !selectedTextModel
+                      ? 'Please select a text model first'
+                      : 'Generate text content for this snippet'
+                }
               >
                 {isGeneratingText ? (
                   <>
@@ -606,7 +657,30 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                 className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
                 onClick={(event) => {
                   event.stopPropagation()
-                  onGenerateImage(snippet.id, selectedImageModel)
+                  openPromptDesigner({
+                    snippetId: snippet.id,
+                    snippetTitle: displayTitle,
+                    mode: 'image',
+                    initialPrompt: computePromptFromConnectedContent(),
+                    onGenerate: async (nextPrompt) => {
+                      const trimmedPrompt = nextPrompt.trim()
+                      if (trimmedPrompt === '') {
+                        toast.warning('Please provide prompt content for image generation')
+                        const handledError = new Error('Missing prompt content for image generation')
+                        Object.assign(handledError, { handled: true })
+                        throw handledError
+                      }
+
+                      if (!selectedImageModel || selectedImageModel === '') {
+                        toast.warning('Please select an image model')
+                        const handledError = new Error('Missing image model selection')
+                        Object.assign(handledError, { handled: true })
+                        throw handledError
+                      }
+
+                      onGenerateImage(snippet.id, selectedImageModel, trimmedPrompt)
+                    }
+                  })
                 }}
                 title={tooManyImages ? `Too many connected images (${connectedImagesCount}). Remove connections to use ≤3.` : 'Generate image for this snippet'}
                 disabled={isGeneratingImage || tooManyImages}
@@ -640,7 +714,15 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                 className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
                 onClick={(event) => {
                   event.stopPropagation()
-                  toast.info('Video generation coming soon!')
+                  openPromptDesigner({
+                    snippetId: snippet.id,
+                    snippetTitle: displayTitle,
+                    mode: 'video',
+                    initialPrompt: computePromptFromConnectedContent(),
+                    onGenerate: async () => {
+                      toast.info('Video generation coming soon!')
+                    }
+                  })
                 }}
                 disabled={false}
                 style={POINTER_EVENTS_STYLES.interactive}

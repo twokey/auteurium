@@ -52,7 +52,7 @@ export interface UseCanvasHandlersResult {
   handleViewVersions: (snippetId: string) => void
   handleUpdateSnippetContent: (snippetId: string, changes: SnippetContentChanges) => Promise<void>
   handleCombineSnippetContent: (snippetId: string) => Promise<void>
-  handleGenerateImage: (snippetId: string, modelId?: string) => void
+  handleGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
 
   // Canvas Operations
   handleCreateSnippet: (position: { x: number; y: number }) => void
@@ -299,7 +299,7 @@ export function useCanvasHandlers({
     }
   }, [combineConnectionsMutation, projectId, setNodes])
 
-  const handleGenerateImage = useCallback((snippetId: string, modelId?: string) => {
+  const handleGenerateImage = useCallback((snippetId: string, modelId?: string, promptOverride?: string) => {
     void (async () => {
       const snippet = snippetsRef.current.find(s => s.id === snippetId)
       if (!snippet) {
@@ -311,9 +311,9 @@ export function useCanvasHandlers({
         return
       }
 
-      const prompt = snippet.textField1?.trim() ?? ''
+      const prompt = (promptOverride ?? snippet.textField1 ?? '').trim()
       if (prompt === '') {
-        toast.warning('Please provide input in Text Field 1 for image generation')
+        toast.warning('Please provide prompt content for image generation')
         return
       }
 

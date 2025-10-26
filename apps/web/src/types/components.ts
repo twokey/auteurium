@@ -79,6 +79,7 @@ export interface CanvasInfoPanelProps {
   }
   snippetCount: number
   connectionCount: number
+  className?: string
 }
 
 // Snippet Node Types
@@ -124,7 +125,7 @@ export interface SnippetNodeData {
   onViewVersions: (snippetId: string) => void
   onUpdateContent: (snippetId: string, changes: Partial<Pick<Snippet, 'textField1'>>) => Promise<void>
   onCombine: (snippetId: string) => Promise<void>
-  onGenerateImage: (snippetId: string, modelId?: string) => void
+  onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
   onGenerateText: (snippetId: string, content: string) => Promise<void>
   isGeneratingImage: boolean
   connectedSnippets?: Array<{ id: string; imageS3Key?: string | null }>

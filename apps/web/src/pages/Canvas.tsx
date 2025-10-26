@@ -21,6 +21,7 @@ import { useReactFlowSetup } from '../features/canvas/hooks/useReactFlowSetup'
 import { CanvasModals } from '../features/canvas/components/CanvasModals'
 import { useCanvasStore } from '../features/canvas/store/canvasStore'
 import { useGenAI } from '../hooks/useGenAI'
+import { PromptDesignerPanel } from '../components/canvas/PromptDesignerPanel'
 
 const NODE_TYPES: NodeTypes = {
   snippet: SnippetNode
@@ -250,14 +251,17 @@ const Canvas = () => {
           reactFlowInstance={reactFlowInstance.current}
         />
         
-        {/* Canvas Info Panel */}
-        {normalisedProject && (
-          <CanvasInfoPanel
-            project={normalisedProject}
-            snippetCount={snippetCount}
-            connectionCount={connectionCount}
-          />
-        )}
+        <div className="absolute top-4 right-4 z-10 flex flex-col items-end gap-3">
+          {normalisedProject && (
+            <CanvasInfoPanel
+              project={normalisedProject}
+              snippetCount={snippetCount}
+              connectionCount={connectionCount}
+              className="pointer-events-auto"
+            />
+          )}
+          <PromptDesignerPanel />
+        </div>
       </div>
 
       {/* All Modals - Now managed centrally */}
