@@ -158,7 +158,7 @@ export const PromptDesignerPanel = () => {
               {connectedContent.map((item, index) => (
                 <div key={`connected-${item.snippetId}-${index}-${item.type}`}>
                   <p className="text-[10px] text-gray-500 font-medium mb-0.5">
-                    From: {item.snippetId}{item.snippetTitle ? ` - ${item.snippetTitle}` : ''}
+                    {item.snippetTitle ? `${item.snippetTitle} - ${item.snippetId}` : item.snippetId}
                   </p>
                   <div className="overflow-hidden rounded border border-gray-200 bg-gray-50">
                     {item.type === 'text' ? (
@@ -183,7 +183,7 @@ export const PromptDesignerPanel = () => {
 
         <div className="mb-3">
           <p className="text-[10px] text-gray-500 font-medium mb-0.5">
-            From: {snippetId}{snippetTitle ? ` - ${snippetTitle}` : ''}
+            {snippetTitle ? `${snippetTitle} - ${snippetId}` : snippetId}
           </p>
 
           {isEditing ? (

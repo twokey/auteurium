@@ -95,6 +95,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
   const [selectedImageModel, setSelectedImageModel] = useState<string>('imagen-4.0-fast-generate-001')
   const [selectedVideoModel, setSelectedVideoModel] = useState<string>('')
   const [isGeneratingText, setIsGeneratingText] = useState(false)
+  const [isGenerateExpanded, setIsGenerateExpanded] = useState(false)
 
   useEffect(() => {
     if (activeField === 'textField1') return
@@ -401,8 +402,8 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
   return (
     <>
       {/* React Flow handles for connections */}
-      <Handle type="target" position={Position.Top} />
-      <Handle type="source" position={Position.Bottom} />
+      <Handle type="target" position={Position.Left} />
+      <Handle type="source" position={Position.Right} />
 
       <div
         className="p-3 min-w-[200px] max-w-[300px] cursor-pointer hover:bg-gray-50 transition-colors"
@@ -428,32 +429,34 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
           onClick={(event) => event.stopPropagation()}
           onMouseDown={(event) => event.stopPropagation()}
         >
-          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
-            Connected Content
+          <p className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+            Prompt
           </p>
           {connectedContent.length > 0 ? (
-            <div className="mt-1 space-y-1.5">
+            <div className="mt-1 space-y-2">
               {connectedContent.map((item, index) => (
-                <div
-                  key={`${snippet.id}-connected-${item.snippetId}-${index}-${item.type}`}
-                  className="overflow-hidden rounded border border-gray-200 bg-gray-50"
-                >
-                  {item.type === 'text' ? (
-                    <p className="px-2 py-1 text-xs text-gray-700 whitespace-pre-wrap">
-                      {item.value}
-                    </p>
-                  ) : (
-                    <img
-                      src={item.value}
-                      alt={`Connected snippet ${item.snippetId} image`}
-                      className="block w-full h-auto max-h-48 object-cover"
-                      loading="lazy"
-                      decoding="async"
-                      onClick={(event) => event.stopPropagation()}
-                      onMouseDown={(event) => event.stopPropagation()}
-                      draggable={false}
-                    />
-                  )}
+                <div key={`${snippet.id}-connected-${item.snippetId}-${index}-${item.type}`}>
+                  <p className="text-[10px] text-gray-500 font-medium mb-0.5">
+                    {item.snippetTitle ? `${item.snippetTitle} - ${item.snippetId}` : item.snippetId}
+                  </p>
+                  <div className="overflow-hidden rounded border border-gray-200 bg-gray-50">
+                    {item.type === 'text' ? (
+                      <p className="px-2 py-1 text-xs text-gray-700 whitespace-pre-wrap">
+                        {item.value}
+                      </p>
+                    ) : (
+                      <img
+                        src={item.value}
+                        alt={`Connected from snippet ${item.snippetId}`}
+                        className="block w-full h-auto max-h-48 object-cover"
+                        loading="lazy"
+                        decoding="async"
+                        onClick={(event) => event.stopPropagation()}
+                        onMouseDown={(event) => event.stopPropagation()}
+                        draggable={false}
+                      />
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -541,95 +544,79 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
           </div>
         )}
 
-        <div className="mt-2 space-y-2">
-          {/* Generation Section */}
-          <div className="space-y-1.5">
-            {/* Text Generation Model Selector */}
-            <select
-              value={selectedTextModel}
-              onChange={(e) => {
-                e.stopPropagation()
-                setSelectedTextModel(e.target.value)
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
-              disabled={savingField !== null}
-              style={POINTER_EVENTS_STYLES.interactive}
+        {/* Expandable Generation Section */}
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setIsGenerateExpanded(!isGenerateExpanded)
+            }}
+            className="w-full flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700 transition-colors py-1"
+            style={POINTER_EVENTS_STYLES.interactive}
+          >
+            <span>Generate</span>
+            <svg
+              className={`w-3 h-3 transition-transform duration-200 ${isGenerateExpanded ? 'rotate-90' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              <option value="" disabled>
-                {isLoadingTextModels ? 'Loading text models...' : 'Select text model...'}
-              </option>
-              {textModels.map((model) => (
-                <option key={model.id} value={model.id} title={model.description ?? undefined}>
-                  {model.displayName}
-                </option>
-              ))}
-            </select>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
 
-            {/* Image Generation Model Selector */}
-            <select
-              value={selectedImageModel}
-              onChange={(e) => {
-                e.stopPropagation()
-                setSelectedImageModel(e.target.value)
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
-              disabled={isGeneratingImage || savingField !== null}
-              style={POINTER_EVENTS_STYLES.interactive}
-            >
-              <option value="imagen-4.0-fast-generate-001">Imagen 4 Fast</option>
-              <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
-            </select>
-
-            {/* Video Generation Model Selector */}
-            <select
-              value={selectedVideoModel}
-              onChange={(e) => {
-                e.stopPropagation()
-                setSelectedVideoModel(e.target.value)
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
-              disabled={savingField !== null}
-              style={POINTER_EVENTS_STYLES.interactive}
-            >
-              <option value="" disabled>
-                Select video model...
-              </option>
-              {/* Video models will be added later */}
-            </select>
-
-            {/* Generation Buttons: Text, Image, Video */}
-            <div className="flex gap-2">
-              {/* Text Generation Button */}
-              <button
-                type="button"
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  openPromptDesigner({
-                    snippetId: snippet.id,
-                    snippetTitle: displayTitle,
-                    mode: 'text',
-                    initialPrompt: snippet.textField1,
-                    connectedContent: connectedContent,
-                    onGenerate: (nextPrompt) => runTextGeneration(nextPrompt)
-                  })
-                }}
-                disabled={isGeneratingText || isLoadingTextModels || (!selectedTextModel && textModels.length > 0) || savingField !== null}
-                style={POINTER_EVENTS_STYLES.interactive}
-                title={
-                  isLoadingTextModels
-                    ? 'Loading models...'
-                    : !selectedTextModel
-                      ? 'Please select a text model first'
-                      : 'Generate text content for this snippet'
-                }
-              >
-                {isGeneratingText ? (
-                  <>
-                    <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+          {isGenerateExpanded && (
+            <div className="mt-2 space-y-1.5">
+              {/* Text Generation Row */}
+              <div className="flex gap-2">
+                <select
+                  value={selectedTextModel}
+                  onChange={(e) => {
+                    e.stopPropagation()
+                    setSelectedTextModel(e.target.value)
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex-1 text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  disabled={savingField !== null}
+                  style={POINTER_EVENTS_STYLES.interactive}
+                >
+                  <option value="" disabled>
+                    {isLoadingTextModels ? 'Loading text models...' : 'Select text model...'}
+                  </option>
+                  {textModels.map((model) => (
+                    <option key={model.id} value={model.id} title={model.description ?? undefined}>
+                      {model.displayName}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center p-2 text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    openPromptDesigner({
+                      snippetId: snippet.id,
+                      snippetTitle: displayTitle,
+                      mode: 'text',
+                      initialPrompt: snippet.textField1,
+                      connectedContent: connectedContent,
+                      onGenerate: (nextPrompt) => runTextGeneration(nextPrompt)
+                    })
+                  }}
+                  disabled={isGeneratingText || isLoadingTextModels || (!selectedTextModel && textModels.length > 0) || savingField !== null}
+                  style={POINTER_EVENTS_STYLES.interactive}
+                  aria-label="Generate text content"
+                  title={
+                    isLoadingTextModels
+                      ? 'Loading models...'
+                      : !selectedTextModel
+                        ? 'Please select a text model first'
+                        : 'Generate text content for this snippet'
+                  }
+                >
+                  {isGeneratingText ? (
+                    <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path
                         className="opacity-75"
@@ -637,57 +624,68 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       />
                     </svg>
-                    Gen...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    Text
-                  </>
-                )}
-              </button>
+                  )}
+                </button>
+              </div>
 
-              {/* Image Generation Button */}
-              <button
-                type="button"
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  openPromptDesigner({
-                    snippetId: snippet.id,
-                    snippetTitle: displayTitle,
-                    mode: 'image',
-                    initialPrompt: snippet.textField1,
-                    connectedContent: connectedContent,
-                    onGenerate: async (nextPrompt) => {
-                      const trimmedPrompt = nextPrompt.trim()
-                      if (trimmedPrompt === '') {
-                        toast.warning('Please provide prompt content for image generation')
-                        const handledError = new Error('Missing prompt content for image generation')
-                        Object.assign(handledError, { handled: true })
-                        throw handledError
+              {/* Image Generation Row */}
+              <div className="flex gap-2">
+                <select
+                  value={selectedImageModel}
+                  onChange={(e) => {
+                    e.stopPropagation()
+                    setSelectedImageModel(e.target.value)
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex-1 text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  disabled={isGeneratingImage || savingField !== null}
+                  style={POINTER_EVENTS_STYLES.interactive}
+                >
+                  <option value="imagen-4.0-fast-generate-001">Imagen 4 Fast</option>
+                  <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
+                </select>
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center p-2 text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    openPromptDesigner({
+                      snippetId: snippet.id,
+                      snippetTitle: displayTitle,
+                      mode: 'image',
+                      initialPrompt: snippet.textField1,
+                      connectedContent: connectedContent,
+                      onGenerate: async (nextPrompt) => {
+                        const trimmedPrompt = nextPrompt.trim()
+                        if (trimmedPrompt === '') {
+                          toast.warning('Please provide prompt content for image generation')
+                          const handledError = new Error('Missing prompt content for image generation')
+                          Object.assign(handledError, { handled: true })
+                          throw handledError
+                        }
+
+                        if (!selectedImageModel || selectedImageModel === '') {
+                          toast.warning('Please select an image model')
+                          const handledError = new Error('Missing image model selection')
+                          Object.assign(handledError, { handled: true })
+                          throw handledError
+                        }
+
+                        onGenerateImage(snippet.id, selectedImageModel, trimmedPrompt)
                       }
-
-                      if (!selectedImageModel || selectedImageModel === '') {
-                        toast.warning('Please select an image model')
-                        const handledError = new Error('Missing image model selection')
-                        Object.assign(handledError, { handled: true })
-                        throw handledError
-                      }
-
-                      onGenerateImage(snippet.id, selectedImageModel, trimmedPrompt)
-                    }
-                  })
-                }}
-                title={tooManyImages ? `Too many connected images (${connectedImagesCount}). Remove connections to use ≤3.` : 'Generate image for this snippet'}
-                disabled={isGeneratingImage || tooManyImages}
-                style={POINTER_EVENTS_STYLES.interactive}
-              >
-                {isGeneratingImage ? (
-                  <>
-                    <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                    })
+                  }}
+                  disabled={isGeneratingImage || tooManyImages}
+                  style={POINTER_EVENTS_STYLES.interactive}
+                  aria-label="Generate image content"
+                  title={tooManyImages ? `Too many connected images (${connectedImagesCount}). Remove connections to use ≤3.` : 'Generate image for this snippet'}
+                >
+                  {isGeneratingImage ? (
+                    <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path
                         className="opacity-75"
@@ -695,66 +693,80 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       />
                     </svg>
-                    Gen...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    Image
-                  </>
-                )}
-              </button>
+                  )}
+                </button>
+              </div>
 
-              {/* Video Generation Button */}
-              <button
-                type="button"
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  openPromptDesigner({
-                    snippetId: snippet.id,
-                    snippetTitle: displayTitle,
-                    mode: 'video',
-                    initialPrompt: snippet.textField1,
-                    connectedContent: connectedContent,
-                    onGenerate: () => {
-                      toast.info('Video generation coming soon!')
-                    }
-                  })
-                }}
-                disabled={false}
-                style={POINTER_EVENTS_STYLES.interactive}
-                title="Generate video content for this snippet"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                Video
-              </button>
+              {/* Video Generation Row */}
+              <div className="flex gap-2">
+                <select
+                  value={selectedVideoModel}
+                  onChange={(e) => {
+                    e.stopPropagation()
+                    setSelectedVideoModel(e.target.value)
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex-1 text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  disabled={savingField !== null}
+                  style={POINTER_EVENTS_STYLES.interactive}
+                >
+                  <option value="" disabled>
+                    Select video model...
+                  </option>
+                  {/* Video models will be added later */}
+                </select>
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center p-2 text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    openPromptDesigner({
+                      snippetId: snippet.id,
+                      snippetTitle: displayTitle,
+                      mode: 'video',
+                      initialPrompt: snippet.textField1,
+                      connectedContent: connectedContent,
+                      onGenerate: () => {
+                        toast.info('Video generation coming soon!')
+                      }
+                    })
+                  }}
+                  disabled={false}
+                  style={POINTER_EVENTS_STYLES.interactive}
+                  aria-label="Generate video content"
+                  title="Generate video content for this snippet"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Warning for too many images */}
+              {tooManyImages && (
+                <div className="text-[10px] text-red-600 flex items-start gap-1" style={POINTER_EVENTS_STYLES.interactive}>
+                  <svg className="w-3 h-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <span>Too many images ({connectedImagesCount}). Remove connections to use ≤3.</span>
+                </div>
+              )}
+
+              {/* Info about multimodal support */}
+              {hasMultimodalSupport && connectedImagesCount > 0 && !tooManyImages && (
+                <div className="text-[10px] text-gray-500 flex items-start gap-1" style={POINTER_EVENTS_STYLES.interactive}>
+                  <svg className="w-3 h-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <span>Using {connectedImagesCount} connected image{connectedImagesCount > 1 ? 's' : ''}</span>
+                </div>
+              )}
             </div>
-
-            {/* Warning for too many images */}
-            {tooManyImages && (
-              <div className="text-[10px] text-red-600 flex items-start gap-1" style={POINTER_EVENTS_STYLES.interactive}>
-                <svg className="w-3 h-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                <span>Too many images ({connectedImagesCount}). Remove connections to use ≤3.</span>
-              </div>
-            )}
-
-            {/* Info about multimodal support */}
-            {hasMultimodalSupport && connectedImagesCount > 0 && !tooManyImages && (
-              <div className="text-[10px] text-gray-500 flex items-start gap-1" style={POINTER_EVENTS_STYLES.interactive}>
-                <svg className="w-3 h-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                </svg>
-                <span>Using {connectedImagesCount} connected image{connectedImagesCount > 1 ? 's' : ''}</span>
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
         {savingField !== null && (

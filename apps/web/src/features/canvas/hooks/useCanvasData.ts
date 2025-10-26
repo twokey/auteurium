@@ -81,7 +81,8 @@ const mergeConnectedEntries = (
     }
 
     const newEntry: ConnectedContentEntry = {
-      snippetId: entry.snippetId
+      snippetId: entry.snippetId,
+      snippetTitle: entry.snippetTitle ?? null
     }
 
     if (hasText) {

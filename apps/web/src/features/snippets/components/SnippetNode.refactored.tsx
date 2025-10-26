@@ -68,8 +68,8 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
 
   return (
     <>
-      <Handle type="target" position={Position.Top} />
-      <Handle type="source" position={Position.Bottom} />
+      <Handle type="target" position={Position.Left} />
+      <Handle type="source" position={Position.Right} />
 
       <div
         className="p-3 min-w-[200px] max-w-[300px] cursor-pointer hover:bg-gray-50 transition-colors"
