@@ -259,6 +259,12 @@ const buildSnippetUpdate = (
   timestamp: string,
   userId: string
 ) => {
+  console.log('[buildSnippetUpdate] Called with:', {
+    updates,
+    currentSnippetId: currentSnippet.id,
+    currentTextField1: currentSnippet.textField1
+  })
+
   const updateExpressions: string[] = [
     '#updatedAt = :updatedAt',
     '#version = :version'
@@ -277,12 +283,23 @@ const buildSnippetUpdate = (
     key: K,
     value: Snippet[K] | undefined
   ) => {
+    console.log('[buildSnippetUpdate] assignField called:', {
+      key,
+      value,
+      valueType: typeof value,
+      isUndefined: value === undefined,
+      hasProperty: Object.prototype.hasOwnProperty.call(updates, key)
+    })
+
     if (value !== undefined) {
       const placeholder = `#${key as string}`
       const valuePlaceholder = `:${key as string}`
       updateExpressions.push(`${placeholder} = ${valuePlaceholder}`)
       expressionAttributeNames[placeholder] = key as string
       expressionAttributeValues[valuePlaceholder] = value
+      console.log('[buildSnippetUpdate] Field added to update:', { key, value })
+    } else {
+      console.log('[buildSnippetUpdate] Field skipped (undefined):', { key })
     }
   }
 
@@ -292,11 +309,15 @@ const buildSnippetUpdate = (
   assignField('tags', updates.tags)
   assignField('categories', updates.categories)
 
-  return {
+  const result = {
     updateExpressions,
     expressionAttributeNames,
     expressionAttributeValues
   }
+
+  console.log('[buildSnippetUpdate] Final result:', result)
+
+  return result
 }
 
 export const updateSnippet = async (

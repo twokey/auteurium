@@ -152,16 +152,32 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
     const newValue = draftValues.textField1
     const currentValue = snippet.textField1
 
-    setActiveField(null)
+    console.log('[SnippetNode] commitField called:', {
+      field: _field,
+      snippetId: snippet.id,
+      newValue,
+      currentValue,
+      areEqual: newValue === currentValue
+    })
+
+    // CRITICAL FIX: Don't clear activeField yet! The useEffect will reset draftValues if we do.
+    // We need to keep activeField set until AFTER the mutation completes.
 
     if (newValue === currentValue) {
+      console.log('[SnippetNode] No change detected, skipping update')
+      setActiveField(null) // It's safe to clear here since we're not saving
       return
     }
 
     setSavingField('textField1')
 
     try {
+      console.log('[SnippetNode] Calling onUpdateContent with:', { snippetId: snippet.id, textField1: newValue })
       await onUpdateContent(snippet.id, { textField1: newValue })
+      console.log('[SnippetNode] onUpdateContent completed successfully')
+
+      // CRITICAL FIX: Only clear activeField AFTER the mutation succeeds
+      setActiveField(null)
     } catch (error) {
       console.error('Failed to update snippet content:', error)
       toast.error('Failed to save snippet changes', 'Please try again')
@@ -169,6 +185,8 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
         ...prev,
         textField1: currentValue
       }))
+      // Clear activeField even on error so user can try again
+      setActiveField(null)
     } finally {
       setSavingField(null)
     }

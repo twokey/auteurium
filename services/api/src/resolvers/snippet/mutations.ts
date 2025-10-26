@@ -95,17 +95,34 @@ export const snippetMutations = {
     args: unknown,
     context: GraphQLContext
   ): Promise<Snippet> => {
+    console.log('[Resolver] updateSnippet called with args:', JSON.stringify(args, null, 2))
+
     const { projectId, id: snippetId, input } = validateInput(updateSnippetSchema, args)
     const user = requireAuth(context.user)
+
+    console.log('[Resolver] Validated input:', {
+      projectId,
+      snippetId,
+      input,
+      userId: user.id
+    })
 
     context.logger.info('Updating snippet', {
       projectId,
       snippetId,
-      userId: user.id
+      userId: user.id,
+      input
     })
 
     // The updateSnippet function will verify ownership
     const updatedSnippet = await updateSnippet(projectId, snippetId, input, user.id)
+
+    console.log('[Resolver] Update completed, returning snippet:', {
+      id: updatedSnippet.id,
+      textField1: updatedSnippet.textField1,
+      version: updatedSnippet.version
+    })
+
     return await withSignedImageUrl(updatedSnippet, context.logger)
   },
 

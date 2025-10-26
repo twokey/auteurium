@@ -176,6 +176,12 @@ export function useCanvasHandlers({
     snippetId: string,
     changes: SnippetContentChanges
   ) => {
+    console.log('[useCanvasHandlers] handleUpdateSnippetContent called:', {
+      snippetId,
+      changes,
+      projectId
+    })
+
     if (!projectId) {
       console.error('Cannot update snippet content: no project ID')
       return
@@ -187,17 +193,29 @@ export function useCanvasHandlers({
       return
     }
 
+    console.log('[useCanvasHandlers] Current snippet state:', {
+      id: snippetBeforeUpdate.id,
+      textField1: snippetBeforeUpdate.textField1
+    })
+
     const updateInput: SnippetContentChanges = {}
     const previousValues: SnippetContentChanges = {}
 
     if (Object.prototype.hasOwnProperty.call(changes, 'textField1')) {
       updateInput.textField1 = changes.textField1 ?? ''
       previousValues.textField1 = snippetBeforeUpdate.textField1
+      console.log('[useCanvasHandlers] textField1 update prepared:', {
+        newValue: updateInput.textField1,
+        oldValue: previousValues.textField1
+      })
     }
 
     if (Object.keys(updateInput).length === 0) {
+      console.log('[useCanvasHandlers] No fields to update, returning early')
       return
     }
+
+    console.log('[useCanvasHandlers] Applying optimistic update and calling mutation')
 
     // Optimistic update
     setNodes((currentNodes: any) =>
@@ -218,15 +236,24 @@ export function useCanvasHandlers({
     )
 
     try {
-      await updateSnippetMutation({
-        variables: {
-          projectId,
-          id: snippetId,
-          input: updateInput
-        } as Record<string, unknown> & UpdateSnippetVariables
+      const mutationVariables = {
+        projectId,
+        id: snippetId,
+        input: updateInput
+      } as Record<string, unknown> & UpdateSnippetVariables
+
+      console.log('[useCanvasHandlers] Calling updateSnippetMutation with variables:', mutationVariables)
+
+      const result = await updateSnippetMutation({
+        variables: mutationVariables
       })
+
+      console.log('[useCanvasHandlers] Mutation completed, result:', result)
+
       // Refetch to ensure snippets array is updated with latest data
+      console.log('[useCanvasHandlers] Calling refetch...')
       await refetch()
+      console.log('[useCanvasHandlers] Refetch completed')
     } catch (error) {
       console.error('Failed to update snippet content:', error)
       // Rollback optimistic update
