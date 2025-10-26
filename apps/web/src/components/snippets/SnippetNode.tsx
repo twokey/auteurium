@@ -43,6 +43,7 @@ interface SnippetNodeProps {
     onCombine: (snippetId: string) => Promise<void>
     onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
     onGenerateText: (snippetId: string, content: string) => Promise<void>
+    onFocusSnippet: (snippetId: string) => void
     isGeneratingImage: boolean
     connectedSnippets?: { id: string; imageS3Key?: string | null }[]
     textModels?: AvailableModel[]
@@ -73,6 +74,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
     onUpdateContent,
     onGenerateImage,
     onGenerateText,
+    onFocusSnippet,
     isGeneratingImage,
     connectedSnippets = [],
     textModels = [],
@@ -312,6 +314,19 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
     }
   }, [isLarge, snippet.id, onEdit])
 
+  const handleIdClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    onFocusSnippet(snippet.id)
+  }, [onFocusSnippet, snippet.id])
+
+  const handleConnectedSnippetClick = useCallback(
+    (connectedSnippetId: string) => (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation()
+      onFocusSnippet(connectedSnippetId)
+    },
+    [onFocusSnippet]
+  )
+
   const runTextGeneration = useCallback(async (rawPrompt: string) => {
     const trimmedPrompt = rawPrompt.trim()
 
@@ -419,7 +434,15 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
         {/* Header with title or snippet label and ID */}
         <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
           <span className="tracking-wide">{displayTitle}</span>
-          <span className="font-mono text-[11px] text-gray-400">#{snippet.id.slice(0, 8)}</span>
+          <button
+            type="button"
+            onClick={handleIdClick}
+            className="font-mono text-[11px] text-gray-400 hover:text-blue-600 hover:underline transition-colors cursor-pointer bg-transparent border-none p-0"
+            style={POINTER_EVENTS_STYLES.interactive}
+            title="Click to zoom and center this snippet"
+          >
+            #{snippet.id.slice(0, 8)}
+          </button>
         </div>
 
         {/* Connected content aggregate */}
@@ -434,31 +457,46 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
           </p>
           {connectedContent.length > 0 ? (
             <div className="mt-1 space-y-2">
-              {connectedContent.map((item, index) => (
-                <div key={`${snippet.id}-connected-${item.snippetId}-${index}-${item.type}`}>
-                  <p className="text-[10px] text-gray-500 font-medium mb-0.5">
-                    {item.snippetTitle ? `${item.snippetTitle} - ${item.snippetId}` : item.snippetId}
-                  </p>
-                  <div className="overflow-hidden rounded border border-gray-200 bg-gray-50">
-                    {item.type === 'text' ? (
-                      <p className="px-2 py-1 text-xs text-gray-700 whitespace-pre-wrap">
-                        {item.value}
-                      </p>
-                    ) : (
-                      <img
-                        src={item.value}
-                        alt={`Connected from snippet ${item.snippetId}`}
-                        className="block w-full h-auto max-h-48 object-cover"
-                        loading="lazy"
-                        decoding="async"
-                        onClick={(event) => event.stopPropagation()}
-                        onMouseDown={(event) => event.stopPropagation()}
-                        draggable={false}
-                      />
-                    )}
+              {connectedContent.map((item, index) => {
+                const truncatedId = item.snippetId.slice(0, 8)
+                const connectedDisplayTitle =
+                  item.snippetTitle && item.snippetTitle.trim() !== ''
+                    ? item.snippetTitle.trim()
+                    : 'Snippet'
+                return (
+                  <div key={`${snippet.id}-connected-${item.snippetId}-${index}-${item.type}`}>
+                    <button
+                      type="button"
+                      onClick={handleConnectedSnippetClick(item.snippetId)}
+                      onMouseDown={(event) => event.stopPropagation()}
+                      className="text-[10px] text-gray-500 font-medium mb-0.5 bg-transparent border-none p-0 hover:text-blue-600 hover:underline transition-colors text-left"
+                      style={POINTER_EVENTS_STYLES.interactive}
+                      title={`Focus snippet ${item.snippetId}`}
+                    >
+                      From: {connectedDisplayTitle}{' '}
+                      <span className="font-mono text-gray-400">#{truncatedId}</span>
+                    </button>
+                    <div className="overflow-hidden rounded border border-gray-200 bg-gray-50">
+                      {item.type === 'text' ? (
+                        <p className="px-2 py-1 text-xs text-gray-700 whitespace-pre-wrap">
+                          {item.value}
+                        </p>
+                      ) : (
+                        <img
+                          src={item.value}
+                          alt={`Connected from snippet ${item.snippetId}`}
+                          className="block w-full h-auto max-h-48 object-cover"
+                          loading="lazy"
+                          decoding="async"
+                          onClick={(event) => event.stopPropagation()}
+                          onMouseDown={(event) => event.stopPropagation()}
+                          draggable={false}
+                        />
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           ) : (
             <p className="text-xs text-gray-400 italic mt-1">No upstream content</p>

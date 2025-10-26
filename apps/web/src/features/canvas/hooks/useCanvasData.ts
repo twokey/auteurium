@@ -496,6 +496,7 @@ export function useFlowNodes(
     onCombine: (snippetId: string) => Promise<void>
     onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
     onGenerateText: (snippetId: string, content: string) => Promise<void>
+    onFocusSnippet: (snippetId: string) => void
   },
   generatingImageSnippetIds: Record<string, boolean>,
   textModels?: AvailableModel[],

@@ -129,6 +129,7 @@ export interface SnippetNodeData {
   onCombine: (snippetId: string) => Promise<void>
   onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
   onGenerateText: (snippetId: string, content: string) => Promise<void>
+  onFocusSnippet: (snippetId: string) => void
   isGeneratingImage: boolean
   connectedSnippets?: Array<{ id: string; imageS3Key?: string | null }>
 }

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect } from 'react'
+import { useMemo, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Background,
@@ -6,7 +6,8 @@ import {
   Controls,
   MiniMap,
   ReactFlow,
-  type NodeTypes
+  type NodeTypes,
+  type ReactFlowInstance
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 
@@ -43,9 +44,9 @@ const Canvas = () => {
   // Get text generation models from Context
   const { textModels, isLoadingTextModels } = useModels()
 
-  // Create a ref for setNodes that will be populated after ReactFlow setup
+  // Create refs that will be populated after ReactFlow setup
   const setNodesRef = useRef<any>(() => {})
-  const reactFlowInstanceRef = useRef<any>(null)
+  const externalReactFlowInstanceRef = useRef<ReactFlowInstance | null>(null)
 
   // Event handlers and mutations
   const handlers = useCanvasHandlers({
@@ -53,7 +54,7 @@ const Canvas = () => {
     snippets,
     setNodes: (updateFn: any) => setNodesRef.current(updateFn),
     refetch,
-    reactFlowInstance: reactFlowInstanceRef.current
+    reactFlowInstance: externalReactFlowInstanceRef
   })
 
   // Create handlers object for flow nodes
@@ -66,7 +67,8 @@ const Canvas = () => {
     onUpdateContent: handlers.handleUpdateSnippetContent,
     onCombine: handlers.handleCombineSnippetContent,
     onGenerateImage: handlers.handleGenerateImage,
-    onGenerateText: handlers.handleGenerateTextSnippet
+    onGenerateText: handlers.handleGenerateTextSnippet,
+    onFocusSnippet: handlers.handleFocusSnippet
   }), [
     handlers.handleEditSnippet,
     handlers.handleDeleteSnippet,
@@ -75,7 +77,8 @@ const Canvas = () => {
     handlers.handleUpdateSnippetContent,
     handlers.handleCombineSnippetContent,
     handlers.handleGenerateImage,
-    handlers.handleGenerateTextSnippet
+    handlers.handleGenerateTextSnippet,
+    handlers.handleFocusSnippet
   ])
 
   // Create flow nodes and edges
@@ -97,7 +100,7 @@ const Canvas = () => {
     onNodesChange,
     onEdgesChange,
     onConnect,
-    onInit,
+    onInit: setupOnInit,
     onNodeDragStop,
     onMoveEnd,
     onZoomToFit,
@@ -113,14 +116,16 @@ const Canvas = () => {
     refetch
   })
 
-  // Update the refs with the actual functions
+  // Wrap onInit to write the instance to external ref while preserving setup behavior
+  const onInit = useCallback((instance: ReactFlowInstance) => {
+    externalReactFlowInstanceRef.current = instance
+    setupOnInit(instance)
+  }, [setupOnInit])
+
+  // Update the ref with the actual setNodes function
   useEffect(() => {
     setNodesRef.current = setNodes
   }, [setNodes])
-
-  useEffect(() => {
-    reactFlowInstanceRef.current = reactFlowInstance
-  }, [reactFlowInstance])
 
   // Normalize project data
   const normalisedProject = project

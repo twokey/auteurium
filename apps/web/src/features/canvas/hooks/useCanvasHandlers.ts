@@ -3,7 +3,8 @@
  * Manages all event handlers, mutations, and canvas operations
  */
 
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, type MutableRefObject } from 'react'
+import type { ReactFlowInstance, Node } from 'reactflow'
 
 import {
   CREATE_SNIPPET,
@@ -36,12 +37,45 @@ import type {
 
 type SnippetContentChanges = Partial<Pick<Snippet, 'textField1'>>
 
+type MeasuredReactFlowNode = Node & {
+  measured?: {
+    width?: number
+    height?: number
+  }
+  width?: number
+  height?: number
+}
+
+const getNodeMeasurements = (node: Node | undefined) => {
+  if (!node) {
+    return { width: undefined as number | undefined, height: undefined as number | undefined }
+  }
+
+  const measuredNode = node as MeasuredReactFlowNode
+
+  const height =
+    typeof measuredNode.measured?.height === 'number'
+      ? measuredNode.measured.height
+      : typeof measuredNode.height === 'number'
+        ? measuredNode.height
+        : undefined
+
+  const width =
+    typeof measuredNode.measured?.width === 'number'
+      ? measuredNode.measured.width
+      : typeof measuredNode.width === 'number'
+        ? measuredNode.width
+        : undefined
+
+  return { width, height }
+}
+
 export interface UseCanvasHandlersProps {
   projectId: string | undefined
   snippets: Snippet[]
   setNodes: (nodes: any) => void
   refetch: () => Promise<void>
-  reactFlowInstance?: any
+  reactFlowInstance?: MutableRefObject<ReactFlowInstance | null>
 }
 
 export interface UseCanvasHandlersResult {
@@ -53,6 +87,7 @@ export interface UseCanvasHandlersResult {
   handleUpdateSnippetContent: (snippetId: string, changes: SnippetContentChanges) => Promise<void>
   handleCombineSnippetContent: (snippetId: string) => Promise<void>
   handleGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
+  handleFocusSnippet: (snippetId: string) => void
 
   // Canvas Operations
   handleCreateSnippet: (position: { x: number; y: number }) => void
@@ -350,14 +385,13 @@ export function useCanvasHandlers({
       const baseX = snippet.position?.x ?? 0
       const baseY = snippet.position?.y ?? 0
 
-      let sourceNodeHeight = CANVAS_CONSTANTS.ESTIMATED_SNIPPET_HEIGHT
-      if (reactFlowInstance && typeof reactFlowInstance.getNode === 'function') {
+      let sourceNodeHeight: number = CANVAS_CONSTANTS.ESTIMATED_SNIPPET_HEIGHT
+      if (reactFlowInstance?.current && typeof reactFlowInstance.current.getNode === 'function') {
         try {
-          const sourceNode = reactFlowInstance.getNode(snippetId)
-          if (sourceNode?.measured?.height) {
-            sourceNodeHeight = sourceNode.measured.height
-          } else if (sourceNode?.height) {
-            sourceNodeHeight = sourceNode.height
+          const sourceNode = reactFlowInstance.current.getNode(snippetId)
+          const { height } = getNodeMeasurements(sourceNode)
+          if (typeof height === 'number') {
+            sourceNodeHeight = height
           }
         } catch (error) {
           console.error('Failed to get node dimensions:', error)
@@ -693,14 +727,13 @@ export function useCanvasHandlers({
     const baseY = sourceSnippet?.position?.y ?? 0
 
     // Try to get actual node height from React Flow, fallback to estimated height
-    let sourceNodeHeight = CANVAS_CONSTANTS.ESTIMATED_SNIPPET_HEIGHT
-    if (reactFlowInstance && typeof reactFlowInstance.getNode === 'function') {
+    let sourceNodeHeight: number = CANVAS_CONSTANTS.ESTIMATED_SNIPPET_HEIGHT
+    if (reactFlowInstance?.current && typeof reactFlowInstance.current.getNode === 'function') {
       try {
-        const sourceNode = reactFlowInstance.getNode(sourceSnippetId)
-        if (sourceNode?.measured?.height) {
-          sourceNodeHeight = sourceNode.measured.height
-        } else if (sourceNode?.height) {
-          sourceNodeHeight = sourceNode.height
+        const sourceNode = reactFlowInstance.current.getNode(sourceSnippetId)
+        const { height } = getNodeMeasurements(sourceNode)
+        if (typeof height === 'number') {
+          sourceNodeHeight = height
         }
       } catch (error) {
         // If getting node fails, use estimated height
@@ -796,6 +829,54 @@ export function useCanvasHandlers({
     clearRealSnippets
   ])
 
+  // Focus on a snippet: center and zoom to make it take ~80% of viewport height
+  const handleFocusSnippet = useCallback((snippetId: string) => {
+    if (!reactFlowInstance?.current || typeof reactFlowInstance.current.getNode !== 'function') {
+      console.error('Cannot focus snippet: ReactFlow instance not available')
+      return
+    }
+
+    try {
+      const node = reactFlowInstance.current.getNode(snippetId)
+      if (!node) {
+        console.error('Cannot focus snippet: node not found')
+        return
+      }
+
+      // Get viewport dimensions
+      const viewportElement = document.querySelector('.react-flow__viewport')
+      if (!viewportElement) {
+        console.error('Cannot focus snippet: viewport element not found')
+        return
+      }
+
+      const viewportHeight = viewportElement.parentElement?.clientHeight ?? 600
+
+      // Get node dimensions (measured or estimated)
+      const { height, width } = getNodeMeasurements(node)
+      const nodeHeight = height ?? CANVAS_CONSTANTS.ESTIMATED_SNIPPET_HEIGHT
+      const nodeWidth = width ?? 250
+
+      // Calculate zoom level to make snippet take 80% of viewport height
+      const targetZoom = (viewportHeight * 0.8) / nodeHeight
+
+      // Clamp zoom between reasonable bounds (0.5x to 2x)
+      const clampedZoom = Math.max(0.5, Math.min(2, targetZoom))
+
+      // Get node center coordinates
+      const nodeCenterX = node.position.x + nodeWidth / 2
+      const nodeCenterY = node.position.y + nodeHeight / 2
+
+      // Animate to center and zoom
+      reactFlowInstance.current.setCenter(nodeCenterX, nodeCenterY, {
+        zoom: clampedZoom,
+        duration: 400
+      })
+    } catch (error) {
+      console.error('Failed to focus on snippet:', error)
+    }
+  }, [reactFlowInstance])
+
   return {
     // Snippet Handlers
     handleEditSnippet,
@@ -805,6 +886,7 @@ export function useCanvasHandlers({
     handleUpdateSnippetContent,
     handleCombineSnippetContent,
     handleGenerateImage,
+    handleFocusSnippet,
 
     // Canvas Operations
     handleCreateSnippet,
