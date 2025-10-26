@@ -84,6 +84,23 @@ export interface CanvasInfoPanelProps {
 // Snippet Node Types
 export type EditableField = 'textField1'
 
+export type ConnectedContentItem =
+  | {
+      snippetId: string
+      type: 'text'
+      value: string
+    }
+  | {
+      snippetId: string
+      type: 'image'
+      value: string
+      imageMetadata?: {
+        width: number
+        height: number
+        aspectRatio: string
+      } | null
+    }
+
 export interface SnippetNodeData {
   snippet: {
     id: string
@@ -99,7 +116,7 @@ export interface SnippetNodeData {
       height: number
       aspectRatio: string
     } | null
-    connectedContent?: string[]
+    connectedContent?: ConnectedContentItem[]
   }
   onEdit: (snippetId: string) => void
   onDelete: (snippetId: string) => void

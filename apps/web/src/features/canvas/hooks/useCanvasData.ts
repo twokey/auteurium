@@ -17,7 +17,8 @@ import type {
   ProjectConnectionsQueryData,
   ProjectConnectionsQueryVariables,
   SnippetNodeData,
-  Connection
+  Connection,
+  ConnectedContentItem
 } from '../../../types'
 import type { Node, Edge } from 'reactflow'
 
@@ -30,7 +31,13 @@ interface ConnectionEdgeData {
 
 interface ConnectedContentEntry {
   snippetId: string
-  text: string
+  text?: string
+  imageUrl?: string | null
+  imageMetadata?: {
+    width: number
+    height: number
+    aspectRatio: string
+  } | null
 }
 
 const mergeConnectedEntries = (
@@ -41,20 +48,52 @@ const mergeConnectedEntries = (
     return base
   }
 
-  const merged = [...base]
-  const seen = new Set(base.map(entry => entry.snippetId))
+  const merged = base.map(entry => ({ ...entry }))
+  const lookup = new Map<string, ConnectedContentEntry>()
+
+  merged.forEach((entry) => {
+    lookup.set(entry.snippetId, entry)
+  })
 
   for (const entry of addition) {
-    const trimmedText = entry.text.trim()
-    if (trimmedText === '' || seen.has(entry.snippetId)) {
+    const trimmedText = entry.text?.trim() ?? ''
+    const hasText = trimmedText !== ''
+    const hasImage = Boolean(entry.imageUrl)
+
+    if (!hasText && !hasImage) {
       continue
     }
 
-    merged.push({
-      snippetId: entry.snippetId,
-      text: trimmedText
-    })
-    seen.add(entry.snippetId)
+    const existing = lookup.get(entry.snippetId)
+
+    if (existing) {
+      if (hasText && !existing.text) {
+        existing.text = trimmedText
+      }
+
+      if (hasImage && !existing.imageUrl) {
+        existing.imageUrl = entry.imageUrl
+        existing.imageMetadata = entry.imageMetadata ?? existing.imageMetadata ?? null
+      }
+
+      continue
+    }
+
+    const newEntry: ConnectedContentEntry = {
+      snippetId: entry.snippetId
+    }
+
+    if (hasText) {
+      newEntry.text = trimmedText
+    }
+
+    if (hasImage) {
+      newEntry.imageUrl = entry.imageUrl
+      newEntry.imageMetadata = entry.imageMetadata ?? null
+    }
+
+    merged.push(newEntry)
+    lookup.set(entry.snippetId, newEntry)
   }
 
   return merged
@@ -65,7 +104,7 @@ const analyzeSnippetConnections = (
 ): {
   snippetMap: Map<string, Snippet>
   incomingSourcesMap: Map<string, string[]>
-  connectedContentMap: Map<string, string[]>
+  connectedContentMap: Map<string, ConnectedContentItem[]>
 } => {
   const snippetMap = new Map<string, Snippet>()
   const snippetOrder = new Map<string, number>()
@@ -142,10 +181,27 @@ const analyzeSnippetConnections = (
       const sourceContent = computeConnectedContent(sourceId)
       const sourceSnippet = snippetMap.get(sourceId)
       const trimmedText = sourceSnippet?.textField1?.trim() ?? ''
-      const branchContent: ConnectedContentEntry[] =
-        trimmedText !== ''
-          ? [...sourceContent, { snippetId: sourceId, text: trimmedText }]
-          : [...sourceContent]
+      const imageUrl = sourceSnippet?.imageUrl ?? null
+      const hasText = trimmedText !== ''
+      const hasImage = Boolean(imageUrl)
+
+      let branchContent: ConnectedContentEntry[] = [...sourceContent]
+
+      if (hasText || hasImage) {
+        branchContent = [
+          ...sourceContent,
+          {
+            snippetId: sourceId,
+            ...(hasText ? { text: trimmedText } : {}),
+            ...(hasImage
+              ? {
+                  imageUrl,
+                  imageMetadata: sourceSnippet?.imageMetadata ?? null
+                }
+              : {})
+          }
+        ]
+      }
 
       aggregated = mergeConnectedEntries(aggregated, branchContent)
     }
@@ -162,13 +218,31 @@ const analyzeSnippetConnections = (
     }
   })
 
-  const connectedContentMap = new Map<string, string[]>()
+  const connectedContentMap = new Map<string, ConnectedContentItem[]>()
 
   connectedEntriesMap.forEach((entries, snippetId) => {
-    connectedContentMap.set(
-      snippetId,
-      entries.map(entry => entry.text)
-    )
+    const items: ConnectedContentItem[] = []
+
+    entries.forEach((entry) => {
+      if (entry.text && entry.text.trim() !== '') {
+        items.push({
+          snippetId: entry.snippetId,
+          type: 'text',
+          value: entry.text
+        })
+      }
+
+      if (entry.imageUrl) {
+        items.push({
+          snippetId: entry.snippetId,
+          type: 'image',
+          value: entry.imageUrl,
+          imageMetadata: entry.imageMetadata ?? null
+        })
+      }
+    })
+
+    connectedContentMap.set(snippetId, items)
   })
 
   return {
@@ -343,17 +417,22 @@ export function useCanvasData(projectId: string | undefined): UseCanvasDataResul
     const combinedSnippets = [...snippetsWithRealOnes, ...newRealSnippets, ...optimisticSnippetsArray]
 
     const enrichedSnippets = combinedSnippets.map((snippet) => {
+      const hasImageAsset = Boolean(snippet.imageUrl || snippet.imageS3Key)
+      const sanitizedSnippet =
+        hasImageAsset && snippet.textField1 !== ''
+          ? { ...snippet, textField1: '' }
+          : snippet
       const connectionsForSnippet = connectionsBySource.get(snippet.id) ?? EMPTY_CONNECTION_LIST
 
       if (connectionsForSnippet === EMPTY_CONNECTION_LIST) {
         return {
-          ...snippet,
+          ...sanitizedSnippet,
           connections: EMPTY_CONNECTION_LIST
         }
       }
 
       return {
-        ...snippet,
+        ...sanitizedSnippet,
         connections: connectionsForSnippet
       }
     })

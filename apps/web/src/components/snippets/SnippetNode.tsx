@@ -6,6 +6,7 @@ import { useGenAI } from '../../hooks/useGenAI'
 import { CANVAS_CONSTANTS } from '../../shared/constants'
 import { useToast } from '../../shared/store/toastStore'
 import { countWords, truncateToWords } from '../../shared/utils/textUtils'
+import type { ConnectedContentItem } from '../../types'
 
 interface AvailableModel {
   id: string
@@ -30,7 +31,7 @@ interface SnippetNodeProps {
         height: number
         aspectRatio: string
       } | null
-      connectedContent?: string[]
+      connectedContent?: ConnectedContentItem[]
     }
     onEdit: (snippetId: string) => void
     onDelete: (snippetId: string) => void
@@ -74,7 +75,9 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
     textModels = [],
     isLoadingTextModels = false
   } = data
-  const connectedContent: string[] = snippet.connectedContent ?? []
+  const connectedContent: ConnectedContentItem[] = snippet.connectedContent ?? []
+  const hasImageAsset = Boolean(snippet.imageUrl || snippet.imageS3Key)
+  const isTextFieldLocked = hasImageAsset
 
   const [showContextMenu, setShowContextMenu] = useState(false)
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 })
@@ -152,6 +155,10 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
       (event: React.MouseEvent<HTMLButtonElement>) => {
         event.stopPropagation()
 
+        if (isTextFieldLocked) {
+          return
+        }
+
         if (activeField && activeField !== field) {
           void commitField(activeField)
         }
@@ -162,7 +169,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
           textField1: snippet.textField1
         }))
       },
-    [activeField, commitField, snippet.textField1]
+    [activeField, commitField, snippet.textField1, isTextFieldLocked]
   )
 
   const handleDraftChange = useCallback(
@@ -236,7 +243,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
   const tooManyImages = hasMultimodalSupport && connectedImagesCount > 3
 
   const wordCount = countWords(snippet.textField1)
-  const isLarge = wordCount > CANVAS_CONSTANTS.WORD_LIMIT
+  const isLarge = !isTextFieldLocked && wordCount > CANVAS_CONSTANTS.WORD_LIMIT
 
   const displayText1 = isLarge
     ? truncateToWords(snippet.textField1, CANVAS_CONSTANTS.WORD_LIMIT)
@@ -381,9 +388,50 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
           <span className="font-mono text-[11px] text-gray-400">#{snippet.id.slice(0, 8)}</span>
         </div>
 
+        {/* Connected content aggregate */}
+        <div
+          className="mb-2"
+          style={POINTER_EVENTS_STYLES.interactive}
+          onClick={(event) => event.stopPropagation()}
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+            Connected Content
+          </p>
+          {connectedContent.length > 0 ? (
+            <div className="mt-1 space-y-1.5">
+              {connectedContent.map((item, index) => (
+                <div
+                  key={`${snippet.id}-connected-${item.snippetId}-${index}-${item.type}`}
+                  className="overflow-hidden rounded border border-gray-200 bg-gray-50"
+                >
+                  {item.type === 'text' ? (
+                    <p className="px-2 py-1 text-xs text-gray-700 whitespace-pre-wrap">
+                      {item.value}
+                    </p>
+                  ) : (
+                    <img
+                      src={item.value}
+                      alt={`Connected snippet ${item.snippetId} image`}
+                      className="block w-full h-auto max-h-48 object-cover"
+                      loading="lazy"
+                      decoding="async"
+                      onClick={(event) => event.stopPropagation()}
+                      onMouseDown={(event) => event.stopPropagation()}
+                      draggable={false}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400 italic mt-1">No upstream content</p>
+          )}
+        </div>
+
         {/* Title / Text Field 1 */}
         <div className="mb-2">
-          {activeField === 'textField1' ? (
+          {activeField === 'textField1' && !isTextFieldLocked ? (
             <textarea
               ref={textField1Ref}
               className="w-full text-sm font-medium text-gray-900 bg-white border border-blue-200 rounded-sm p-1 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
@@ -397,6 +445,13 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
               placeholder="Input..."
               style={POINTER_EVENTS_STYLES.interactive}
             />
+          ) : isTextFieldLocked ? (
+            <div
+              className="w-full text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-sm px-2 py-1 cursor-not-allowed select-none"
+              title="Text is disabled when a snippet has its own image"
+            >
+              <span className="italic text-gray-400">Text disabled for image snippet</span>
+            </div>
           ) : (
             <button
               type="button"
@@ -423,31 +478,35 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
           </button>
         )}
 
-        {/* Connected content aggregate */}
-        <div
-          className="mb-2"
-          style={POINTER_EVENTS_STYLES.interactive}
-          onClick={(event) => event.stopPropagation()}
-          onMouseDown={(event) => event.stopPropagation()}
-        >
-          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
-            Connected Content
-          </p>
-          {connectedContent.length > 0 ? (
-            <div className="mt-1 space-y-1.5">
-              {connectedContent.map((content: string, index: number) => (
-                <div
-                  key={`${snippet.id}-connected-${index}`}
-                  className="text-xs text-gray-700 bg-gray-100 rounded px-2 py-1 whitespace-pre-wrap"
-                >
-                  {content}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-gray-400 italic mt-1">No upstream content</p>
-          )}
-        </div>
+        {/* Image Preview */}
+        {snippet.imageUrl && (
+          <div className="mt-2">
+            {isImageLoading && (
+              <div className="w-full h-48 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 animate-pulse rounded-md" />
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onEdit(snippet.id)
+              }}
+              className="w-full rounded-md border border-gray-200 hover:border-blue-400 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+              title="Click to view full image and edit snippet"
+              style={{ display: isImageLoading ? 'none' : 'block', pointerEvents: 'auto' }}
+            >
+              <img
+                src={snippet.imageUrl}
+                alt={snippet.title ?? 'Snippet generated image'}
+                className="w-full h-auto rounded-md"
+                onLoad={() => setIsImageLoading(false)}
+                onError={(e) => {
+                  setIsImageLoading(false)
+                  e.currentTarget.parentElement!.style.display = 'none'
+                }}
+              />
+            </button>
+          </div>
+        )}
 
         <div className="mt-2 space-y-2">
           {/* Generation Section */}
@@ -657,36 +716,6 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                 +{snippet.categories.length - 2}
               </span>
             )}
-          </div>
-        )}
-
-        {/* Image Preview */}
-        {snippet.imageUrl && (
-          <div className="mt-3">
-            {isImageLoading && (
-              <div className="w-full h-48 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 animate-pulse rounded-md" />
-            )}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                onEdit(snippet.id)
-              }}
-              className="w-full rounded-md border border-gray-200 hover:border-blue-400 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
-              title="Click to view full image and edit snippet"
-              style={{ display: isImageLoading ? 'none' : 'block', pointerEvents: 'auto' }}
-            >
-              <img
-                src={snippet.imageUrl}
-                alt={snippet.title ?? 'Snippet generated image'}
-                className="w-full h-auto rounded-md"
-                onLoad={() => setIsImageLoading(false)}
-                onError={(e) => {
-                  setIsImageLoading(false)
-                  e.currentTarget.parentElement!.style.display = 'none'
-                }}
-              />
-            </button>
           </div>
         )}
       </div>
