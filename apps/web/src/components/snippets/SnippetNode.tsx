@@ -79,10 +79,6 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
   } = data
   const connectedContent: ConnectedContentItem[] = snippet.connectedContent ?? []
   const computePromptFromConnectedContent = useCallback(() => {
-    if (connectedContent.length === 0) {
-      return ''
-    }
-
     const lines = connectedContent
       .map((item) => {
         const value = item.value?.trim()
@@ -98,8 +94,16 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
       })
       .filter((line): line is string => Boolean(line))
 
-    return lines.join('\n')
-  }, [connectedContent])
+    const connectedText = lines.join('\n')
+    const currentText = snippet.textField1.trim()
+
+    // Combine connected content with current snippet's text
+    if (connectedText && currentText) {
+      return `${connectedText}\n\n${currentText}`
+    }
+
+    return connectedText || currentText || ''
+  }, [connectedContent, snippet.textField1])
   const hasImageAsset = Boolean(snippet.imageUrl || snippet.imageS3Key)
   const isTextFieldLocked = hasImageAsset
 
