@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
 
 import { GET_AVAILABLE_MODELS } from '../graphql/genai'
-import { useGraphQLQuery } from '../hooks/useGraphQLQuery'
+import { useGraphQLQueryWithCache } from '../shared/hooks/useGraphQLQueryWithCache'
 
 export interface AvailableModel {
   id: string
@@ -34,23 +34,23 @@ interface ModelsProviderProps {
 }
 
 export const ModelsProvider = ({ children }: ModelsProviderProps) => {
-  // Query text generation models
+  // Query text generation models with caching
   const {
     data: textModelsData,
     loading: isLoadingTextModels,
     error: textModelsError,
     refetch: refetchTextModels
-  } = useGraphQLQuery<AvailableModelsData>(GET_AVAILABLE_MODELS, {
+  } = useGraphQLQueryWithCache<AvailableModelsData>(GET_AVAILABLE_MODELS, {
     variables: { modality: 'TEXT_TO_TEXT' }
   })
 
-  // Query image generation models
+  // Query image generation models with caching
   const {
     data: imageModelsData,
     loading: isLoadingImageModels,
     error: imageModelsError,
     refetch: refetchImageModels
-  } = useGraphQLQuery<AvailableModelsData>(GET_AVAILABLE_MODELS, {
+  } = useGraphQLQueryWithCache<AvailableModelsData>(GET_AVAILABLE_MODELS, {
     variables: { modality: 'TEXT_TO_IMAGE' }
   })
 

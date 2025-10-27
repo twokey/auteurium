@@ -49,6 +49,8 @@ interface SnippetNodeProps {
     connectedSnippets?: { id: string; imageS3Key?: string | null }[]
     textModels?: AvailableModel[]
     isLoadingTextModels?: boolean
+    imageModels?: AvailableModel[]
+    isLoadingImageModels?: boolean
   }
 }
 
@@ -79,7 +81,9 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
     isGeneratingImage,
     connectedSnippets = [],
     textModels = [],
-    isLoadingTextModels = false
+    isLoadingTextModels = false,
+    imageModels = [],
+    isLoadingImageModels = false
   } = data
   const connectedContent: ConnectedContentItem[] = snippet.connectedContent ?? []
   const hasImageAsset = Boolean(snippet.imageUrl ?? snippet.imageS3Key)
@@ -97,7 +101,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
   const titleRef = useRef<HTMLInputElement | null>(null)
   const [isImageLoading, setIsImageLoading] = useState(true)
   const [selectedTextModel, setSelectedTextModel] = useState<string>('')
-  const [selectedImageModel, setSelectedImageModel] = useState<string>('imagen-4.0-fast-generate-001')
+  const [selectedImageModel, setSelectedImageModel] = useState<string>('')
   const [selectedVideoModel, setSelectedVideoModel] = useState<string>('')
   const [isGeneratingText, setIsGeneratingText] = useState(false)
   const [isGenerateExpanded, setIsGenerateExpanded] = useState(false)
@@ -138,6 +142,13 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
       setSelectedTextModel(textModels[0].id)
     }
   }, [textModels, selectedTextModel])
+
+  // Auto-select first image model when models load
+  useEffect(() => {
+    if (imageModels.length > 0 && selectedImageModel === '') {
+      setSelectedImageModel(imageModels[0].id)
+    }
+  }, [imageModels, selectedImageModel])
 
   useEffect(() => {
     if (activeField === 'textField1') {
@@ -808,8 +819,14 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                   disabled={isGeneratingImage || savingField !== null}
                   style={POINTER_EVENTS_STYLES.interactive}
                 >
-                  <option value="imagen-4.0-fast-generate-001">Imagen 4 Fast</option>
-                  <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
+                  <option value="" disabled>
+                    {isLoadingImageModels ? 'Loading image models...' : 'Select image model...'}
+                  </option>
+                  {imageModels.map((model) => (
+                    <option key={model.id} value={model.id} title={model.description ?? undefined}>
+                      {model.displayName}
+                    </option>
+                  ))}
                 </select>
                 <button
                   type="button"
@@ -842,10 +859,18 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                       }
                     })
                   }}
-                  disabled={isGeneratingImage || tooManyImages}
+                  disabled={isGeneratingImage || isLoadingImageModels || (!selectedImageModel && imageModels.length > 0) || tooManyImages || savingField !== null}
                   style={POINTER_EVENTS_STYLES.interactive}
                   aria-label="Generate image content"
-                  title={tooManyImages ? `Too many connected images (${connectedImagesCount}). Remove connections to use ≤3.` : 'Generate image for this snippet'}
+                  title={
+                    isLoadingImageModels
+                      ? 'Loading models...'
+                      : !selectedImageModel
+                        ? 'Please select an image model first'
+                        : tooManyImages
+                          ? `Too many connected images (${connectedImagesCount}). Remove connections to use ≤3.`
+                          : 'Generate image for this snippet'
+                  }
                 >
                   {isGeneratingImage ? (
                     <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">

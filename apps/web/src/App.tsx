@@ -2,7 +2,6 @@ import { lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 
 import { Navigation } from './components/ui/Navigation'
-import { ModelsProvider } from './contexts/ModelsContext'
 import { AuthProvider } from './hooks/AuthProvider'
 import { useAuth } from './hooks/useAuth'
 import { ErrorBoundary } from './shared/components/ErrorBoundary'
@@ -87,10 +86,8 @@ const AppContent = () => {
 const App = () => (
   <ErrorBoundary>
     <AuthProvider>
-      <ModelsProvider>
-        <AppContent />
-        <ToastContainer />
-      </ModelsProvider>
+      <AppContent />
+      <ToastContainer />
     </AuthProvider>
   </ErrorBoundary>
 )

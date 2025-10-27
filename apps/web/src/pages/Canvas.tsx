@@ -21,7 +21,7 @@ import { useCanvasHandlers } from '../features/canvas/hooks/useCanvasHandlers'
 import { useReactFlowSetup } from '../features/canvas/hooks/useReactFlowSetup'
 import { CanvasModals } from '../features/canvas/components/CanvasModals'
 import { useCanvasStore } from '../features/canvas/store/canvasStore'
-import { useModels } from '../contexts/ModelsContext'
+import { ModelsProvider, useModels } from '../contexts/ModelsContext'
 import { PromptDesignerPanel } from '../components/canvas/PromptDesignerPanel'
 
 const NODE_TYPES: NodeTypes = {
@@ -33,7 +33,7 @@ const NODE_TYPES: NodeTypes = {
  * Orchestrates canvas functionality using custom hooks
  */
 
-const Canvas = () => {
+const CanvasContent = () => {
   const { id: projectId } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { generatingImageSnippetIds } = useCanvasStore()
@@ -41,8 +41,8 @@ const Canvas = () => {
   // Data fetching
   const { project, snippets, loading, error, refetch } = useCanvasData(projectId)
 
-  // Get text generation models from Context
-  const { textModels, isLoadingTextModels } = useModels()
+  // Get text and image generation models from Context
+  const { textModels, isLoadingTextModels, imageModels, isLoadingImageModels } = useModels()
 
   // Create refs that will be populated after ReactFlow setup
   const setNodesRef = useRef<any>(() => {})
@@ -87,7 +87,9 @@ const Canvas = () => {
     nodeHandlers,
     generatingImageSnippetIds,
     textModels,
-    isLoadingTextModels
+    isLoadingTextModels,
+    imageModels,
+    isLoadingImageModels
   )
 
   const flowEdges = useFlowEdges(snippets)
@@ -278,6 +280,13 @@ const Canvas = () => {
     </>
   )
 }
+
+// Wrap with ModelsProvider for lazy loading
+const Canvas = () => (
+  <ModelsProvider>
+    <CanvasContent />
+  </ModelsProvider>
+)
 
 // Named export for lazy loading
 export { Canvas }

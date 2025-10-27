@@ -500,7 +500,9 @@ export function useFlowNodes(
   },
   generatingImageSnippetIds: Record<string, boolean>,
   textModels?: AvailableModel[],
-  isLoadingTextModels?: boolean
+  isLoadingTextModels?: boolean,
+  imageModels?: AvailableModel[],
+  isLoadingImageModels?: boolean
 ): Node<SnippetNodeData>[] {
   return useMemo(() => {
     const { snippetMap, incomingSourcesMap, connectedContentMap } = analyzeSnippetConnections(snippets)
@@ -553,7 +555,9 @@ export function useFlowNodes(
           isGeneratingImage: Boolean(generatingImageSnippetIds[snippet.id]),
           connectedSnippets,
           textModels,
-          isLoadingTextModels
+          isLoadingTextModels,
+          imageModels,
+          isLoadingImageModels
         },
         style: {
           background: '#fff',
@@ -564,7 +568,7 @@ export function useFlowNodes(
         }
       } as Node<SnippetNodeData>
     })
-  }, [snippets, handlers, generatingImageSnippetIds, textModels, isLoadingTextModels])
+  }, [snippets, handlers, generatingImageSnippetIds, textModels, isLoadingTextModels, imageModels, isLoadingImageModels])
 }
 
 /**
