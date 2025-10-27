@@ -79,8 +79,8 @@ export class AuteuriumApiStack extends cdk.Stack {
       }
     })
 
-    // Grant S3 read permissions for generating presigned URLs
-    mediaBucket.grantRead(apiFunction)
+    // Grant S3 read/write permissions so the API can manage snippet media lifecycle
+    mediaBucket.grantReadWrite(apiFunction)
 
     // Grant DynamoDB permissions to Lambda
     usersTable.grantReadWriteData(apiFunction)
