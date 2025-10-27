@@ -446,16 +446,13 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
         </div>
 
         {/* Connected content aggregate */}
-        <div
-          className="mb-2"
-          style={POINTER_EVENTS_STYLES.interactive}
-          onClick={(event) => event.stopPropagation()}
-          onMouseDown={(event) => event.stopPropagation()}
-        >
-          <p className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
-            Prompt
-          </p>
-          {connectedContent.length > 0 ? (
+        {connectedContent.length > 0 && (
+          <div
+            className="mb-2"
+            style={POINTER_EVENTS_STYLES.interactive}
+            onClick={(event) => event.stopPropagation()}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
             <div className="mt-1 space-y-2">
               {connectedContent.map((item, index) => {
                 const truncatedId = item.snippetId.slice(0, 8)
@@ -473,7 +470,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                       style={POINTER_EVENTS_STYLES.interactive}
                       title={`Focus snippet ${item.snippetId}`}
                     >
-                      From: {connectedDisplayTitle}{' '}
+                      {connectedDisplayTitle}{' '}
                       <span className="font-mono text-gray-400">#{truncatedId}</span>
                     </button>
                     <div className="overflow-hidden rounded border border-gray-200 bg-gray-50">
@@ -498,10 +495,8 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                 )
               })}
             </div>
-          ) : (
-            <p className="text-xs text-gray-400 italic mt-1">No upstream content</p>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Title / Text Field 1 */}
         <div className="mb-2">

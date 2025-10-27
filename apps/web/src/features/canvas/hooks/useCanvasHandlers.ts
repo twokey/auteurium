@@ -70,6 +70,48 @@ const getNodeMeasurements = (node: Node | undefined) => {
   return { width, height }
 }
 
+/**
+ * Find all downstream snippets that depend on the given snippet
+ * Uses BFS to traverse outgoing connections
+ */
+const findDownstreamSnippets = (
+  sourceSnippetId: string,
+  snippets: Snippet[]
+): Set<string> => {
+  const downstreamIds = new Set<string>()
+  const visited = new Set<string>()
+  const queue: string[] = [sourceSnippetId]
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!
+
+    if (visited.has(currentId)) {
+      continue
+    }
+
+    visited.add(currentId)
+
+    // Find all snippets that have this snippet as a source
+    const currentSnippet = snippets.find(s => s.id === currentId)
+    if (!currentSnippet) {
+      continue
+    }
+
+    // Get all outgoing connections from this snippet
+    const outgoingConnections = currentSnippet.connections ?? []
+
+    for (const connection of outgoingConnections) {
+      const targetId = connection.targetSnippetId
+      if (targetId && !visited.has(targetId)) {
+        downstreamIds.add(targetId)
+        queue.push(targetId)
+      }
+    }
+  }
+
+  return downstreamIds
+}
+
 export interface UseCanvasHandlersProps {
   projectId: string | undefined
   snippets: Snippet[]
@@ -286,10 +328,24 @@ export function useCanvasHandlers({
 
       console.log('[useCanvasHandlers] Mutation completed, result:', result)
 
-      // No refetch needed - the optimistic update already updated the UI
-      // Refetching here causes a race condition where snippet data gets refreshed
-      // while the SnippetNode component is still in edit mode, causing the
-      // useEffect to reset draftValues and lose the user's changes
+      // PROPAGATION LOGIC: If textField1 was updated, find all downstream snippets
+      // and refetch to propagate the change to their connectedContent
+      if (Object.prototype.hasOwnProperty.call(updateInput, 'textField1')) {
+        const downstreamSnippets = findDownstreamSnippets(snippetId, snippetsRef.current)
+
+        if (downstreamSnippets.size > 0) {
+          console.log('[useCanvasHandlers] Propagating textField1 change to downstream snippets:', {
+            updatedSnippetId: snippetId,
+            downstreamCount: downstreamSnippets.size,
+            downstreamIds: Array.from(downstreamSnippets)
+          })
+
+          // Refetch to trigger re-computation of connectedContent for all snippets
+          // This will update the GraphQL cache and cause useCanvasData to re-run
+          // analyzeSnippetConnections(), which will propagate the textField1 change
+          await refetch()
+        }
+      }
     } catch (error) {
       console.error('Failed to update snippet content:', error)
       // Rollback optimistic update
@@ -311,7 +367,7 @@ export function useCanvasHandlers({
       )
       throw error
     }
-  }, [projectId, setNodes, updateSnippetMutation])
+  }, [projectId, setNodes, updateSnippetMutation, refetch])
 
   const handleCombineSnippetContent = useCallback(async (snippetId: string) => {
     if (!projectId) {
