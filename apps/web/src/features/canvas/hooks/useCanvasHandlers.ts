@@ -35,7 +35,7 @@ import type {
   GenerateSnippetImageMutationData
 } from '../../../types'
 
-type SnippetContentChanges = Partial<Pick<Snippet, 'textField1'>>
+type SnippetContentChanges = Partial<Pick<Snippet, 'textField1' | 'title'>>
 
 type MeasuredReactFlowNode = Node & {
   measured?: {
@@ -285,6 +285,15 @@ export function useCanvasHandlers({
       console.log('[useCanvasHandlers] textField1 update prepared:', {
         newValue: updateInput.textField1,
         oldValue: previousValues.textField1
+      })
+    }
+
+    if (Object.prototype.hasOwnProperty.call(changes, 'title')) {
+      updateInput.title = changes.title ?? ''
+      previousValues.title = snippetBeforeUpdate.title
+      console.log('[useCanvasHandlers] title update prepared:', {
+        newValue: updateInput.title,
+        oldValue: previousValues.title
       })
     }
 

@@ -492,7 +492,7 @@ export function useFlowNodes(
     onDelete: (snippetId: string) => void
     onManageConnections: (snippetId: string) => void
     onViewVersions: (snippetId: string) => void
-    onUpdateContent: (snippetId: string, changes: Partial<Pick<Snippet, 'textField1'>>) => Promise<void>
+    onUpdateContent: (snippetId: string, changes: Partial<Pick<Snippet, 'textField1' | 'title'>>) => Promise<void>
     onCombine: (snippetId: string) => Promise<void>
     onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
     onGenerateText: (snippetId: string, content: string) => Promise<void>
@@ -522,6 +522,14 @@ export function useFlowNodes(
         .map(s => ({ id: s.id, imageS3Key: s.imageS3Key }))
       const connectedContent = connectedContentMap.get(snippet.id) ?? []
 
+      // Compute downstream connections (snippets this snippet connects TO)
+      const downstreamConnections = (snippet.connections ?? [])
+        .map(conn => {
+          const targetSnippet = snippetMap.get(conn.targetSnippetId)
+          return targetSnippet ? { id: targetSnippet.id, title: targetSnippet.title } : null
+        })
+        .filter(conn => conn !== null) as Array<{ id: string; title?: string }>
+
       return {
         id: snippet.id,
         type: 'snippet',
@@ -538,7 +546,8 @@ export function useFlowNodes(
             imageUrl: snippet.imageUrl,
             imageS3Key: snippet.imageS3Key,
             imageMetadata: snippet.imageMetadata,
-            connectedContent
+            connectedContent,
+            downstreamConnections
           },
           ...handlers,
           isGeneratingImage: Boolean(generatingImageSnippetIds[snippet.id]),

@@ -34,12 +34,13 @@ interface SnippetNodeProps {
         aspectRatio: string
       } | null
       connectedContent?: ConnectedContentItem[]
+      downstreamConnections?: Array<{ id: string; title?: string }>
     }
     onEdit: (snippetId: string) => void
     onDelete: (snippetId: string) => void
     onManageConnections: (snippetId: string) => void
     onViewVersions: (snippetId: string) => void
-    onUpdateContent: (snippetId: string, changes: Partial<Record<'textField1', string>>) => Promise<void>
+    onUpdateContent: (snippetId: string, changes: Partial<Record<'textField1' | 'title', string>>) => Promise<void>
     onCombine: (snippetId: string) => Promise<void>
     onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
     onGenerateText: (snippetId: string, content: string) => Promise<void>
@@ -51,7 +52,7 @@ interface SnippetNodeProps {
   }
 }
 
-type EditableField = 'textField1'
+type EditableField = 'textField1' | 'title'
 
 // Extract inline styles outside component to prevent object recreation on every render
 // This is a critical performance fix for preventing unnecessary React Flow node updates
@@ -88,10 +89,12 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 })
   const [activeField, setActiveField] = useState<EditableField | null>(null)
   const [draftValues, setDraftValues] = useState({
-    textField1: snippet.textField1
+    textField1: snippet.textField1,
+    title: snippet.title ?? ''
   })
   const [savingField, setSavingField] = useState<EditableField | null>(null)
   const textField1Ref = useRef<HTMLTextAreaElement | null>(null)
+  const titleRef = useRef<HTMLInputElement | null>(null)
   const [isImageLoading, setIsImageLoading] = useState(true)
   const [selectedTextModel, setSelectedTextModel] = useState<string>('')
   const [selectedImageModel, setSelectedImageModel] = useState<string>('imagen-4.0-fast-generate-001')
@@ -114,6 +117,21 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
     })
   }, [snippet.textField1, activeField])
 
+  useEffect(() => {
+    if (activeField === 'title') return
+
+    setDraftValues((prev) => {
+      if (prev.title === (snippet.title ?? '')) {
+        return prev
+      }
+
+      return {
+        ...prev,
+        title: snippet.title ?? ''
+      }
+    })
+  }, [snippet.title, activeField])
+
   // Auto-select first text model when models load
   useEffect(() => {
     if (textModels.length > 0 && selectedTextModel === '') {
@@ -127,59 +145,95 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
       target?.focus()
       const length = target?.value.length ?? 0
       target?.setSelectionRange(length, length)
+    } else if (activeField === 'title') {
+      const target = titleRef.current
+      target?.focus()
+      target?.select()
     }
   }, [activeField])
 
-  const commitField = useCallback(async (_field: EditableField) => {
-    const newValue = draftValues.textField1
-    const currentValue = snippet.textField1
+  const commitField = useCallback(async (field: EditableField) => {
+    if (field === 'textField1') {
+      const newValue = draftValues.textField1
+      const currentValue = snippet.textField1
 
-    console.log('[SnippetNode] commitField called:', {
-      field: _field,
-      snippetId: snippet.id,
-      newValue,
-      currentValue,
-      areEqual: newValue === currentValue
-    })
+      console.log('[SnippetNode] commitField called:', {
+        field,
+        snippetId: snippet.id,
+        newValue,
+        currentValue,
+        areEqual: newValue === currentValue
+      })
 
-    // CRITICAL FIX: Don't clear activeField yet! The useEffect will reset draftValues if we do.
-    // We need to keep activeField set until AFTER the mutation completes.
+      if (newValue === currentValue) {
+        console.log('[SnippetNode] No change detected, skipping update')
+        setActiveField(null)
+        return
+      }
 
-    if (newValue === currentValue) {
-      console.log('[SnippetNode] No change detected, skipping update')
-      setActiveField(null) // It's safe to clear here since we're not saving
-      return
+      setSavingField('textField1')
+
+      try {
+        console.log('[SnippetNode] Calling onUpdateContent with:', { snippetId: snippet.id, textField1: newValue })
+        await onUpdateContent(snippet.id, { textField1: newValue })
+        console.log('[SnippetNode] onUpdateContent completed successfully')
+        setActiveField(null)
+      } catch (error) {
+        console.error('Failed to update snippet content:', error)
+        toast.error('Failed to save snippet changes', 'Please try again')
+        setDraftValues((prev) => ({
+          ...prev,
+          textField1: currentValue
+        }))
+        setActiveField(null)
+      } finally {
+        setSavingField(null)
+      }
+    } else if (field === 'title') {
+      const newValue = draftValues.title
+      const currentValue = snippet.title ?? ''
+
+      console.log('[SnippetNode] commitField called:', {
+        field,
+        snippetId: snippet.id,
+        newValue,
+        currentValue,
+        areEqual: newValue === currentValue
+      })
+
+      if (newValue === currentValue) {
+        console.log('[SnippetNode] No change detected, skipping update')
+        setActiveField(null)
+        return
+      }
+
+      setSavingField('title')
+
+      try {
+        console.log('[SnippetNode] Calling onUpdateContent with:', { snippetId: snippet.id, title: newValue })
+        await onUpdateContent(snippet.id, { title: newValue })
+        console.log('[SnippetNode] onUpdateContent completed successfully')
+        setActiveField(null)
+      } catch (error) {
+        console.error('Failed to update snippet title:', error)
+        toast.error('Failed to save title changes', 'Please try again')
+        setDraftValues((prev) => ({
+          ...prev,
+          title: currentValue
+        }))
+        setActiveField(null)
+      } finally {
+        setSavingField(null)
+      }
     }
-
-    setSavingField('textField1')
-
-    try {
-      console.log('[SnippetNode] Calling onUpdateContent with:', { snippetId: snippet.id, textField1: newValue })
-      await onUpdateContent(snippet.id, { textField1: newValue })
-      console.log('[SnippetNode] onUpdateContent completed successfully')
-
-      // CRITICAL FIX: Only clear activeField AFTER the mutation succeeds
-      setActiveField(null)
-    } catch (error) {
-      console.error('Failed to update snippet content:', error)
-      toast.error('Failed to save snippet changes', 'Please try again')
-      setDraftValues((prev) => ({
-        ...prev,
-        textField1: currentValue
-      }))
-      // Clear activeField even on error so user can try again
-      setActiveField(null)
-    } finally {
-      setSavingField(null)
-    }
-  }, [draftValues, onUpdateContent, snippet.id, snippet.textField1, toast])
+  }, [draftValues, onUpdateContent, snippet.id, snippet.textField1, snippet.title, toast])
 
   const handleFieldActivate = useCallback(
     (field: EditableField) =>
       (event: React.MouseEvent<HTMLButtonElement>) => {
         event.stopPropagation()
 
-        if (isTextFieldLocked) {
+        if (field === 'textField1' && isTextFieldLocked) {
           return
         }
 
@@ -188,17 +242,24 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
         }
 
         setActiveField(field)
-        setDraftValues((prev) => ({
-          ...prev,
-          textField1: snippet.textField1
-        }))
+        if (field === 'textField1') {
+          setDraftValues((prev) => ({
+            ...prev,
+            textField1: snippet.textField1
+          }))
+        } else if (field === 'title') {
+          setDraftValues((prev) => ({
+            ...prev,
+            title: snippet.title ?? ''
+          }))
+        }
       },
-    [activeField, commitField, snippet.textField1, isTextFieldLocked]
+    [activeField, commitField, snippet.textField1, snippet.title, isTextFieldLocked]
   )
 
   const handleDraftChange = useCallback(
     (field: EditableField) =>
-      (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+      (event: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => {
         const { value } = event.target
         setDraftValues((prev) => ({
           ...prev,
@@ -234,6 +295,27 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
         }
       },
     [commitField, snippet.textField1]
+  )
+
+  const handleInputKeyDown = useCallback(
+    (field: EditableField) =>
+      (event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          setDraftValues((prev) => ({
+            ...prev,
+            title: snippet.title ?? ''
+          }))
+          setActiveField(null)
+          return
+        }
+
+        if (event.key === 'Enter') {
+          event.preventDefault()
+          void commitField(field)
+        }
+      },
+    [commitField, snippet.title]
   )
 
   const handleSnippetClick = useCallback((e: React.MouseEvent) => {
@@ -433,7 +515,30 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
       >
         {/* Header with title or snippet label and ID */}
         <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-          <span className="tracking-wide">{displayTitle}</span>
+          {activeField === 'title' ? (
+            <input
+              ref={titleRef}
+              type="text"
+              className="flex-1 text-xs tracking-wide text-gray-900 bg-white border border-blue-200 rounded-sm px-1 py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-300 mr-2"
+              value={draftValues.title}
+              onChange={handleDraftChange('title')}
+              onBlur={handleBlur('title')}
+              onKeyDown={handleInputKeyDown('title')}
+              onClick={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
+              placeholder="Title..."
+              style={POINTER_EVENTS_STYLES.interactive}
+            />
+          ) : (
+            <button
+              type="button"
+              className="tracking-wide text-left cursor-text bg-transparent border-none p-0 focus-visible:outline-none hover:text-gray-700 transition-colors"
+              onClick={handleFieldActivate('title')}
+              style={POINTER_EVENTS_STYLES.interactive}
+            >
+              {displayTitle}
+            </button>
+          )}
           <button
             type="button"
             onClick={handleIdClick}
@@ -577,7 +682,27 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
           </div>
         )}
 
+        {/* Downstream connections section */}
+        {snippet.downstreamConnections && snippet.downstreamConnections.length > 0 && (
+          <div className="flex items-center justify-between text-xs text-gray-500 mb-1 mt-2">
+            <span className="tracking-wide">Connected</span>
+            <button
+              type="button"
+              onClick={handleConnectedSnippetClick(snippet.downstreamConnections[0].id)}
+              onMouseDown={(event) => event.stopPropagation()}
+              className="text-[11px] text-gray-400 hover:text-blue-600 hover:underline transition-colors cursor-pointer bg-transparent border-none p-0"
+              style={POINTER_EVENTS_STYLES.interactive}
+              title={`Focus snippet ${snippet.downstreamConnections[0].id}`}
+            >
+              {snippet.downstreamConnections[0].title && snippet.downstreamConnections[0].title.trim() !== ''
+                ? snippet.downstreamConnections[0].title.trim()
+                : 'Snippet'}
+            </button>
+          </div>
+        )}
+
         {/* Expandable Generation Section */}
+        {connectedContent.length > 0 && (
         <div className="mt-2">
           <button
             type="button"
@@ -801,6 +926,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
             </div>
           )}
         </div>
+        )}
 
         {savingField !== null && (
           <div className="text-[11px] text-gray-400 mt-1">

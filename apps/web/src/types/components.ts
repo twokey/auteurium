@@ -120,12 +120,13 @@ export interface SnippetNodeData {
       aspectRatio: string
     } | null
     connectedContent?: ConnectedContentItem[]
+    downstreamConnections?: Array<{ id: string; title?: string }>
   }
   onEdit: (snippetId: string) => void
   onDelete: (snippetId: string) => void
   onManageConnections: (snippetId: string) => void
   onViewVersions: (snippetId: string) => void
-  onUpdateContent: (snippetId: string, changes: Partial<Pick<Snippet, 'textField1'>>) => Promise<void>
+  onUpdateContent: (snippetId: string, changes: Partial<Pick<Snippet, 'textField1' | 'title'>>) => Promise<void>
   onCombine: (snippetId: string) => Promise<void>
   onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
   onGenerateText: (snippetId: string, content: string) => Promise<void>
