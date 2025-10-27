@@ -73,11 +73,19 @@ export interface SnippetVersion {
   createdAt: string
 }
 
+export type GenerationModality =
+  | 'TEXT_TO_TEXT'
+  | 'TEXT_TO_IMAGE'
+  | 'TEXT_AND_IMAGE_TO_IMAGE'
+  | 'TEXT_TO_VIDEO'
+  | 'TEXT_TO_AUDIO'
+
 export interface AvailableModel {
   id: string
   displayName: string
   description?: string | null
   provider: string
+  modality: GenerationModality
   maxTokens?: number | null
   costPerToken?: number | null
 }
@@ -89,4 +97,3 @@ export interface GenerateContentResult {
   modelUsed: string
   generationTimeMs: number
 }
-

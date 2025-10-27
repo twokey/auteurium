@@ -90,6 +90,7 @@ export type GenerateContentInput = {
 };
 
 export enum GenerationModality {
+  TextAndImageToImage = 'TEXT_AND_IMAGE_TO_IMAGE',
   TextToAudio = 'TEXT_TO_AUDIO',
   TextToImage = 'TEXT_TO_IMAGE',
   TextToText = 'TEXT_TO_TEXT',

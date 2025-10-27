@@ -242,6 +242,7 @@ enum ModelProvider {
 enum GenerationModality {
   TEXT_TO_TEXT
   TEXT_TO_IMAGE
+  TEXT_AND_IMAGE_TO_IMAGE
   TEXT_TO_VIDEO
   TEXT_TO_AUDIO
 }

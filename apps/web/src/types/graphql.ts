@@ -36,8 +36,15 @@ export interface SnippetVersionsQueryVariables {
   snippetId: string
 }
 
+export type GraphQLGenerationModality =
+  | 'TEXT_TO_TEXT'
+  | 'TEXT_TO_IMAGE'
+  | 'TEXT_AND_IMAGE_TO_IMAGE'
+  | 'TEXT_TO_VIDEO'
+  | 'TEXT_TO_AUDIO'
+
 export interface AvailableModelsQueryVariables {
-  modality: 'TEXT_TO_TEXT' | 'TEXT_TO_IMAGE'
+  modality?: GraphQLGenerationModality
 }
 
 // Query Response Types
@@ -250,4 +257,3 @@ export interface GenerationStreamEvent {
 export interface GenerationStreamSubscriptionData {
   onGenerationStream: GenerationStreamEvent | null
 }
-

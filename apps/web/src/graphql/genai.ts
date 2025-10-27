@@ -1,10 +1,11 @@
 export const GET_AVAILABLE_MODELS = /* GraphQL */ `
-  query GetAvailableModels($modality: GenerationModality!) {
-    availableModels(modality: $modality) {
+  query GetAvailableModels {
+    availableModels {
       id
       displayName
       description
       provider
+      modality
       maxTokens
       costPerToken
     }
@@ -44,5 +45,4 @@ export const GENERATION_STREAM_SUBSCRIPTION = /* GraphQL */ `
     }
   }
 `
-
 

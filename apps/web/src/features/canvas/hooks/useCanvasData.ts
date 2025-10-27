@@ -18,7 +18,8 @@ import type {
   ProjectConnectionsQueryVariables,
   SnippetNodeData,
   Connection,
-  ConnectedContentItem
+  ConnectedContentItem,
+  AvailableModel
 } from '../../../types'
 import type { Node, Edge } from 'reactflow'
 
@@ -477,12 +478,6 @@ export function useCanvasData(projectId: string | undefined): UseCanvasDataResul
   }
 }
 
-interface AvailableModel {
-  id: string
-  displayName: string
-  description?: string | null
-}
-
 /**
  * Transform snippets to ReactFlow nodes
  */
@@ -503,7 +498,9 @@ export function useFlowNodes(
   textModels?: AvailableModel[],
   isLoadingTextModels?: boolean,
   imageModels?: AvailableModel[],
-  isLoadingImageModels?: boolean
+  isLoadingImageModels?: boolean,
+  videoModels?: AvailableModel[],
+  isLoadingVideoModels?: boolean
 ): Node<SnippetNodeData>[] {
   return useMemo(() => {
     const { snippetMap, incomingSourcesMap, connectedContentMap } = analyzeSnippetConnections(snippets)
@@ -558,7 +555,9 @@ export function useFlowNodes(
           textModels,
           isLoadingTextModels,
           imageModels,
-          isLoadingImageModels
+          isLoadingImageModels,
+          videoModels,
+          isLoadingVideoModels
         },
         style: {
           background: '#fff',
@@ -569,7 +568,17 @@ export function useFlowNodes(
         }
       } as Node<SnippetNodeData>
     })
-  }, [snippets, handlers, generatingImageSnippetIds, textModels, isLoadingTextModels, imageModels, isLoadingImageModels])
+  }, [
+    snippets,
+    handlers,
+    generatingImageSnippetIds,
+    textModels,
+    isLoadingTextModels,
+    imageModels,
+    isLoadingImageModels,
+    videoModels,
+    isLoadingVideoModels
+  ])
 }
 
 /**

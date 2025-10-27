@@ -42,7 +42,14 @@ const CanvasContent = () => {
   const { project, snippets, loading, error, refetch } = useCanvasData(projectId)
 
   // Get text and image generation models from Context
-  const { textModels, isLoadingTextModels, imageModels, isLoadingImageModels } = useModels()
+  const {
+    textModels,
+    imageModels,
+    videoModels,
+    isLoadingTextModels,
+    isLoadingImageModels,
+    isLoadingVideoModels
+  } = useModels()
 
   // Create refs that will be populated after ReactFlow setup
   const setNodesRef = useRef<any>(() => {})
@@ -89,7 +96,9 @@ const CanvasContent = () => {
     textModels,
     isLoadingTextModels,
     imageModels,
-    isLoadingImageModels
+    isLoadingImageModels,
+    videoModels,
+    isLoadingVideoModels
   )
 
   const flowEdges = useFlowEdges(snippets)

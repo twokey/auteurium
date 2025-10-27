@@ -1,16 +1,8 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react'
 
 import { GET_AVAILABLE_MODELS } from '../graphql/genai'
 import { useGraphQLQueryWithCache } from '../shared/hooks/useGraphQLQueryWithCache'
-
-export interface AvailableModel {
-  id: string
-  displayName: string
-  description?: string | null
-  provider?: string
-  maxTokens?: number
-  costPerToken?: number
-}
+import type { AvailableModel } from '../types'
 
 interface AvailableModelsData {
   availableModels: AvailableModel[]
@@ -19,12 +11,16 @@ interface AvailableModelsData {
 interface ModelsContextValue {
   textModels: AvailableModel[]
   imageModels: AvailableModel[]
+  videoModels: AvailableModel[]
   isLoadingTextModels: boolean
   isLoadingImageModels: boolean
+  isLoadingVideoModels: boolean
   textModelsError: Error | null
   imageModelsError: Error | null
+  videoModelsError: Error | null
   refetchTextModels: () => Promise<void>
   refetchImageModels: () => Promise<void>
+  refetchVideoModels: () => Promise<void>
 }
 
 const ModelsContext = createContext<ModelsContextValue | null>(null)
@@ -34,49 +30,56 @@ interface ModelsProviderProps {
 }
 
 export const ModelsProvider = ({ children }: ModelsProviderProps) => {
-  // Query text generation models with caching
   const {
-    data: textModelsData,
-    loading: isLoadingTextModels,
-    error: textModelsError,
-    refetch: refetchTextModels
-  } = useGraphQLQueryWithCache<AvailableModelsData>(GET_AVAILABLE_MODELS, {
-    variables: { modality: 'TEXT_TO_TEXT' }
-  })
+    data,
+    loading,
+    error,
+    refetch
+  } = useGraphQLQueryWithCache<AvailableModelsData>(GET_AVAILABLE_MODELS)
 
-  // Query image generation models with caching
-  const {
-    data: imageModelsData,
-    loading: isLoadingImageModels,
-    error: imageModelsError,
-    refetch: refetchImageModels
-  } = useGraphQLQueryWithCache<AvailableModelsData>(GET_AVAILABLE_MODELS, {
-    variables: { modality: 'TEXT_TO_IMAGE' }
-  })
+  const allModels = data?.availableModels ?? []
 
-  const textModels = useMemo(() => textModelsData?.availableModels ?? [], [textModelsData])
-  const imageModels = useMemo(() => imageModelsData?.availableModels ?? [], [imageModelsData])
+  const filterByModalities = useCallback(
+    (models: AvailableModel[], modalities: Array<AvailableModel['modality']>) =>
+      models.filter(model => modalities.includes(model.modality)),
+    []
+  )
+
+  const textModels = useMemo(
+    () => filterByModalities(allModels, ['TEXT_TO_TEXT']),
+    [allModels, filterByModalities]
+  )
+  const imageModels = useMemo(
+    () => filterByModalities(allModels, ['TEXT_TO_IMAGE', 'TEXT_AND_IMAGE_TO_IMAGE']),
+    [allModels, filterByModalities]
+  )
+  const videoModels = useMemo(
+    () => filterByModalities(allModels, ['TEXT_TO_VIDEO']),
+    [allModels, filterByModalities]
+  )
 
   const value = useMemo(
     () => ({
       textModels,
       imageModels,
-      isLoadingTextModels,
-      isLoadingImageModels,
-      textModelsError,
-      imageModelsError,
-      refetchTextModels,
-      refetchImageModels
+      videoModels,
+      isLoadingTextModels: loading,
+      isLoadingImageModels: loading,
+      isLoadingVideoModels: loading,
+      textModelsError: error,
+      imageModelsError: error,
+      videoModelsError: error,
+      refetchTextModels: refetch,
+      refetchImageModels: refetch,
+      refetchVideoModels: refetch
     }),
     [
       textModels,
       imageModels,
-      isLoadingTextModels,
-      isLoadingImageModels,
-      textModelsError,
-      imageModelsError,
-      refetchTextModels,
-      refetchImageModels
+      videoModels,
+      loading,
+      error,
+      refetch
     ]
   )
 

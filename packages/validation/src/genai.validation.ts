@@ -15,7 +15,13 @@ export const generateContentInputSchema = z.object({
 })
 
 export const availableModelsInputSchema = z.object({
-  modality: z.enum(['text-to-text', 'text-to-image', 'text-to-video', 'text-to-audio']).optional()
+  modality: z.enum([
+    'text-to-text',
+    'text-to-image',
+    'text-and-image-to-image',
+    'text-to-video',
+    'text-to-audio'
+  ]).optional()
 })
 
 export const generationHistoryInputSchema = z.object({

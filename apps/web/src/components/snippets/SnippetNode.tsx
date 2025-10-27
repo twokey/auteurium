@@ -8,13 +8,7 @@ import { CANVAS_CONSTANTS } from '../../shared/constants'
 import { useToast } from '../../shared/store/toastStore'
 import { countWords, truncateToWords } from '../../shared/utils/textUtils'
 
-import type { ConnectedContentItem } from '../../types'
-
-interface AvailableModel {
-  id: string
-  displayName: string
-  description?: string | null
-}
+import type { AvailableModel, ConnectedContentItem } from '../../types'
 
 interface SnippetNodeProps {
   id: string
@@ -51,6 +45,8 @@ interface SnippetNodeProps {
     isLoadingTextModels?: boolean
     imageModels?: AvailableModel[]
     isLoadingImageModels?: boolean
+    videoModels?: AvailableModel[]
+    isLoadingVideoModels?: boolean
   }
 }
 
@@ -83,7 +79,9 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
     textModels = [],
     isLoadingTextModels = false,
     imageModels = [],
-    isLoadingImageModels = false
+    isLoadingImageModels = false,
+    videoModels = [],
+    isLoadingVideoModels = false
   } = data
   const connectedContent: ConnectedContentItem[] = snippet.connectedContent ?? []
   const hasImageAsset = Boolean(snippet.imageUrl ?? snippet.imageS3Key)
@@ -150,6 +148,13 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
     }
   }, [imageModels, selectedImageModel])
 
+  // Auto-select first video model when models load
+  useEffect(() => {
+    if (videoModels.length > 0 && selectedVideoModel === '') {
+      setSelectedVideoModel(videoModels[0].id)
+    }
+  }, [videoModels, selectedVideoModel])
+
   useEffect(() => {
     if (activeField === 'textField1') {
       const target = textField1Ref.current
@@ -162,6 +167,12 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
       target?.select()
     }
   }, [activeField])
+
+  useEffect(() => {
+    if (isTextFieldLocked && activeField === 'textField1') {
+      setActiveField(null)
+    }
+  }, [isTextFieldLocked, activeField])
 
   const commitField = useCallback(async (field: EditableField) => {
     if (field === 'textField1') {
@@ -615,39 +626,34 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
         )}
 
         {/* Title / Text Field 1 */}
-        <div className="mb-2">
-          {activeField === 'textField1' && !isTextFieldLocked ? (
-            <textarea
-              ref={textField1Ref}
-              className="w-full text-sm font-medium text-gray-900 bg-white border border-blue-200 rounded-sm p-1 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
-              value={draftValues.textField1}
-              onChange={handleDraftChange('textField1')}
-              onBlur={handleBlur('textField1')}
-              onKeyDown={handleTextareaKeyDown('textField1')}
-              onClick={(event) => event.stopPropagation()}
-              onMouseDown={(event) => event.stopPropagation()}
-              rows={Math.min(6, Math.max(2, draftValues.textField1.split('\n').length))}
-              placeholder="Input..."
-              style={POINTER_EVENTS_STYLES.interactive}
-            />
-          ) : isTextFieldLocked ? (
-            <div
-              className="w-full text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-sm px-2 py-1 cursor-not-allowed select-none"
-              title="Text is disabled when a snippet has its own image"
-            >
-              <span className="italic text-gray-400">Text disabled for image snippet</span>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="w-full text-left font-medium text-sm text-gray-900 break-words cursor-text bg-transparent border-none p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-1 focus-visible:ring-offset-white rounded-sm"
-              onClick={handleFieldActivate('textField1')}
-              style={POINTER_EVENTS_STYLES.interactive}
-            >
-              {(displayText1 && displayText1.trim() !== '') ? displayText1 : 'Input...'}
-            </button>
-          )}
-        </div>
+        {!isTextFieldLocked && (
+          <div className="mb-2">
+            {activeField === 'textField1' ? (
+              <textarea
+                ref={textField1Ref}
+                className="w-full text-sm font-medium text-gray-900 bg-white border border-blue-200 rounded-sm p-1 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
+                value={draftValues.textField1}
+                onChange={handleDraftChange('textField1')}
+                onBlur={handleBlur('textField1')}
+                onKeyDown={handleTextareaKeyDown('textField1')}
+                onClick={(event) => event.stopPropagation()}
+                onMouseDown={(event) => event.stopPropagation()}
+                rows={Math.min(6, Math.max(2, draftValues.textField1.split('\n').length))}
+                placeholder="Input..."
+                style={POINTER_EVENTS_STYLES.interactive}
+              />
+            ) : (
+              <button
+                type="button"
+                className="w-full text-left font-medium text-sm text-gray-900 break-words cursor-text bg-transparent border-none p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-1 focus-visible:ring-offset-white rounded-sm"
+                onClick={handleFieldActivate('textField1')}
+                style={POINTER_EVENTS_STYLES.interactive}
+              >
+                {(displayText1 && displayText1.trim() !== '') ? displayText1 : 'Input...'}
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Large snippet indicator and expand button */}
         {isLarge && (
@@ -899,13 +905,17 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                   }}
                   onClick={(e) => e.stopPropagation()}
                   className="flex-1 text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
-                  disabled={savingField !== null}
+                  disabled={savingField !== null || isLoadingVideoModels}
                   style={POINTER_EVENTS_STYLES.interactive}
                 >
                   <option value="" disabled>
-                    Select video model...
+                    {isLoadingVideoModels ? 'Loading video models...' : 'Select video model...'}
                   </option>
-                  {/* Video models will be added later */}
+                  {videoModels.map((model) => (
+                    <option key={model.id} value={model.id} title={model.description ?? undefined}>
+                      {model.displayName}
+                    </option>
+                  ))}
                 </select>
                 <button
                   type="button"
