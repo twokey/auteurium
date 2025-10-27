@@ -267,6 +267,7 @@ const areSnippetsEqual = (a: Snippet[], b: Snippet[]): boolean => {
 
     if (
       snippetA.id !== snippetB.id ||
+      (snippetA.title ?? '') !== (snippetB.title ?? '') ||
       snippetA.textField1 !== snippetB.textField1 ||
       snippetA.version !== snippetB.version ||
       snippetA.imageUrl !== snippetB.imageUrl ||

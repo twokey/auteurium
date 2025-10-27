@@ -304,6 +304,13 @@ export function useCanvasHandlers({
 
     console.log('[useCanvasHandlers] Applying optimistic update and calling mutation')
 
+    const previousSnippetSnapshot: Snippet = { ...snippetBeforeUpdate }
+    const updatedSnippet: Snippet = {
+      ...snippetBeforeUpdate,
+      ...updateInput
+    }
+    updateRealSnippet(updatedSnippet)
+
     // Optimistic update
     setNodes((currentNodes: any) =>
       currentNodes.map((node: any) =>
@@ -357,6 +364,7 @@ export function useCanvasHandlers({
       }
     } catch (error) {
       console.error('Failed to update snippet content:', error)
+      updateRealSnippet(previousSnippetSnapshot)
       // Rollback optimistic update
       setNodes((currentNodes: any) =>
         currentNodes.map((node: any) =>
@@ -376,7 +384,7 @@ export function useCanvasHandlers({
       )
       throw error
     }
-  }, [projectId, setNodes, updateSnippetMutation, refetch])
+  }, [projectId, setNodes, updateSnippetMutation, refetch, updateRealSnippet])
 
   const handleCombineSnippetContent = useCallback(async (snippetId: string) => {
     if (!projectId) {
