@@ -684,20 +684,25 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
 
         {/* Downstream connections section */}
         {snippet.downstreamConnections && snippet.downstreamConnections.length > 0 && (
-          <div className="flex items-center justify-between text-xs text-gray-500 mb-1 mt-2">
-            <span className="tracking-wide">Connected</span>
-            <button
-              type="button"
-              onClick={handleConnectedSnippetClick(snippet.downstreamConnections[0].id)}
-              onMouseDown={(event) => event.stopPropagation()}
-              className="text-[11px] text-gray-400 hover:text-blue-600 hover:underline transition-colors cursor-pointer bg-transparent border-none p-0"
-              style={POINTER_EVENTS_STYLES.interactive}
-              title={`Focus snippet ${snippet.downstreamConnections[0].id}`}
-            >
-              {snippet.downstreamConnections[0].title && snippet.downstreamConnections[0].title.trim() !== ''
-                ? snippet.downstreamConnections[0].title.trim()
-                : 'Snippet'}
-            </button>
+          <div className="mt-2 flex items-start justify-between">
+            <span className="text-xs text-gray-500 tracking-wide">Connected:</span>
+            <div className="flex flex-col items-end gap-0.5">
+              {snippet.downstreamConnections.map((connection, index) => (
+                <button
+                  key={`${snippet.id}-downstream-${connection.id}-${index}`}
+                  type="button"
+                  onClick={handleConnectedSnippetClick(connection.id)}
+                  onMouseDown={(event) => event.stopPropagation()}
+                  className="text-[11px] text-gray-400 hover:text-blue-600 hover:underline transition-colors cursor-pointer bg-transparent border-none p-0"
+                  style={POINTER_EVENTS_STYLES.interactive}
+                  title={`Focus snippet ${connection.id}`}
+                >
+                  {connection.title && connection.title.trim() !== ''
+                    ? connection.title.trim()
+                    : 'Snippet'}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
