@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { client } from '../../services/graphql'
+import { getClient } from '../../services/graphql'
 import { GRAPHQL } from '../constants'
 
 const getOperationName = (graphQLDocument: string): string => {
@@ -168,7 +168,7 @@ export const useGraphQLQueryWithCache = <TData = unknown, TVariables = Record<st
         variables: requestVariables
       })
 
-      const result = await client.graphql({
+      const result = await getClient().graphql({
         query,
         variables: requestVariables
       })

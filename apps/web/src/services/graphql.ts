@@ -1,8 +1,21 @@
 import { generateClient } from 'aws-amplify/api'
 
-// Create the Amplify GraphQL client
-// Authentication is handled automatically via Amplify.configure() in config/amplify.ts
-export const client = generateClient()
+// Lazy initialization pattern to avoid race condition
+// The client is created on first use, ensuring Amplify.configure() has been called
+// Using 'any' to avoid excessive type depth issues with Amplify's recursive client types
+let client: any = null
+
+/**
+ * Get the GraphQL client, creating it if necessary.
+ * Uses lazy initialization to ensure Amplify is configured before client creation.
+ * Authentication is handled automatically via Amplify.configure() in config/amplify.ts
+ */
+export const getClient = () => {
+  if (!client) {
+    client = generateClient()
+  }
+  return client
+}
 
 // Error handler utility for logging GraphQL errors
 export const logGraphQLErrors = (errors: Array<{ message: string; locations?: unknown; path?: unknown }>) => {
@@ -22,4 +35,4 @@ export const logGraphQLErrors = (errors: Array<{ message: string; locations?: un
   })
 }
 
-export default client
+export default getClient

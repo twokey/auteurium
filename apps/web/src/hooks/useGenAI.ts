@@ -6,7 +6,7 @@ import {
   GENERATION_STREAM_SUBSCRIPTION
 } from '../graphql/genai'
 import { useModels } from '../contexts/ModelsContext'
-import { client } from '../services/graphql'
+import { getClient } from '../services/graphql'
 import { useGraphQLMutation } from './useGraphQLMutation'
 
 type GenerateContentResult = {
@@ -253,7 +253,7 @@ export const useGenAI = (options: UseGenAIOptions = {}) => {
       }
 
       // Using Amplify client for subscriptions
-      const subscription = client.graphql({
+      const subscription = getClient().graphql({
         query: GENERATION_STREAM_SUBSCRIPTION,
         variables: { snippetId }
       })

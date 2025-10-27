@@ -2,7 +2,6 @@ import { lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 
 import { Navigation } from './components/ui/Navigation'
-import { configureAmplify } from './config/amplify'
 import { ModelsProvider } from './contexts/ModelsContext'
 import { AuthProvider } from './hooks/AuthProvider'
 import { useAuth } from './hooks/useAuth'
@@ -15,8 +14,7 @@ const AuthPage = lazy(() => import('./pages/AuthPage').then(module => ({ default
 const Canvas = lazy(() => import('./pages/Canvas').then(module => ({ default: module.Canvas })))
 const Dashboard = lazy(() => import('./pages/Dashboard').then(module => ({ default: module.Dashboard })))
 
-// Configure Amplify
-configureAmplify()
+// Amplify is now configured in main.tsx before React rendering
 
 const AppContent = () => {
   const { isAuthenticated, hasCheckedAuth } = useAuth()

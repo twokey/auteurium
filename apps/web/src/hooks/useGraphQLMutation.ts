@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 
-import { client } from '../services/graphql'
+import { getClient } from '../services/graphql'
 
 const getOperationName = (graphQLDocument: string): string => {
   const match = graphQLDocument.match(/\b(mutation|query|subscription)\s+([A-Za-z_][A-Za-z0-9_]*)/)
@@ -43,7 +43,7 @@ export const useGraphQLMutation = <TData = unknown, TVariables = Record<string, 
           variables: mutationOptions.variables
         })
 
-        const result = await client.graphql({
+        const result = await getClient().graphql({
           query: mutation,
           variables: mutationOptions.variables as Record<string, unknown>
         })

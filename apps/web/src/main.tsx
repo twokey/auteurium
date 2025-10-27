@@ -3,12 +3,17 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 
 import App from './App'
+import { configureAmplify } from './config/amplify'
 import './styles/index.css'
 
 const globalObject = globalThis as typeof globalThis & { Buffer?: typeof Buffer }
 if (typeof globalObject.Buffer === 'undefined') {
   globalObject.Buffer = Buffer
 }
+
+// Configure Amplify BEFORE React rendering to prevent race conditions
+// This ensures generateClient() calls have a configured Amplify instance
+configureAmplify()
 
 // StrictMode disabled in development for performance
 // - StrictMode intentionally double-mounts components to detect side effects
