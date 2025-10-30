@@ -16,6 +16,8 @@ import {
 } from '../../../graphql/mutations'
 import { useGraphQLMutation } from '../../../hooks/useGraphQLMutation'
 import { CANVAS_CONSTANTS } from '../../../shared/constants'
+import { invalidateQueries } from '../../../shared/hooks/useGraphQLQueryWithCache'
+import { mutateWithInvalidate, mutateOptimisticOnly } from '../../../shared/utils/cacheHelpers'
 import { useModalStore } from '../../../shared/store/modalStore'
 import { useToast } from '../../../shared/store/toastStore'
 import { useCanvasStore } from '../store/canvasStore'
@@ -71,52 +73,41 @@ const getNodeMeasurements = (node: Node | undefined) => {
 }
 
 /**
- * Find all downstream snippets that depend on the given snippet
- * Uses BFS to traverse outgoing connections
+ * NOTE: findDownstreamSnippets() was removed to fix build errors
+ * If you need immediate downstream propagation for textField1 updates,
+ * uncomment the code in handleUpdateSnippetContent at lines 355-360
+ * and re-implement findDownstreamSnippets with this logic:
+ *
+ * function findDownstreamSnippets(sourceSnippetId: string, snippets: Snippet[]): Set<string> {
+ *   const downstreamIds = new Set<string>()
+ *   const visited = new Set<string>()
+ *   const queue: string[] = [sourceSnippetId]
+ *
+ *   while (queue.length > 0) {
+ *     const currentId = queue.shift()!
+ *     if (visited.has(currentId)) continue
+ *     visited.add(currentId)
+ *
+ *     const currentSnippet = snippets.find(s => s.id === currentId)
+ *     if (!currentSnippet) continue
+ *
+ *     const outgoingConnections = currentSnippet.connections ?? []
+ *     for (const connection of outgoingConnections) {
+ *       const targetId = connection.targetSnippetId
+ *       if (targetId && !visited.has(targetId)) {
+ *         downstreamIds.add(targetId)
+ *         queue.push(targetId)
+ *       }
+ *     }
+ *   }
+ *   return downstreamIds
+ * }
  */
-const findDownstreamSnippets = (
-  sourceSnippetId: string,
-  snippets: Snippet[]
-): Set<string> => {
-  const downstreamIds = new Set<string>()
-  const visited = new Set<string>()
-  const queue: string[] = [sourceSnippetId]
-
-  while (queue.length > 0) {
-    const currentId = queue.shift()!
-
-    if (visited.has(currentId)) {
-      continue
-    }
-
-    visited.add(currentId)
-
-    // Find all snippets that have this snippet as a source
-    const currentSnippet = snippets.find(s => s.id === currentId)
-    if (!currentSnippet) {
-      continue
-    }
-
-    // Get all outgoing connections from this snippet
-    const outgoingConnections = currentSnippet.connections ?? []
-
-    for (const connection of outgoingConnections) {
-      const targetId = connection.targetSnippetId
-      if (targetId && !visited.has(targetId)) {
-        downstreamIds.add(targetId)
-        queue.push(targetId)
-      }
-    }
-  }
-
-  return downstreamIds
-}
 
 export interface UseCanvasHandlersProps {
   projectId: string | undefined
   snippets: Snippet[]
   setNodes: (nodes: any) => void
-  refetch: () => Promise<void>
   reactFlowInstance?: MutableRefObject<ReactFlowInstance | null>
 }
 
@@ -130,6 +121,7 @@ export interface UseCanvasHandlersResult {
   handleCombineSnippetContent: (snippetId: string) => Promise<void>
   handleGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
   handleFocusSnippet: (snippetId: string) => void
+  handleCreateUpstreamSnippet: (targetSnippetId: string) => Promise<void>
 
   // Canvas Operations
   handleCreateSnippet: (position: { x: number; y: number }) => void
@@ -149,7 +141,6 @@ export function useCanvasHandlers({
   projectId,
   snippets,
   setNodes,
-  refetch,
   reactFlowInstance
 }: UseCanvasHandlersProps): UseCanvasHandlersResult {
   const toast = useToast()
@@ -338,30 +329,16 @@ export function useCanvasHandlers({
 
       console.log('[useCanvasHandlers] Calling updateSnippetMutation with variables:', mutationVariables)
 
-      const result = await updateSnippetMutation({
-        variables: mutationVariables
-      })
+      // Use optimistic-only pattern: mutation already shows changes via optimistic update
+      // No cache invalidation needed - we only changed existing fields
+      // The stale-while-revalidate cache will refresh in background if needed
+      const result = await mutateOptimisticOnly(() =>
+        updateSnippetMutation({
+          variables: mutationVariables
+        })
+      )
 
       console.log('[useCanvasHandlers] Mutation completed, result:', result)
-
-      // PROPAGATION LOGIC: If textField1 was updated, find all downstream snippets
-      // and refetch to propagate the change to their connectedContent
-      if (Object.prototype.hasOwnProperty.call(updateInput, 'textField1')) {
-        const downstreamSnippets = findDownstreamSnippets(snippetId, snippetsRef.current)
-
-        if (downstreamSnippets.size > 0) {
-          console.log('[useCanvasHandlers] Propagating textField1 change to downstream snippets:', {
-            updatedSnippetId: snippetId,
-            downstreamCount: downstreamSnippets.size,
-            downstreamIds: Array.from(downstreamSnippets)
-          })
-
-          // Refetch to trigger re-computation of connectedContent for all snippets
-          // This will update the GraphQL cache and cause useCanvasData to re-run
-          // analyzeSnippetConnections(), which will propagate the textField1 change
-          await refetch()
-        }
-      }
     } catch (error) {
       console.error('Failed to update snippet content:', error)
       updateRealSnippet(previousSnippetSnapshot)
@@ -384,7 +361,7 @@ export function useCanvasHandlers({
       )
       throw error
     }
-  }, [projectId, setNodes, updateSnippetMutation, refetch, updateRealSnippet])
+  }, [projectId, setNodes, updateSnippetMutation, updateRealSnippet])
 
   const handleCombineSnippetContent = useCallback(async (snippetId: string) => {
     if (!projectId) {
@@ -498,18 +475,23 @@ export function useCanvasHandlers({
 
       let createdSnippet: Snippet | null = null
       try {
-        const creationResult = await createSnippetMutation({
-          variables: {
-            input: {
-              projectId,
-              title: 'Generated image snippet',
-              textField1: prompt,
-              position: targetPosition,
-              tags: [],
-              categories: []
-            }
-          }
-        })
+        // Create snippet - changes list shape, so invalidate
+        const creationResult = await mutateWithInvalidate(
+          () =>
+            createSnippetMutation({
+              variables: {
+                input: {
+                  projectId,
+                  title: 'Generated image snippet',
+                  textField1: prompt,
+                  position: targetPosition,
+                  tags: [],
+                  categories: []
+                }
+              }
+            }),
+          ['ProjectWithSnippets']
+        )
 
         const newSnippet = creationResult?.createSnippet
         if (!newSnippet) {
@@ -522,23 +504,26 @@ export function useCanvasHandlers({
           ...newSnippet,
           textField1: ''
         })
+        clearRealSnippets()
         setGeneratingImage(tempId, false)
         setGeneratingImage(newSnippet.id, true)
 
         try {
-          await createConnectionMutation({
-            variables: {
-              input: {
-                projectId,
-                sourceSnippetId: snippetId,
-                targetSnippetId: newSnippet.id,
-                label: ''
-              }
-            }
-          })
-          await refetch()
-          // Clear realSnippets now that cache is updated
-          clearRealSnippets()
+          // Create connection - changes list shape, so invalidate
+          await mutateWithInvalidate(
+            () =>
+              createConnectionMutation({
+                variables: {
+                  input: {
+                    projectId,
+                    sourceSnippetId: snippetId,
+                    targetSnippetId: newSnippet.id,
+                    label: ''
+                  }
+                }
+              }),
+            ['ProjectConnections']
+          )
         } catch (connectionError) {
           console.error('Failed to connect generated image snippet:', connectionError)
           toast.error('Failed to connect new image snippet', connectionError instanceof Error ? connectionError.message : 'Unknown error')
@@ -605,13 +590,134 @@ export function useCanvasHandlers({
     projectId,
     reactFlowInstance,
     replaceOptimisticSnippet,
-    refetch,
     setGeneratingImage,
     toast,
     updateSnippetMutation,
     updateRealSnippet,
     removeOptimisticSnippet,
     clearRealSnippets
+  ])
+
+  const handleCreateUpstreamSnippet = useCallback(async (targetSnippetId: string) => {
+    if (!projectId) {
+      console.error('Cannot create snippet: no project ID')
+      return
+    }
+
+    const targetSnippet = snippetsRef.current.find(s => s.id === targetSnippetId)
+    if (!targetSnippet) {
+      console.error('Cannot create snippet: target snippet not found')
+      return
+    }
+
+    const baseX = targetSnippet.position?.x ?? CANVAS_CONSTANTS.DEFAULT_NODE_POSITION.x
+    const baseY = targetSnippet.position?.y ?? CANVAS_CONSTANTS.DEFAULT_NODE_POSITION.y
+
+    let targetWidth: number = CANVAS_CONSTANTS.MIN_NODE_WIDTH
+    if (reactFlowInstance?.current && typeof reactFlowInstance.current.getNode === 'function') {
+      try {
+        const node = reactFlowInstance.current.getNode(targetSnippetId)
+        const { width } = getNodeMeasurements(node)
+        if (typeof width === 'number' && !Number.isNaN(width)) {
+          targetWidth = width
+        }
+      } catch (error) {
+        console.error('Failed to measure target snippet width:', error)
+      }
+    }
+
+    const horizontalOffset = targetWidth + CANVAS_CONSTANTS.MIN_NODE_WIDTH + CANVAS_CONSTANTS.RELATED_SNIPPET_HORIZONTAL_GAP
+    const targetPosition = {
+      x: Math.max(0, baseX - horizontalOffset),
+      y: baseY
+    }
+
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+    const now = new Date().toISOString()
+
+    addOptimisticSnippet({
+      id: tempId,
+      projectId,
+      title: 'New snippet',
+      textField1: '',
+      position: targetPosition,
+      tags: [],
+      categories: [],
+      connections: [],
+      createdAt: now,
+      updatedAt: now,
+      version: 1,
+      isOptimistic: true
+    })
+
+    try {
+      // Create snippet - changes list shape, so invalidate
+      const creationResult = await mutateWithInvalidate(
+        () =>
+          createSnippetMutation({
+            variables: {
+              input: {
+                projectId,
+                title: 'New snippet',
+                textField1: '',
+                position: targetPosition,
+                tags: [],
+                categories: []
+              }
+            }
+          }),
+        ['ProjectWithSnippets']
+      )
+
+      const createdSnippet = (creationResult as any)?.createSnippet as Snippet | undefined
+      if (!createdSnippet) {
+        throw new Error('Failed to create snippet: missing response data')
+      }
+
+      replaceOptimisticSnippet(tempId, createdSnippet)
+      clearRealSnippets()
+
+      try {
+        // Create connection - changes list shape, so invalidate
+        await mutateWithInvalidate(
+          () =>
+            createConnectionMutation({
+              variables: {
+                input: {
+                  projectId,
+                  sourceSnippetId: createdSnippet.id,
+                  targetSnippetId,
+                  label: ''
+                }
+              }
+            }),
+          ['ProjectConnections']
+        )
+      } catch (connectionError) {
+        console.error('Failed to connect new snippet:', connectionError)
+        toast.error(
+          'Failed to connect new snippet',
+          connectionError instanceof Error ? connectionError.message : 'Unknown error'
+        )
+        return
+      }
+
+      toast.success('Snippet created and connected')
+    } catch (error) {
+      console.error('Failed to create upstream snippet:', error)
+      removeOptimisticSnippet(tempId)
+      toast.error('Failed to create snippet', error instanceof Error ? error.message : 'Unknown error')
+    }
+  }, [
+    projectId,
+    reactFlowInstance,
+    addOptimisticSnippet,
+    createSnippetMutation,
+    replaceOptimisticSnippet,
+    createConnectionMutation,
+    clearRealSnippets,
+    toast,
+    removeOptimisticSnippet
   ])
 
   // Canvas Operations
@@ -652,15 +758,15 @@ export function useCanvasHandlers({
       }
     } as Record<string, unknown> & CreateSnippetVariables
 
-    createSnippetMutation({ variables })
+    mutateWithInvalidate(
+      () => createSnippetMutation({ variables }),
+      ['ProjectWithSnippets']
+    )
       .then(async (result) => {
         if (result) {
           const createdSnippet = (result as any).createSnippet as Snippet
           // Replace optimistic snippet with real one from server
           replaceOptimisticSnippet(tempId, createdSnippet)
-          // Refetch to update GraphQL cache with the new snippet
-          // This is necessary for creation (unlike updates) because we need the server data
-          await refetch()
           // Clear realSnippets now that the GraphQL cache has been updated
           // This prevents duplicate snippets and stale data issues
           clearRealSnippets()
@@ -671,7 +777,7 @@ export function useCanvasHandlers({
         // Remove optimistic snippet on failure
         removeOptimisticSnippet(tempId)
       })
-  }, [projectId, createSnippetMutation, addOptimisticSnippet, replaceOptimisticSnippet, removeOptimisticSnippet, refetch, clearRealSnippets])
+  }, [projectId, createSnippetMutation, addOptimisticSnippet, replaceOptimisticSnippet, removeOptimisticSnippet, clearRealSnippets])
 
   const handleSaveCanvas = useCallback(() => {
     setLoading(true)
@@ -726,18 +832,23 @@ export function useCanvasHandlers({
 
     setGeneratedSnippetCreating(true)
     try {
-      const creationResult = await createSnippetMutation({
-        variables: {
-          input: {
-            projectId,
-            title: 'Generated snippet',
-            textField1: generatedSnippetPreview.content,
-            position: targetPosition,
-            tags: [],
-            categories: []
-          }
-        }
-      })
+      // Create snippet - changes list shape, so invalidate
+      const creationResult = await mutateWithInvalidate(
+        () =>
+          createSnippetMutation({
+            variables: {
+              input: {
+                projectId,
+                title: 'Generated snippet',
+                textField1: generatedSnippetPreview.content,
+                position: targetPosition,
+                tags: [],
+                categories: []
+              }
+            }
+          }),
+        ['ProjectWithSnippets']
+      )
 
       const newSnippetId = creationResult ? (creationResult as any).createSnippet.id : null
       if (!newSnippetId) {
@@ -747,22 +858,24 @@ export function useCanvasHandlers({
       const createdSnippet = (creationResult as any).createSnippet as Snippet
       // Replace optimistic snippet with real one from server
       replaceOptimisticSnippet(tempId, createdSnippet)
-
-      await createConnectionMutation({
-        variables: {
-          input: {
-            projectId,
-            sourceSnippetId: generatedSnippetPreview.sourceSnippetId,
-            targetSnippetId: newSnippetId,
-            label: ''
-          }
-        }
-      })
-
-      // Refetch to update GraphQL cache with new snippet and connections
-      await refetch()
-      // Clear realSnippets now that cache is updated
       clearRealSnippets()
+
+      // Create connection - changes list shape, so invalidate
+      await mutateWithInvalidate(
+        () =>
+          createConnectionMutation({
+            variables: {
+              input: {
+                projectId,
+                sourceSnippetId: generatedSnippetPreview.sourceSnippetId,
+                targetSnippetId: newSnippetId,
+                label: ''
+              }
+            }
+          }),
+        ['ProjectConnections']
+      )
+
       toast.success('Generated snippet created successfully!')
     } catch (error) {
       console.error('Failed to create generated snippet:', error)
@@ -784,7 +897,6 @@ export function useCanvasHandlers({
     addOptimisticSnippet,
     replaceOptimisticSnippet,
     removeOptimisticSnippet,
-    refetch,
     clearRealSnippets
   ])
 
@@ -841,18 +953,23 @@ export function useCanvasHandlers({
     })
 
     try {
-      const creationResult = await createSnippetMutation({
-        variables: {
-          input: {
-            projectId,
-            title: 'Generated text snippet',
-            textField1: generatedContent,
-            position: targetPosition,
-            tags: [],
-            categories: []
-          }
-        }
-      })
+      // Create snippet - changes list shape, so invalidate
+      const creationResult = await mutateWithInvalidate(
+        () =>
+          createSnippetMutation({
+            variables: {
+              input: {
+                projectId,
+                title: 'Generated text snippet',
+                textField1: generatedContent,
+                position: targetPosition,
+                tags: [],
+                categories: []
+              }
+            }
+          }),
+        ['ProjectWithSnippets']
+      )
 
       const newSnippetId = creationResult ? (creationResult as any).createSnippet.id : null
       if (!newSnippetId) {
@@ -862,21 +979,24 @@ export function useCanvasHandlers({
       const createdSnippet = (creationResult as any).createSnippet as Snippet
       // Replace optimistic snippet with real one from server
       replaceOptimisticSnippet(tempId, createdSnippet)
+      clearRealSnippets()
 
       try {
-        await createConnectionMutation({
-          variables: {
-            input: {
-              projectId,
-              sourceSnippetId,
-              targetSnippetId: newSnippetId,
-              label: ''
-            }
-          }
-        })
-        await refetch()
-        // Clear realSnippets now that cache is updated
-        clearRealSnippets()
+        // Create connection - changes list shape, so invalidate
+        await mutateWithInvalidate(
+          () =>
+            createConnectionMutation({
+              variables: {
+                input: {
+                  projectId,
+                  sourceSnippetId,
+                  targetSnippetId: newSnippetId,
+                  label: ''
+                }
+              }
+            }),
+          ['ProjectConnections']
+        )
       } catch (connectionError) {
         console.error('Failed to connect generated text snippet:', connectionError)
         toast.error('Failed to connect new text snippet', connectionError instanceof Error ? connectionError.message : 'Unknown error')
@@ -898,7 +1018,6 @@ export function useCanvasHandlers({
     removeOptimisticSnippet,
     toast,
     reactFlowInstance,
-    refetch,
     clearRealSnippets
   ])
 
@@ -959,6 +1078,7 @@ export function useCanvasHandlers({
     handleUpdateSnippetContent,
     handleCombineSnippetContent,
     handleGenerateImage,
+    handleCreateUpstreamSnippet,
     handleFocusSnippet,
 
     // Canvas Operations

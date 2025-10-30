@@ -104,6 +104,7 @@ export class AuteuriumGenAIStack extends cdk.Stack {
         tsconfig: path.join(__dirname, '../../../../services/api/tsconfig.json'),
         nodeModules: ['@google/genai'] // Include Gemini SDK
       },
+      depsLockFilePath: path.join(__dirname, '../../../../package-lock.json'),
       environment: {
         STAGE: stage,
         GENERATIONS_TABLE: this.generationsTable.tableName,
@@ -130,6 +131,7 @@ export class AuteuriumGenAIStack extends cdk.Stack {
         tsconfig: path.join(__dirname, '../../../../services/api/tsconfig.json'),
         nodeModules: ['@google/genai']
       },
+      depsLockFilePath: path.join(__dirname, '../../../../package-lock.json'),
       environment: {
         STAGE: stage,
         GENERATIONS_TABLE: this.generationsTable.tableName,
@@ -162,6 +164,7 @@ export class AuteuriumGenAIStack extends cdk.Stack {
         sourceMap: true,
         tsconfig: path.join(__dirname, '../../../../services/api/tsconfig.json')
       },
+      depsLockFilePath: path.join(__dirname, '../../../../package-lock.json'),
       environment: {
         STAGE: stage
       }
@@ -181,6 +184,7 @@ export class AuteuriumGenAIStack extends cdk.Stack {
         sourceMap: true,
         tsconfig: path.join(__dirname, '../../../../services/api/tsconfig.json')
       },
+      depsLockFilePath: path.join(__dirname, '../../../../package-lock.json'),
       environment: {
         STAGE: stage,
         GENERATIONS_TABLE: this.generationsTable.tableName,
@@ -204,6 +208,7 @@ export class AuteuriumGenAIStack extends cdk.Stack {
         tsconfig: path.join(__dirname, '../../../../services/api/tsconfig.json'),
         nodeModules: ['@google/genai'] // Include Gemini SDK
       },
+      depsLockFilePath: path.join(__dirname, '../../../../package-lock.json'),
       environment: {
         STAGE: stage,
         SNIPPETS_TABLE: snippetsTable.tableName,

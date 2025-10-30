@@ -6,7 +6,7 @@
 import { useMemo, useRef, useCallback } from 'react'
 
 import { GET_PROJECT_CONNECTIONS, GET_PROJECT_WITH_SNIPPETS } from '../../../graphql/queries'
-import { useGraphQLQuery } from '../../../hooks/useGraphQLQuery'
+import { useGraphQLQueryWithCache } from '../../../shared/hooks/useGraphQLQueryWithCache'
 import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
 
 import type {
@@ -322,7 +322,15 @@ export interface UseCanvasDataResult {
 }
 
 export function useCanvasData(projectId: string | undefined): UseCanvasDataResult {
-  const { optimisticSnippets, realSnippets, deletingSnippets, deletedSnippets } = useOptimisticUpdatesStore()
+  const {
+    optimisticSnippets,
+    realSnippets,
+    deletingSnippets,
+    deletedSnippets,
+    optimisticConnections,
+    deletingConnections,
+    deletedConnections
+  } = useOptimisticUpdatesStore()
 
   const queryVariables = useMemo(
     () => (projectId ? { projectId } : undefined),
@@ -334,12 +342,14 @@ export function useCanvasData(projectId: string | undefined): UseCanvasDataResul
     loading: projectLoading,
     error: projectError,
     refetch: refetchProject
-  } = useGraphQLQuery<
+  } = useGraphQLQueryWithCache<
     ProjectWithSnippetsQueryData,
     ProjectWithSnippetsQueryVariables
   >(GET_PROJECT_WITH_SNIPPETS, {
     variables: queryVariables,
-    skip: !projectId
+    skip: !projectId,
+    staleTime: 30000, // Consider data fresh for 30 seconds
+    cacheTime: 300000 // Keep in cache for 5 minutes
   })
 
   const {
@@ -347,11 +357,13 @@ export function useCanvasData(projectId: string | undefined): UseCanvasDataResul
     loading: connectionsLoading,
     error: connectionsError,
     refetch: refetchConnections
-  } = useGraphQLQuery<ProjectConnectionsQueryData, ProjectConnectionsQueryVariables>(
+  } = useGraphQLQueryWithCache<ProjectConnectionsQueryData, ProjectConnectionsQueryVariables>(
     GET_PROJECT_CONNECTIONS,
     {
       variables: queryVariables,
-      skip: !projectId
+      skip: !projectId,
+      staleTime: 30000, // Consider data fresh for 30 seconds
+      cacheTime: 300000 // Keep in cache for 5 minutes
     }
   )
 
@@ -367,15 +379,28 @@ export function useCanvasData(projectId: string | undefined): UseCanvasDataResul
     [connectionData?.projectConnections]
   )
 
+  // Merge real connections with optimistic connections, filter out deleted ones
+  const mergedConnections = useMemo<Connection[]>(() => {
+    // Start with real connections, filtering out deleted and deleting ones
+    const realConnectionsFiltered = projectConnections.filter(
+      (conn) => !deletedConnections.has(conn.id) && !deletingConnections.has(conn.id)
+    )
+
+    // Add optimistic connections
+    const optimisticConnectionsList = Object.values(optimisticConnections) as Connection[]
+
+    return [...realConnectionsFiltered, ...optimisticConnectionsList]
+  }, [projectConnections, optimisticConnections, deletingConnections, deletedConnections])
+
   // Memoize connection mapping for performance
   const connectionsBySource = useMemo(() => {
-    if (projectConnections === EMPTY_CONNECTION_LIST) {
+    if (mergedConnections.length === 0) {
       return new Map<string, Connection[]>()
     }
 
     const map = new Map<string, Connection[]>()
 
-    for (const connection of projectConnections) {
+    for (const connection of mergedConnections) {
       const list = map.get(connection.sourceSnippetId)
       if (list) {
         list.push(connection)
@@ -394,7 +419,7 @@ export function useCanvasData(projectId: string | undefined): UseCanvasDataResul
     })
 
     return map
-  }, [projectConnections])
+  }, [mergedConnections])
   const previousSnippetsRef = useRef<Snippet[]>(EMPTY_SNIPPET_LIST)
 
   // Memoize snippets to prevent unnecessary re-renders
@@ -493,6 +518,7 @@ export function useFlowNodes(
     onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
     onGenerateText: (snippetId: string, content: string) => Promise<void>
     onFocusSnippet: (snippetId: string) => void
+    onCreateUpstreamSnippet: (snippetId: string) => Promise<void> | void
   },
   generatingImageSnippetIds: Record<string, boolean>,
   textModels?: AvailableModel[],
@@ -502,8 +528,13 @@ export function useFlowNodes(
   videoModels?: AvailableModel[],
   isLoadingVideoModels?: boolean
 ): Node<SnippetNodeData>[] {
+  // Memoize connection analysis separately - only recompute when snippets actually change
+  const connectionAnalysis = useMemo(() => {
+    return analyzeSnippetConnections(snippets)
+  }, [snippets])
+
   return useMemo(() => {
-    const { snippetMap, incomingSourcesMap, connectedContentMap } = analyzeSnippetConnections(snippets)
+    const { snippetMap, incomingSourcesMap, connectedContentMap } = connectionAnalysis
 
     // Sort snippets by creation time to assign z-index
     const sortedSnippets = [...snippets].sort((a, b) => {

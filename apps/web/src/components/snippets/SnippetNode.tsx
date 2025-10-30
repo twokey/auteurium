@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { Handle, Position } from 'reactflow'
 
 import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
+import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisticUpdatesStore'
 import { useGenAI } from '../../hooks/useGenAI'
 import { CANVAS_CONSTANTS } from '../../shared/constants'
 import { useToast } from '../../shared/store/toastStore'
@@ -39,6 +40,7 @@ interface SnippetNodeProps {
     onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
     onGenerateText: (snippetId: string, content: string) => Promise<void>
     onFocusSnippet: (snippetId: string) => void
+    onCreateUpstreamSnippet: (snippetId: string) => Promise<void> | void
     isGeneratingImage: boolean
     connectedSnippets?: { id: string; imageS3Key?: string | null }[]
     textModels?: AvailableModel[]
@@ -63,6 +65,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
   const { id: projectId } = useParams<{ id: string }>()
   const { generateStream } = useGenAI({ enabled: true })
   const openPromptDesigner = usePromptDesignerStore((state) => state.open)
+  const { markSnippetDirty, clearSnippetDirty, markSnippetSaving, clearSnippetSaving } = useOptimisticUpdatesStore()
 
   const {
     snippet,
@@ -74,6 +77,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
     onGenerateImage,
     onGenerateText,
     onFocusSnippet,
+    onCreateUpstreamSnippet,
     isGeneratingImage,
     connectedSnippets = [],
     textModels = [],
@@ -86,6 +90,12 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
   const connectedContent: ConnectedContentItem[] = snippet.connectedContent ?? []
   const hasImageAsset = Boolean(snippet.imageUrl ?? snippet.imageS3Key)
   const isTextFieldLocked = hasImageAsset
+  const hasIncomingConnections = connectedSnippets.length > 0
+  const trimmedTextField1 = snippet.textField1.trim()
+  const isTextFieldEmpty = trimmedTextField1 === ''
+  const hideTextFieldDueToConnections = hasIncomingConnections && isTextFieldEmpty
+  const isTextFieldReadOnlyDueToConnections = hasIncomingConnections && !isTextFieldEmpty
+  const isTextFieldEditable = !isTextFieldLocked && !isTextFieldReadOnlyDueToConnections
 
   const [showContextMenu, setShowContextMenu] = useState(false)
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 })
@@ -169,10 +179,10 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
   }, [activeField])
 
   useEffect(() => {
-    if (isTextFieldLocked && activeField === 'textField1') {
+    if (!isTextFieldEditable && activeField === 'textField1') {
       setActiveField(null)
     }
-  }, [isTextFieldLocked, activeField])
+  }, [isTextFieldEditable, activeField])
 
   const commitField = useCallback(async (field: EditableField) => {
     if (field === 'textField1') {
@@ -189,16 +199,19 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
 
       if (newValue === currentValue) {
         console.log('[SnippetNode] No change detected, skipping update')
+        clearSnippetDirty(snippet.id)
         setActiveField(null)
         return
       }
 
       setSavingField('textField1')
+      markSnippetSaving(snippet.id)
 
       try {
         console.log('[SnippetNode] Calling onUpdateContent with:', { snippetId: snippet.id, textField1: newValue })
         await onUpdateContent(snippet.id, { textField1: newValue })
         console.log('[SnippetNode] onUpdateContent completed successfully')
+        clearSnippetDirty(snippet.id)
         setActiveField(null)
       } catch (error) {
         console.error('Failed to update snippet content:', error)
@@ -210,6 +223,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
         setActiveField(null)
       } finally {
         setSavingField(null)
+        clearSnippetSaving(snippet.id)
       }
     } else if (field === 'title') {
       const newValue = draftValues.title
@@ -225,16 +239,19 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
 
       if (newValue === currentValue) {
         console.log('[SnippetNode] No change detected, skipping update')
+        clearSnippetDirty(snippet.id)
         setActiveField(null)
         return
       }
 
       setSavingField('title')
+      markSnippetSaving(snippet.id)
 
       try {
         console.log('[SnippetNode] Calling onUpdateContent with:', { snippetId: snippet.id, title: newValue })
         await onUpdateContent(snippet.id, { title: newValue })
         console.log('[SnippetNode] onUpdateContent completed successfully')
+        clearSnippetDirty(snippet.id)
         setActiveField(null)
       } catch (error) {
         console.error('Failed to update snippet title:', error)
@@ -246,16 +263,17 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
         setActiveField(null)
       } finally {
         setSavingField(null)
+        clearSnippetSaving(snippet.id)
       }
     }
-  }, [draftValues, onUpdateContent, snippet.id, snippet.textField1, snippet.title, toast])
+  }, [draftValues, onUpdateContent, snippet.id, snippet.textField1, snippet.title, toast, markSnippetSaving, clearSnippetSaving, clearSnippetDirty])
 
   const handleFieldActivate = useCallback(
     (field: EditableField) =>
       (event: React.MouseEvent<HTMLButtonElement>) => {
         event.stopPropagation()
 
-        if (field === 'textField1' && isTextFieldLocked) {
+        if (field === 'textField1' && !isTextFieldEditable) {
           return
         }
 
@@ -264,6 +282,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
         }
 
         setActiveField(field)
+        markSnippetDirty(snippet.id)
         if (field === 'textField1') {
           setDraftValues((prev) => ({
             ...prev,
@@ -276,7 +295,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
           }))
         }
       },
-    [activeField, commitField, snippet.textField1, snippet.title, isTextFieldLocked]
+    [activeField, commitField, snippet.id, snippet.textField1, snippet.title, isTextFieldEditable, markSnippetDirty]
   )
 
   const handleDraftChange = useCallback(
@@ -429,6 +448,18 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
       onFocusSnippet(connectedSnippetId)
     },
     [onFocusSnippet]
+  )
+
+  const handleCreateUpstreamSnippetClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation()
+      if (!onCreateUpstreamSnippet) {
+        return
+      }
+
+      void onCreateUpstreamSnippet(snippet.id)
+    },
+    [onCreateUpstreamSnippet, snippet.id]
   )
 
   const runTextGeneration = useCallback(async (rawPrompt: string) => {
@@ -625,10 +656,30 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
           </div>
         )}
 
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={handleCreateUpstreamSnippetClick}
+            onMouseDown={(event) => event.stopPropagation()}
+            className="w-full text-xs font-semibold text-blue-600 border border-blue-200 rounded-md py-1 transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+            style={POINTER_EVENTS_STYLES.interactive}
+          >
+            + snippet
+          </button>
+        </div>
+
         {/* Title / Text Field 1 */}
-        {!isTextFieldLocked && (
+        {!isTextFieldLocked && !hideTextFieldDueToConnections && (
           <div className="mb-2">
-            {activeField === 'textField1' ? (
+            {isTextFieldReadOnlyDueToConnections ? (
+              <div
+                className="w-full text-sm font-medium text-gray-900 bg-gray-50 border border-gray-200 rounded-sm p-2 whitespace-pre-wrap break-words"
+                onClick={(event) => event.stopPropagation()}
+                onMouseDown={(event) => event.stopPropagation()}
+              >
+                {displayText1}
+              </div>
+            ) : activeField === 'textField1' ? (
               <textarea
                 ref={textField1Ref}
                 className="w-full text-sm font-medium text-gray-900 bg-white border border-blue-200 rounded-sm p-1 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"

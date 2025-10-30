@@ -3,10 +3,15 @@
  * Manages ReactFlow configuration, viewport, and node/edge updates
  */
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { addEdge, useEdgesState, useNodesState } from 'reactflow'
 
+import { invalidateQueries } from '../../../shared/hooks/useGraphQLQueryWithCache'
+import { useDebouncedCallback } from '../../../shared/hooks/useDebounce'
+import { mutateWithInvalidate, mutateOptimisticOnly } from '../../../shared/utils/cacheHelpers'
 import { useCanvasStore } from '../store/canvasStore'
+import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
+import { usePendingPositionsStore } from '../store/pendingPositionsStore'
 
 import type { Snippet, SnippetNodeData, UseGraphQLMutationResult, CreateConnectionVariables, DeleteConnectionVariables } from '../../../types'
 import type { ReactFlowInstance, Connection, Node, Edge } from 'reactflow'
@@ -94,7 +99,6 @@ export interface UseReactFlowSetupProps {
   updateSnippetMutation: any
   createConnectionMutation: UseGraphQLMutationResult<any, CreateConnectionVariables>['mutate']
   deleteConnectionMutation: UseGraphQLMutationResult<any, DeleteConnectionVariables>['mutate']
-  refetch: () => Promise<void>
 }
 
 export interface UseReactFlowSetupResult {
@@ -119,11 +123,13 @@ export function useReactFlowSetup({
   snippets,
   updateSnippetMutation,
   createConnectionMutation,
-  deleteConnectionMutation,
-  refetch
+  deleteConnectionMutation
 }: UseReactFlowSetupProps): UseReactFlowSetupResult {
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null)
   const { saveViewportToStorage, loadViewportFromStorage } = useCanvasStore()
+  const { addOptimisticConnection, removeOptimisticConnection, markConnectionDeleting, rollbackConnectionDeletion } = useOptimisticUpdatesStore()
+  const { addPendingPosition, getPendingPositions, clearAll: clearPendingPositions } = usePendingPositionsStore()
+  const [isFlushing, setIsFlushing] = useState(false)
 
   // Use refs to avoid recreating callbacks when snippets/edges change
   const snippetsRef = useRef<Snippet[]>(snippets)
@@ -158,6 +164,52 @@ export function useReactFlowSetup({
     edgesRef.current = edges
   }, [edges])
 
+  // Flush all pending position updates to backend
+  // This sends all accumulated position changes in batch (max one per snippet)
+  const flushPendingPositions = useCallback(async () => {
+    const pendingPositions = getPendingPositions()
+    const snippetIds = Object.keys(pendingPositions)
+
+    if (snippetIds.length === 0 || !projectId || isFlushing) {
+      return
+    }
+
+    setIsFlushing(true)
+
+    try {
+      // Send each pending position update sequentially
+      // In a future optimization, could batch these into a single mutation
+      await Promise.all(
+        snippetIds.map((snippetId) => {
+          const position = pendingPositions[snippetId]
+          return updateSnippetMutation({
+            variables: {
+              projectId,
+              id: snippetId,
+              input: {
+                position: {
+                  x: position.x,
+                  y: position.y
+                }
+              }
+            }
+          }).catch((error: unknown) => {
+            console.error(`Failed to save position for snippet ${snippetId}:`, error)
+            // On failure, position remains pending for next flush attempt
+          })
+        })
+      )
+
+      // Clear all pending positions after successful flush
+      clearPendingPositions()
+    } finally {
+      setIsFlushing(false)
+    }
+  }, [projectId, getPendingPositions, updateSnippetMutation, isFlushing, clearPendingPositions])
+
+  // Debounced version of flush (500ms delay)
+  const debouncedFlushPositions = useDebouncedCallback(flushPendingPositions, 500)
+
   // Initialize ReactFlow
   const onInit = useCallback((instance: ReactFlowInstance) => {
     reactFlowInstance.current = instance
@@ -172,25 +224,20 @@ export function useReactFlowSetup({
   }, [projectId, loadViewportFromStorage])
 
   // Handle node drag - Using ref to avoid recreating callback when snippets change
+  // Positions are added to pending store and flushed in batch after 500ms delay
   const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
     const snippet = snippetsRef.current.find(s => s.id === node.id)
     if (!snippet || !projectId) return
 
-    updateSnippetMutation({
-      variables: {
-        projectId,
-        id: node.id,
-        input: {
-          position: {
-            x: node.position.x,
-            y: node.position.y
-          }
-        }
-      }
-    }).catch((error: unknown) => {
-      console.error('Failed to save snippet position:', error)
+    // Add position to pending store (instant, no mutation yet)
+    addPendingPosition(node.id, {
+      x: node.position.x,
+      y: node.position.y
     })
-  }, [projectId, updateSnippetMutation])
+
+    // Trigger debounced flush (will send all pending positions after 500ms delay)
+    debouncedFlushPositions()
+  }, [projectId, addPendingPosition, debouncedFlushPositions])
 
   // Save viewport when it changes
   const onMoveEnd = useCallback(() => {
@@ -205,33 +252,51 @@ export function useReactFlowSetup({
     (params: Connection) => {
       if (!projectId || !params.source || !params.target) return
 
+      // Generate temporary ID for optimistic connection
+      const tempId = `temp-conn-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+
+      // Add optimistic connection immediately for instant feedback
+      addOptimisticConnection({
+        id: tempId,
+        projectId,
+        sourceSnippetId: params.source,
+        targetSnippetId: params.target,
+        label: '',
+        createdAt: new Date().toISOString(),
+        isOptimistic: true
+      })
+
       // Add edge visually immediately
       setEdges((eds) => addEdge(params, eds))
 
-      // Persist to database
-      createConnectionMutation({
-        variables: {
-          input: {
-            projectId,
-            sourceSnippetId: params.source,
-            targetSnippetId: params.target,
-            label: ''
-          }
-        }
-      })
+      // Persist to database - changes list shape, so invalidate
+      mutateWithInvalidate(
+        () =>
+          createConnectionMutation({
+            variables: {
+              input: {
+                projectId,
+                sourceSnippetId: params.source,
+                targetSnippetId: params.target,
+                label: ''
+              }
+            }
+          }),
+        ['ProjectConnections']
+      )
         .then(() => {
-          // Refetch connections to ensure query cache is updated
-          refetch().catch((error) => {
-            console.error('Failed to refetch after creating connection:', error)
-          })
+          // Remove optimistic connection now that real one exists
+          removeOptimisticConnection(tempId)
         })
         .catch((error) => {
           console.error('Failed to save connection:', error)
+          // Remove optimistic connection on failure
+          removeOptimisticConnection(tempId)
           // Remove edge if save failed
           setEdges((eds) => eds.filter(e => !(e.source === params.source && e.target === params.target)))
         })
     },
-    [projectId, setEdges, createConnectionMutation, refetch]
+    [projectId, setEdges, createConnectionMutation, addOptimisticConnection, removeOptimisticConnection]
   )
 
   // Zoom to fit all nodes
@@ -257,24 +322,30 @@ export function useReactFlowSetup({
               return
             }
 
+            // Mark connection as deleting for optimistic UI update
+            markConnectionDeleting(connectionId)
+
             // Optimistically remove the edge from UI
             setEdges((eds) => eds.filter(e => e.id !== edge.id))
 
-            // Delete from backend
-            deleteConnectionMutation({
-              variables: {
-                projectId,
-                connectionId
-              }
-            })
+            // Delete from backend - changes list shape, so invalidate
+            mutateWithInvalidate(
+              () =>
+                deleteConnectionMutation({
+                  variables: {
+                    projectId,
+                    connectionId
+                  }
+                }),
+              ['ProjectConnections']
+            )
               .then(() => {
-                // Refetch connections to ensure query cache is updated
-                refetch().catch((error) => {
-                  console.error('Failed to refetch after deleting connection:', error)
-                })
+                // Connection is now deleted on server, no need to keep in deleting state
               })
               .catch((error) => {
                 console.error('Failed to delete connection:', error)
+                // Rollback optimistic deletion
+                rollbackConnectionDeletion(connectionId)
                 // Restore edge if deletion failed
                 setEdges((eds) => [...eds, edge])
               })
@@ -285,7 +356,7 @@ export function useReactFlowSetup({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [projectId, deleteConnectionMutation, setEdges, refetch])
+  }, [projectId, deleteConnectionMutation, setEdges, markConnectionDeleting, rollbackConnectionDeletion])
 
   return {
     nodes,

@@ -60,7 +60,6 @@ const CanvasContent = () => {
     projectId,
     snippets,
     setNodes: (updateFn: any) => setNodesRef.current(updateFn),
-    refetch,
     reactFlowInstance: externalReactFlowInstanceRef
   })
 
@@ -75,7 +74,8 @@ const CanvasContent = () => {
     onCombine: handlers.handleCombineSnippetContent,
     onGenerateImage: handlers.handleGenerateImage,
     onGenerateText: handlers.handleGenerateTextSnippet,
-    onFocusSnippet: handlers.handleFocusSnippet
+    onFocusSnippet: handlers.handleFocusSnippet,
+    onCreateUpstreamSnippet: handlers.handleCreateUpstreamSnippet
   }), [
     handlers.handleEditSnippet,
     handlers.handleDeleteSnippet,
@@ -85,7 +85,8 @@ const CanvasContent = () => {
     handlers.handleCombineSnippetContent,
     handlers.handleGenerateImage,
     handlers.handleGenerateTextSnippet,
-    handlers.handleFocusSnippet
+    handlers.handleFocusSnippet,
+    handlers.handleCreateUpstreamSnippet
   ])
 
   // Create flow nodes and edges
@@ -123,8 +124,7 @@ const CanvasContent = () => {
     snippets,
     updateSnippetMutation: handlers.updateSnippetMutation,
     createConnectionMutation: handlers.createConnectionMutation,
-    deleteConnectionMutation: handlers.deleteConnectionMutation,
-    refetch
+    deleteConnectionMutation: handlers.deleteConnectionMutation
   })
 
   // Wrap onInit to write the instance to external ref while preserving setup behavior

@@ -12,6 +12,7 @@ export const CANVAS_CONSTANTS = {
   DEFAULT_NODE_POSITION: { x: 200, y: 200 },
   MIN_NODE_WIDTH: 200,
   MAX_NODE_WIDTH: 300,
+  RELATED_SNIPPET_HORIZONTAL_GAP: 60,
   VIEWPORT_PADDING: 0.2,
 } as const
 
@@ -67,6 +68,5 @@ export const ERROR_MESSAGES = {
   NOT_FOUND: 'The requested resource was not found.',
   VALIDATION: 'Please check your input and try again.',
 } as const
-
 
 

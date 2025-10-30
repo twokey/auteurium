@@ -66,6 +66,7 @@ export class AuteuriumApiStack extends cdk.Stack {
         sourceMap: true,
         tsconfig: path.join(__dirname, '../../../../services/api/tsconfig.json')
       },
+      depsLockFilePath: path.join(__dirname, '../../../../package-lock.json'),
       environment: {
         STAGE: stage,
         USERS_TABLE: usersTable.tableName,

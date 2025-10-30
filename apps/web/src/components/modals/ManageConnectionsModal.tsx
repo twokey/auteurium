@@ -2,6 +2,8 @@ import { useCallback, useMemo, useState } from 'react'
 
 import { CREATE_CONNECTION, DELETE_CONNECTION } from '../../graphql/mutations'
 import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
+import { invalidateQueries } from '../../shared/hooks/useGraphQLQueryWithCache'
+import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisticUpdatesStore'
 import { useToast } from '../../shared/store/toastStore'
 
 interface Connection {
@@ -32,6 +34,7 @@ interface ManageConnectionsModalProps {
 
 export const ManageConnectionsModal = ({ isOpen, onClose, onConnectionChange, snippet, allSnippets }: ManageConnectionsModalProps) => {
   const toast = useToast()
+  const { addOptimisticConnection, removeOptimisticConnection, markConnectionDeleting, rollbackConnectionDeletion } = useOptimisticUpdatesStore()
   const [targetSnippetId, setTargetSnippetId] = useState('')
   const [connectionLabel, setConnectionLabel] = useState('')
   const [isCreating, setIsCreating] = useState(false)
@@ -79,8 +82,23 @@ export const ManageConnectionsModal = ({ isOpen, onClose, onConnectionChange, sn
     }
 
     setIsCreating(true)
+
+    // Generate temporary ID for optimistic connection
+    const tempId = `temp-conn-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+    const trimmedLabel = connectionLabel.trim()
+
+    // Add optimistic connection immediately for instant feedback
+    addOptimisticConnection({
+      id: tempId,
+      projectId: snippet.projectId,
+      sourceSnippetId: snippet.id,
+      targetSnippetId: fullTargetId,
+      label: trimmedLabel === '' ? null : trimmedLabel,
+      createdAt: new Date().toISOString(),
+      isOptimistic: true
+    })
+
     try {
-      const trimmedLabel = connectionLabel.trim()
       await createConnectionMutation({
         variables: {
           input: {
@@ -91,23 +109,35 @@ export const ManageConnectionsModal = ({ isOpen, onClose, onConnectionChange, sn
           }
         }
       })
+
+      // Remove optimistic connection now that real one exists
+      removeOptimisticConnection(tempId)
+
       setTargetSnippetId('')
       setConnectionLabel('')
 
-      // Trigger refetch after successful connection creation
+      // Invalidate connection queries to trigger background refetch
+      invalidateQueries('ProjectConnections')
+
+      // Also call the optional callback if provided
       if (onConnectionChange) {
         await onConnectionChange()
       }
     } catch (error) {
       console.error('Failed to create connection:', error)
+      // Remove optimistic connection on failure
+      removeOptimisticConnection(tempId)
       toast.error('Failed to create connection', error instanceof Error ? error.message : 'Unknown error')
     } finally {
       setIsCreating(false)
     }
-  }, [targetSnippetId, connectionLabel, allSnippets, snippet.id, snippet.projectId, createConnectionMutation, onConnectionChange, toast])
+  }, [targetSnippetId, connectionLabel, allSnippets, snippet.id, snippet.projectId, createConnectionMutation, onConnectionChange, toast, addOptimisticConnection, removeOptimisticConnection])
 
   const handleDeleteConnection = useCallback(async (connectionId: string) => {
     if (!confirm('Are you sure you want to delete this connection?')) return
+
+    // Mark connection as deleting for optimistic UI update
+    markConnectionDeleting(connectionId)
 
     try {
       await deleteConnectionMutation({
@@ -117,15 +147,21 @@ export const ManageConnectionsModal = ({ isOpen, onClose, onConnectionChange, sn
         }
       })
 
-      // Trigger refetch after successful connection deletion
+      // Connection is now deleted on server
+      // Invalidate connection queries to trigger background refetch
+      invalidateQueries('ProjectConnections')
+
+      // Also call the optional callback if provided
       if (onConnectionChange) {
         await onConnectionChange()
       }
     } catch (error) {
       console.error('Failed to delete connection:', error)
+      // Rollback optimistic deletion
+      rollbackConnectionDeletion(connectionId)
       toast.error('Failed to delete connection', error instanceof Error ? error.message : 'Unknown error')
     }
-  }, [deleteConnectionMutation, snippet.projectId, onConnectionChange, toast])
+  }, [deleteConnectionMutation, snippet.projectId, onConnectionChange, toast, markConnectionDeleting, rollbackConnectionDeletion])
 
   const getSnippetPreview = useCallback((snippetId: string) => {
     const foundSnippet = allSnippets.find(s => s.id === snippetId)

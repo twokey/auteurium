@@ -10,10 +10,11 @@ Never try to create git commit without me asking so.
 **Auteurium** is a web application for creating text snippets and organizing them visually on a canvas with logical connections. The application is built with a complete AWS serverless architecture and React frontend, ready for development and testing.
 
 ### Core Concept
-- Users create text snippets within projects 
+- Users create text snippets within projects
 - Snippets are positioned on a visual canvas (similar to Miro/FigJam)
 - Snippets can be connected with directional, many-to-many relationships
-- Each snippet has two text fields and can have tags/categories
+- Each snippet has a primary text field (textField1) and a title field, plus tags/categories
+- Inline editing of title and text directly on canvas nodes (click to edit, Cmd/Ctrl+Enter to save)
 - Canvas supports zooming, panning, and drag-and-drop positioning
 
 ## Architecture
@@ -42,15 +43,18 @@ Never try to create git commit without me asking so.
 - Project deletion cascades to all contained snippets
 
 ### Snippet Management
-- One primary text field per snippet, no length limits (expected up to page length)
-- Unique alphanumeric IDs displayed on canvas
+- Each snippet has a title field and primary text field (textField1), no length limits (expected up to page length)
+- Unique alphanumeric IDs displayed on canvas (shortened to 8 characters)
 - Large snippets (>100 words) shown minimized with expand modal
 - Version history with revert capability
 - Positioned freely on infinite canvas
-- AI-powered image generation using multiple models (Google Imagen 4 Fast, Gemini 2.5 Flash Image with multimodal support)
-- Text-to-text generation with snippet creation
-- Model selection for text and image generation on snippet nodes
-- Edit and combine snippets directly on canvas nodes (inline editing)
+- **Inline Editing**: Click title or text field directly on canvas node to edit, Cmd/Ctrl+Enter to save, Esc to cancel
+- **Connected Content Aggregation**: Snippets automatically aggregate content from upstream connections
+- **Prompt Designer**: Interactive prompt builder for AI generation with connected content preview
+- **AI-Powered Image Generation**: Multiple models (Google Imagen 4 Fast, Gemini 2.5 Flash Image with multimodal support for up to 3 connected images)
+- **Text-to-Text Generation**: LLM-powered snippet creation with model selection
+- **Model Selection**: Choose text, image, or video models directly on snippet nodes
+- **Optimistic Updates**: Instant UI feedback with background synchronization
 
 ### Connection System
 - Directional relationships between snippets (A depends on B)
@@ -192,10 +196,15 @@ Never try to create git commit without me asking so.
 **Frontend Architecture**:
 - React 19.2 with React Flow for canvas interactions, React Router for navigation
 - AWS Amplify v6 for authentication integration with Cognito and GraphQL operations with AppSync (recently migrated from Apollo Client)
+- **Feature-based Folder Structure**: Organized by domain (features/canvas/, features/projects/, shared/)
+- **State Management**: Zustand stores for canvas, modals, prompts, optimistic updates, and toasts
 - Optimistic UI updates for improved user experience
 - Tailwind CSS for styling
 - Authentication context with useAuth hook
-- Component structure: pages/, components/auth/, components/projects/, components/canvas/
+- **Shared Component Library**: Reusable UI components (Button, Modal, Card, Input, Textarea, Toast, LoadingSpinner)
+- **Custom Hooks Library**: useLocalStorage, useDebounce, useMediaQuery, useKeyPress, useGraphQLQueryWithCache
+- **Centralized Constants**: Canvas config, validation rules, UI settings in shared/constants/
+- **Error Boundaries**: Global and feature-level error handling with fallback UI
 
 **Backend Architecture**:
 - GraphQL API via AWS AppSync with Lambda resolvers organized by domain
@@ -219,6 +228,28 @@ Never try to create git commit without me asking so.
 - **Infrastructure**: CDK stacks with app-specific resource naming for multi-app AWS accounts
 - **Cost Optimization**: Monitoring stack disabled during development (~$5-7/month savings)
 - **Resolver Pattern**: Domain-based organization with mutations.ts and queries.ts per feature area
+
+**Frontend State Management (Zustand Stores)**:
+- **canvasStore** (`features/canvas/store/canvasStore.ts`) - Canvas viewport persistence, zoom/pan state
+- **promptDesignerStore** (`features/canvas/store/promptDesignerStore.ts`) - AI prompt builder UI state, connected content preview
+- **optimisticUpdatesStore** (`features/canvas/store/optimisticUpdatesStore.ts`) - Optimistic UI updates, tracks pending/deleting/real snippets
+- **modalStore** (`shared/store/modalStore.ts`) - Centralized modal state management
+- **toastStore** (`shared/store/toastStore.ts`) - Toast notifications with queue management
+- **projectStore** (`features/projects/store/projectStore.ts`) - Client-side project cache
+
+**Shared Components & Utilities**:
+- **UI Components** (`shared/components/ui/`): Button, Modal, Card, Input, Textarea, Toast, LoadingSpinner
+- **Forms** (`shared/components/forms/`): FormField, FormSection, BaseFormModal, ConfirmationModal
+- **Error Handling** (`shared/components/`): ErrorBoundary, ErrorFallback
+- **Custom Hooks** (`shared/hooks/`): useLocalStorage, useDebounce, useMediaQuery, useKeyPress, useGraphQLQueryWithCache, useEntityForm, useModalForm
+- **Utilities** (`shared/utils/`): textUtils (word counting, truncation), dateFormatters, errorLogger, formHelpers, validation
+- **Constants** (`shared/constants/`): CANVAS_CONSTANTS, VALIDATION, UI, GRAPHQL, IMAGE_GENERATION, ERROR_MESSAGES
+
+**Canvas Hooks** (feature-based organization):
+- **useCanvasData** (`features/canvas/hooks/useCanvasData.ts`) - Data fetching, snippet/connection aggregation, memoization
+- **useCanvasHandlers** (`features/canvas/hooks/useCanvasHandlers.ts`) - Event handlers for canvas operations
+- **useFlowNodes** - Transform snippets to ReactFlow nodes with connected content analysis
+- **useFlowEdges** - Transform connections to ReactFlow edges
 
 **AWS Infrastructure** (6 deployed stacks):
 1. **Auteurium-Auth-dev** - Cognito User Pool with email/password authentication
@@ -267,6 +298,31 @@ Never try to create git commit without me asking so.
 - Automated alerts for API errors (>5 errors) and high latency (>5 seconds)
 - SNS notifications for production issues
 - Centralized logging with configurable retention
+
+## Documentation References
+
+**Architectural Documentation** (docs/ directory):
+- `docs/ARCHITECTURE.md` - System architecture and design decisions
+- `docs/ARCHITECTURE_DECISIONS.md` - ADRs and architectural choices
+- `docs/application-requirements.md` - Complete feature specifications
+- `docs/canvas-design.md` - UI/UX design and interaction patterns
+- `docs/aws-well-architecture-analysis-results.md` - AWS Well-Architected Framework analysis
+
+**Development Plans** (.cursor/plans/):
+- `react-architecture-0483ac5b.plan.md` - React architecture refactoring plan (completed implementation includes feature-based structure, Zustand stores, shared components, error boundaries, toast notifications, and custom hooks)
+
+**Current Architecture Status**:
+- ✅ Feature-based folder structure implemented
+- ✅ Zustand state management fully integrated
+- ✅ Shared component library created
+- ✅ Custom hooks library in use
+- ✅ Error boundaries deployed
+- ✅ Toast notification system replacing alerts
+- ✅ Centralized constants and utilities
+- ✅ Optimistic UI updates pattern
+- ✅ Inline editing on canvas nodes
+- ✅ Prompt designer for AI generation
+
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.
 NEVER create files unless they're absolutely necessary for achieving your goal.
