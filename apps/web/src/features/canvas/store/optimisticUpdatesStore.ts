@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand'
-import type { Snippet } from '../../../types'
+import type { Connection, Snippet } from '../../../types'
 
 interface OptimisticSnippet {
   id: string
@@ -51,6 +51,12 @@ interface OptimisticUpdatesState {
   // Optimistic connections being created (keyed by temporary ID)
   optimisticConnections: Record<string, OptimisticConnection>
 
+  // Real connections that replaced optimistic ones (keyed by real ID)
+  realConnections: Record<string, Connection>
+
+  // Mapping from temp connection ID to real ID
+  tempConnectionToRealIdMap: Record<string, string>
+
   // Connections currently being deleted (optimistic, waiting for server)
   deletingConnections: Set<string>
 
@@ -90,6 +96,12 @@ interface OptimisticUpdatesState {
   // Add optimistic connection
   addOptimisticConnection: (connection: OptimisticConnection) => void
 
+  // Add a real connection without a prior optimistic version
+  addRealConnection: (connection: Connection) => void
+
+  // Replace optimistic connection with real one
+  replaceOptimisticConnection: (tempId: string, realConnection: Connection) => void
+
   // Remove optimistic connection (if creation failed)
   removeOptimisticConnection: (tempId: string) => void
 
@@ -114,6 +126,13 @@ interface OptimisticUpdatesState {
   // Clear saving state (mutation completed or failed)
   clearSnippetSaving: (snippetId: string) => void
 
+  // Update snippet position while keeping other fields intact
+  updateSnippetPosition: (
+    snippetId: string,
+    position: { x: number; y: number },
+    fallbackSnippet?: Snippet
+  ) => void
+
   // Clear all optimistic updates
   clearAll: () => void
 }
@@ -125,6 +144,8 @@ export const useOptimisticUpdatesStore = create<OptimisticUpdatesState>((set) =>
   deletingSnippets: new Set(),
   deletedSnippets: new Set(),
   optimisticConnections: {},
+  realConnections: {},
+  tempConnectionToRealIdMap: {},
   deletingConnections: new Set(),
   deletedConnections: new Set(),
   dirtySnippets: new Set(),
@@ -200,6 +221,28 @@ export const useOptimisticUpdatesStore = create<OptimisticUpdatesState>((set) =>
     }
   })),
 
+  addRealConnection: (connection) => set((state) => ({
+    realConnections: {
+      ...state.realConnections,
+      [connection.id]: connection
+    }
+  })),
+
+  replaceOptimisticConnection: (tempId, realConnection) => set((state) => {
+    const { [tempId]: removed, ...remainingOptimistic } = state.optimisticConnections
+    return {
+      optimisticConnections: remainingOptimistic,
+      realConnections: {
+        ...state.realConnections,
+        [realConnection.id]: realConnection
+      },
+      tempConnectionToRealIdMap: {
+        ...state.tempConnectionToRealIdMap,
+        [tempId]: realConnection.id
+      }
+    }
+  }),
+
   removeOptimisticConnection: (tempId) => set((state) => {
     const { [tempId]: removed, ...remaining } = state.optimisticConnections
     return {
@@ -254,6 +297,58 @@ export const useOptimisticUpdatesStore = create<OptimisticUpdatesState>((set) =>
       return { savingSnippets: newSet }
     }),
 
+  updateSnippetPosition: (snippetId, position, fallbackSnippet) =>
+    set((state) => {
+      const optimisticEntry = state.optimisticSnippets[snippetId]
+      const realEntry = state.realSnippets[snippetId]
+
+      let updatedOptimisticSnippets = state.optimisticSnippets
+      let updatedRealSnippets = state.realSnippets
+      let didUpdate = false
+
+      if (optimisticEntry) {
+        updatedOptimisticSnippets = {
+          ...state.optimisticSnippets,
+          [snippetId]: {
+            ...optimisticEntry,
+            position
+          }
+        }
+        didUpdate = true
+      }
+
+      if (realEntry) {
+        updatedRealSnippets = {
+          ...state.realSnippets,
+          [snippetId]: {
+            ...realEntry,
+            position
+          }
+        }
+        didUpdate = true
+      }
+
+      if (!didUpdate && fallbackSnippet) {
+        updatedRealSnippets = {
+          ...state.realSnippets,
+          [snippetId]: {
+            ...fallbackSnippet,
+            position
+          }
+        }
+        didUpdate = true
+      }
+
+      if (!didUpdate) {
+        return state
+      }
+
+      return {
+        optimisticSnippets: updatedOptimisticSnippets,
+        realSnippets: updatedRealSnippets
+      }
+    }),
+
   clearAll: () => set({
     optimisticSnippets: {},
     realSnippets: {},
@@ -261,6 +356,8 @@ export const useOptimisticUpdatesStore = create<OptimisticUpdatesState>((set) =>
     deletingSnippets: new Set(),
     deletedSnippets: new Set(),
     optimisticConnections: {},
+    realConnections: {},
+    tempConnectionToRealIdMap: {},
     deletingConnections: new Set(),
     deletedConnections: new Set(),
     dirtySnippets: new Set(),

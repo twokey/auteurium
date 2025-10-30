@@ -5,6 +5,7 @@ import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
 import { invalidateQueries } from '../../shared/hooks/useGraphQLQueryWithCache'
 import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisticUpdatesStore'
 import { useToast } from '../../shared/store/toastStore'
+import type { CreateConnectionMutationData, CreateConnectionVariables } from '../../types'
 
 interface Connection {
   id: string
@@ -34,12 +35,18 @@ interface ManageConnectionsModalProps {
 
 export const ManageConnectionsModal = ({ isOpen, onClose, onConnectionChange, snippet, allSnippets }: ManageConnectionsModalProps) => {
   const toast = useToast()
-  const { addOptimisticConnection, removeOptimisticConnection, markConnectionDeleting, rollbackConnectionDeletion } = useOptimisticUpdatesStore()
+  const {
+    addOptimisticConnection,
+    replaceOptimisticConnection,
+    removeOptimisticConnection,
+    markConnectionDeleting,
+    rollbackConnectionDeletion
+  } = useOptimisticUpdatesStore()
   const [targetSnippetId, setTargetSnippetId] = useState('')
   const [connectionLabel, setConnectionLabel] = useState('')
   const [isCreating, setIsCreating] = useState(false)
 
-  const { mutate: createConnectionMutation } = useGraphQLMutation(CREATE_CONNECTION)
+  const { mutate: createConnectionMutation } = useGraphQLMutation<CreateConnectionMutationData, CreateConnectionVariables>(CREATE_CONNECTION)
 
   const { mutate: deleteConnectionMutation } = useGraphQLMutation(DELETE_CONNECTION)
 
@@ -99,7 +106,7 @@ export const ManageConnectionsModal = ({ isOpen, onClose, onConnectionChange, sn
     })
 
     try {
-      await createConnectionMutation({
+      const mutationResult = await createConnectionMutation({
         variables: {
           input: {
             projectId: snippet.projectId,
@@ -109,9 +116,13 @@ export const ManageConnectionsModal = ({ isOpen, onClose, onConnectionChange, sn
           }
         }
       })
+      const createdConnection = mutationResult?.createConnection
 
-      // Remove optimistic connection now that real one exists
-      removeOptimisticConnection(tempId)
+      if (createdConnection) {
+        replaceOptimisticConnection(tempId, createdConnection)
+      } else {
+        console.warn('createConnection mutation returned no connection data; leaving optimistic entry in place')
+      }
 
       setTargetSnippetId('')
       setConnectionLabel('')
@@ -131,7 +142,19 @@ export const ManageConnectionsModal = ({ isOpen, onClose, onConnectionChange, sn
     } finally {
       setIsCreating(false)
     }
-  }, [targetSnippetId, connectionLabel, allSnippets, snippet.id, snippet.projectId, createConnectionMutation, onConnectionChange, toast, addOptimisticConnection, removeOptimisticConnection])
+  }, [
+    targetSnippetId,
+    connectionLabel,
+    allSnippets,
+    snippet.id,
+    snippet.projectId,
+    createConnectionMutation,
+    onConnectionChange,
+    toast,
+    addOptimisticConnection,
+    replaceOptimisticConnection,
+    removeOptimisticConnection
+  ])
 
   const handleDeleteConnection = useCallback(async (connectionId: string) => {
     if (!confirm('Are you sure you want to delete this connection?')) return

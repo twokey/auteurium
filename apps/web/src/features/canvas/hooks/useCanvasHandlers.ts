@@ -16,7 +16,6 @@ import {
 } from '../../../graphql/mutations'
 import { useGraphQLMutation } from '../../../hooks/useGraphQLMutation'
 import { CANVAS_CONSTANTS } from '../../../shared/constants'
-import { invalidateQueries } from '../../../shared/hooks/useGraphQLQueryWithCache'
 import { mutateWithInvalidate, mutateOptimisticOnly } from '../../../shared/utils/cacheHelpers'
 import { useModalStore } from '../../../shared/store/modalStore'
 import { useToast } from '../../../shared/store/toastStore'
@@ -161,7 +160,9 @@ export function useCanvasHandlers({
     replaceOptimisticSnippet,
     removeOptimisticSnippet,
     updateRealSnippet,
-    clearRealSnippets
+    addOptimisticConnection,
+    replaceOptimisticConnection,
+    removeOptimisticConnection
   } = useOptimisticUpdatesStore()
 
   // Mutations
@@ -504,13 +505,26 @@ export function useCanvasHandlers({
           ...newSnippet,
           textField1: ''
         })
-        clearRealSnippets()
         setGeneratingImage(tempId, false)
         setGeneratingImage(newSnippet.id, true)
 
+        const optimisticConnectionId = `temp-conn-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+        const connectionTimestamp = new Date().toISOString()
+
+        addOptimisticConnection({
+          id: optimisticConnectionId,
+          projectId,
+          sourceSnippetId: snippetId,
+          targetSnippetId: newSnippet.id,
+          label: '',
+          createdAt: connectionTimestamp,
+          updatedAt: connectionTimestamp,
+          isOptimistic: true
+        })
+
         try {
           // Create connection - changes list shape, so invalidate
-          await mutateWithInvalidate(
+          const connectionResult = await mutateWithInvalidate(
             () =>
               createConnectionMutation({
                 variables: {
@@ -524,8 +538,16 @@ export function useCanvasHandlers({
               }),
             ['ProjectConnections']
           )
+
+          const createdConnection = connectionResult?.createConnection
+          if (createdConnection) {
+            replaceOptimisticConnection(optimisticConnectionId, createdConnection)
+          } else {
+            console.warn('createConnection mutation returned no data; optimistic connection will remain until refresh')
+          }
         } catch (connectionError) {
           console.error('Failed to connect generated image snippet:', connectionError)
+          removeOptimisticConnection(optimisticConnectionId)
           toast.error('Failed to connect new image snippet', connectionError instanceof Error ? connectionError.message : 'Unknown error')
         }
 
@@ -595,7 +617,9 @@ export function useCanvasHandlers({
     updateSnippetMutation,
     updateRealSnippet,
     removeOptimisticSnippet,
-    clearRealSnippets
+    addOptimisticConnection,
+    replaceOptimisticConnection,
+    removeOptimisticConnection
   ])
 
   const handleCreateUpstreamSnippet = useCallback(async (targetSnippetId: string) => {
@@ -669,17 +693,30 @@ export function useCanvasHandlers({
         ['ProjectWithSnippets']
       )
 
-      const createdSnippet = (creationResult as any)?.createSnippet as Snippet | undefined
+      const createdSnippet = creationResult?.createSnippet
       if (!createdSnippet) {
         throw new Error('Failed to create snippet: missing response data')
       }
 
       replaceOptimisticSnippet(tempId, createdSnippet)
-      clearRealSnippets()
+
+      const optimisticConnectionId = `temp-conn-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+      const connectionTimestamp = new Date().toISOString()
+
+      addOptimisticConnection({
+        id: optimisticConnectionId,
+        projectId,
+        sourceSnippetId: createdSnippet.id,
+        targetSnippetId,
+        label: '',
+        createdAt: connectionTimestamp,
+        updatedAt: connectionTimestamp,
+        isOptimistic: true
+      })
 
       try {
         // Create connection - changes list shape, so invalidate
-        await mutateWithInvalidate(
+        const connectionResult = await mutateWithInvalidate(
           () =>
             createConnectionMutation({
               variables: {
@@ -693,8 +730,16 @@ export function useCanvasHandlers({
             }),
           ['ProjectConnections']
         )
+
+        const createdConnection = connectionResult?.createConnection
+        if (createdConnection) {
+          replaceOptimisticConnection(optimisticConnectionId, createdConnection)
+        } else {
+          console.warn('createConnection mutation returned no data; optimistic connection will remain until refresh')
+        }
       } catch (connectionError) {
         console.error('Failed to connect new snippet:', connectionError)
+        removeOptimisticConnection(optimisticConnectionId)
         toast.error(
           'Failed to connect new snippet',
           connectionError instanceof Error ? connectionError.message : 'Unknown error'
@@ -715,7 +760,9 @@ export function useCanvasHandlers({
     createSnippetMutation,
     replaceOptimisticSnippet,
     createConnectionMutation,
-    clearRealSnippets,
+    addOptimisticConnection,
+    replaceOptimisticConnection,
+    removeOptimisticConnection,
     toast,
     removeOptimisticSnippet
   ])
@@ -767,9 +814,6 @@ export function useCanvasHandlers({
           const createdSnippet = (result as any).createSnippet as Snippet
           // Replace optimistic snippet with real one from server
           replaceOptimisticSnippet(tempId, createdSnippet)
-          // Clear realSnippets now that the GraphQL cache has been updated
-          // This prevents duplicate snippets and stale data issues
-          clearRealSnippets()
         }
       })
       .catch((error) => {
@@ -777,7 +821,7 @@ export function useCanvasHandlers({
         // Remove optimistic snippet on failure
         removeOptimisticSnippet(tempId)
       })
-  }, [projectId, createSnippetMutation, addOptimisticSnippet, replaceOptimisticSnippet, removeOptimisticSnippet, clearRealSnippets])
+  }, [projectId, createSnippetMutation, addOptimisticSnippet, replaceOptimisticSnippet, removeOptimisticSnippet])
 
   const handleSaveCanvas = useCallback(() => {
     setLoading(true)
@@ -789,7 +833,8 @@ export function useCanvasHandlers({
 
   // Generated Snippet Handlers
   const handleCreateGeneratedSnippet = useCallback(async () => {
-    if (!generatedSnippetPreview.isOpen || !generatedSnippetPreview.sourceSnippetId) {
+    const { isOpen, sourceSnippetId } = generatedSnippetPreview
+    if (!isOpen || !sourceSnippetId) {
       return
     }
 
@@ -798,7 +843,7 @@ export function useCanvasHandlers({
       return
     }
 
-    const sourceSnippet = snippetsRef.current.find(s => s.id === generatedSnippetPreview.sourceSnippetId)
+    const sourceSnippet = snippetsRef.current.find(s => s.id === sourceSnippetId)
     const baseX = sourceSnippet?.position?.x ?? 0
     const baseY = sourceSnippet?.position?.y ?? 0
     const targetPosition = {
@@ -850,31 +895,56 @@ export function useCanvasHandlers({
         ['ProjectWithSnippets']
       )
 
-      const newSnippetId = creationResult ? (creationResult as any).createSnippet.id : null
-      if (!newSnippetId) {
+      const createdSnippet = creationResult?.createSnippet
+      if (!createdSnippet) {
         throw new Error('Failed to create snippet: missing snippet ID in response')
       }
 
-      const createdSnippet = (creationResult as any).createSnippet as Snippet
+      const newSnippetId = createdSnippet.id
       // Replace optimistic snippet with real one from server
       replaceOptimisticSnippet(tempId, createdSnippet)
-      clearRealSnippets()
 
-      // Create connection - changes list shape, so invalidate
-      await mutateWithInvalidate(
-        () =>
-          createConnectionMutation({
-            variables: {
-              input: {
-                projectId,
-                sourceSnippetId: generatedSnippetPreview.sourceSnippetId,
-                targetSnippetId: newSnippetId,
-                label: ''
+      const optimisticConnectionId = `temp-conn-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+      const connectionTimestamp = new Date().toISOString()
+
+      addOptimisticConnection({
+        id: optimisticConnectionId,
+        projectId,
+        sourceSnippetId,
+        targetSnippetId: newSnippetId,
+        label: '',
+        createdAt: connectionTimestamp,
+        updatedAt: connectionTimestamp,
+        isOptimistic: true
+      })
+
+      try {
+        // Create connection - changes list shape, so invalidate
+        const connectionResult = await mutateWithInvalidate(
+          () =>
+            createConnectionMutation({
+              variables: {
+                input: {
+                  projectId,
+                  sourceSnippetId,
+                  targetSnippetId: newSnippetId,
+                  label: ''
+                }
               }
-            }
-          }),
-        ['ProjectConnections']
-      )
+            }),
+          ['ProjectConnections']
+        )
+
+        const createdConnection = connectionResult?.createConnection
+        if (createdConnection) {
+          replaceOptimisticConnection(optimisticConnectionId, createdConnection)
+        } else {
+          console.warn('createConnection mutation returned no data; optimistic connection will remain until refresh')
+        }
+      } catch (connectionError) {
+        removeOptimisticConnection(optimisticConnectionId)
+        throw connectionError
+      }
 
       toast.success('Generated snippet created successfully!')
     } catch (error) {
@@ -897,7 +967,9 @@ export function useCanvasHandlers({
     addOptimisticSnippet,
     replaceOptimisticSnippet,
     removeOptimisticSnippet,
-    clearRealSnippets
+    addOptimisticConnection,
+    replaceOptimisticConnection,
+    removeOptimisticConnection
   ])
 
   // Handler for creating snippet from text generation
@@ -971,19 +1043,32 @@ export function useCanvasHandlers({
         ['ProjectWithSnippets']
       )
 
-      const newSnippetId = creationResult ? (creationResult as any).createSnippet.id : null
-      if (!newSnippetId) {
+      const createdSnippet = creationResult?.createSnippet
+      if (!createdSnippet) {
         throw new Error('Failed to create snippet: missing snippet ID in response')
       }
 
-      const createdSnippet = (creationResult as any).createSnippet as Snippet
+      const newSnippetId = createdSnippet.id
       // Replace optimistic snippet with real one from server
       replaceOptimisticSnippet(tempId, createdSnippet)
-      clearRealSnippets()
+
+      const optimisticConnectionId = `temp-conn-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+      const connectionTimestamp = new Date().toISOString()
+
+      addOptimisticConnection({
+        id: optimisticConnectionId,
+        projectId,
+        sourceSnippetId,
+        targetSnippetId: newSnippetId,
+        label: '',
+        createdAt: connectionTimestamp,
+        updatedAt: connectionTimestamp,
+        isOptimistic: true
+      })
 
       try {
         // Create connection - changes list shape, so invalidate
-        await mutateWithInvalidate(
+        const connectionResult = await mutateWithInvalidate(
           () =>
             createConnectionMutation({
               variables: {
@@ -997,8 +1082,16 @@ export function useCanvasHandlers({
             }),
           ['ProjectConnections']
         )
+
+        const createdConnection = connectionResult?.createConnection
+        if (createdConnection) {
+          replaceOptimisticConnection(optimisticConnectionId, createdConnection)
+        } else {
+          console.warn('createConnection mutation returned no data; optimistic connection will remain until refresh')
+        }
       } catch (connectionError) {
         console.error('Failed to connect generated text snippet:', connectionError)
+        removeOptimisticConnection(optimisticConnectionId)
         toast.error('Failed to connect new text snippet', connectionError instanceof Error ? connectionError.message : 'Unknown error')
       }
 
@@ -1016,9 +1109,11 @@ export function useCanvasHandlers({
     addOptimisticSnippet,
     replaceOptimisticSnippet,
     removeOptimisticSnippet,
+    addOptimisticConnection,
+    replaceOptimisticConnection,
+    removeOptimisticConnection,
     toast,
-    reactFlowInstance,
-    clearRealSnippets
+    reactFlowInstance
   ])
 
   // Focus on a snippet: center and zoom to make it take ~80% of viewport height

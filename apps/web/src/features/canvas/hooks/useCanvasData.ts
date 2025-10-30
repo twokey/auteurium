@@ -328,6 +328,7 @@ export function useCanvasData(projectId: string | undefined): UseCanvasDataResul
     deletingSnippets,
     deletedSnippets,
     optimisticConnections,
+    realConnections,
     deletingConnections,
     deletedConnections
   } = useOptimisticUpdatesStore()
@@ -381,16 +382,34 @@ export function useCanvasData(projectId: string | undefined): UseCanvasDataResul
 
   // Merge real connections with optimistic connections, filter out deleted ones
   const mergedConnections = useMemo<Connection[]>(() => {
-    // Start with real connections, filtering out deleted and deleting ones
-    const realConnectionsFiltered = projectConnections.filter(
-      (conn) => !deletedConnections.has(conn.id) && !deletingConnections.has(conn.id)
-    )
+    const mergedById = new Map<string, Connection>()
 
-    // Add optimistic connections
-    const optimisticConnectionsList = Object.values(optimisticConnections) as Connection[]
+    // Start with real connections from server, filtering out deleted/deleting ones
+    projectConnections.forEach((connection) => {
+      if (deletedConnections.has(connection.id) || deletingConnections.has(connection.id)) {
+        return
+      }
+      mergedById.set(connection.id, connection)
+    })
 
-    return [...realConnectionsFiltered, ...optimisticConnectionsList]
-  }, [projectConnections, optimisticConnections, deletingConnections, deletedConnections])
+    // Inject real connections that replaced optimistic ones but aren't yet in server response
+    Object.values(realConnections).forEach((connection) => {
+      if (deletedConnections.has(connection.id) || deletingConnections.has(connection.id)) {
+        return
+      }
+      mergedById.set(connection.id, connection)
+    })
+
+    // Append active optimistic connections (temp IDs)
+    Object.values(optimisticConnections).forEach((connection) => {
+      if (deletedConnections.has(connection.id) || deletingConnections.has(connection.id)) {
+        return
+      }
+      mergedById.set(connection.id, connection as Connection)
+    })
+
+    return Array.from(mergedById.values())
+  }, [projectConnections, realConnections, optimisticConnections, deletingConnections, deletedConnections])
 
   // Memoize connection mapping for performance
   const connectionsBySource = useMemo(() => {

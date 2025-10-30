@@ -6,9 +6,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { addEdge, useEdgesState, useNodesState } from 'reactflow'
 
-import { invalidateQueries } from '../../../shared/hooks/useGraphQLQueryWithCache'
 import { useDebouncedCallback } from '../../../shared/hooks/useDebounce'
-import { mutateWithInvalidate, mutateOptimisticOnly } from '../../../shared/utils/cacheHelpers'
+import { mutateWithInvalidate } from '../../../shared/utils/cacheHelpers'
 import { useCanvasStore } from '../store/canvasStore'
 import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
 import { usePendingPositionsStore } from '../store/pendingPositionsStore'
@@ -127,7 +126,14 @@ export function useReactFlowSetup({
 }: UseReactFlowSetupProps): UseReactFlowSetupResult {
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null)
   const { saveViewportToStorage, loadViewportFromStorage } = useCanvasStore()
-  const { addOptimisticConnection, removeOptimisticConnection, markConnectionDeleting, rollbackConnectionDeletion } = useOptimisticUpdatesStore()
+  const {
+    addOptimisticConnection,
+    replaceOptimisticConnection,
+    removeOptimisticConnection,
+    markConnectionDeleting,
+    rollbackConnectionDeletion,
+    updateSnippetPosition
+  } = useOptimisticUpdatesStore()
   const { addPendingPosition, getPendingPositions, clearAll: clearPendingPositions } = usePendingPositionsStore()
   const [isFlushing, setIsFlushing] = useState(false)
 
@@ -180,23 +186,35 @@ export function useReactFlowSetup({
       // Send each pending position update sequentially
       // In a future optimization, could batch these into a single mutation
       await Promise.all(
-        snippetIds.map((snippetId) => {
+        snippetIds.map(async (snippetId) => {
           const position = pendingPositions[snippetId]
-          return updateSnippetMutation({
-            variables: {
-              projectId,
-              id: snippetId,
-              input: {
-                position: {
-                  x: position.x,
-                  y: position.y
+          const snapshot = snippetsRef.current.find(s => s.id === snippetId)
+          const fallbackSnippet = snapshot
+            ? {
+                ...snapshot,
+                position: snapshot.position ? { ...snapshot.position } : null
+              }
+            : undefined
+
+          updateSnippetPosition(snippetId, { x: position.x, y: position.y }, fallbackSnippet)
+
+          try {
+            await updateSnippetMutation({
+              variables: {
+                projectId,
+                id: snippetId,
+                input: {
+                  position: {
+                    x: position.x,
+                    y: position.y
+                  }
                 }
               }
-            }
-          }).catch((error: unknown) => {
+            })
+          } catch (error: unknown) {
             console.error(`Failed to save position for snippet ${snippetId}:`, error)
-            // On failure, position remains pending for next flush attempt
-          })
+            // On failure, position overrides remain; next successful flush will resync
+          }
         })
       )
 
@@ -205,7 +223,7 @@ export function useReactFlowSetup({
     } finally {
       setIsFlushing(false)
     }
-  }, [projectId, getPendingPositions, updateSnippetMutation, isFlushing, clearPendingPositions])
+  }, [projectId, getPendingPositions, updateSnippetMutation, isFlushing, clearPendingPositions, updateSnippetPosition])
 
   // Debounced version of flush (500ms delay)
   const debouncedFlushPositions = useDebouncedCallback(flushPendingPositions, 500)
@@ -252,6 +270,9 @@ export function useReactFlowSetup({
     (params: Connection) => {
       if (!projectId || !params.source || !params.target) return
 
+      const sourceSnippetId = params.source!
+      const targetSnippetId = params.target!
+
       // Generate temporary ID for optimistic connection
       const tempId = `temp-conn-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
 
@@ -259,8 +280,8 @@ export function useReactFlowSetup({
       addOptimisticConnection({
         id: tempId,
         projectId,
-        sourceSnippetId: params.source,
-        targetSnippetId: params.target,
+        sourceSnippetId,
+        targetSnippetId,
         label: '',
         createdAt: new Date().toISOString(),
         isOptimistic: true
@@ -276,27 +297,32 @@ export function useReactFlowSetup({
             variables: {
               input: {
                 projectId,
-                sourceSnippetId: params.source,
-                targetSnippetId: params.target,
+                sourceSnippetId,
+                targetSnippetId,
                 label: ''
               }
             }
           }),
         ['ProjectConnections']
       )
-        .then(() => {
-          // Remove optimistic connection now that real one exists
-          removeOptimisticConnection(tempId)
+        .then((result) => {
+          const connectionData = result?.createConnection
+
+          if (connectionData) {
+            replaceOptimisticConnection(tempId, connectionData)
+          } else {
+            console.warn('createConnection returned no data; keeping optimistic connection in place')
+          }
         })
         .catch((error) => {
           console.error('Failed to save connection:', error)
           // Remove optimistic connection on failure
           removeOptimisticConnection(tempId)
           // Remove edge if save failed
-          setEdges((eds) => eds.filter(e => !(e.source === params.source && e.target === params.target)))
+          setEdges((eds) => eds.filter(e => !(e.source === sourceSnippetId && e.target === targetSnippetId)))
         })
     },
-    [projectId, setEdges, createConnectionMutation, addOptimisticConnection, removeOptimisticConnection]
+    [projectId, setEdges, createConnectionMutation, addOptimisticConnection, replaceOptimisticConnection, removeOptimisticConnection]
   )
 
   // Zoom to fit all nodes
