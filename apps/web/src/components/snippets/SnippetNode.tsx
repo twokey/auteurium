@@ -556,7 +556,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
       <Handle type="source" position={Position.Right} />
 
       <div
-        className="p-3 min-w-[200px] max-w-[300px] cursor-pointer hover:bg-gray-50 transition-colors"
+        className="p-3 w-[300px] cursor-pointer hover:bg-gray-50 transition-colors"
         onContextMenu={handleContextMenu}
         onClick={handleSnippetClick}
         onKeyDown={handleSnippetKeyDown}
@@ -567,12 +567,12 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
         data-snippet-id={snippet.id}
       >
         {/* Header with title or snippet label and ID */}
-        <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+        <div className="flex items-center justify-between text-sm font-bold text-gray-900 uppercase mb-1">
           {activeField === 'title' ? (
             <input
               ref={titleRef}
               type="text"
-              className="flex-1 text-xs tracking-wide text-gray-900 bg-white border border-blue-200 rounded-sm px-1 py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-300 mr-2"
+              className="flex-1 text-sm font-bold tracking-wide text-gray-900 uppercase bg-white border border-blue-200 rounded-sm px-1 py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-300 mr-2"
               value={draftValues.title}
               onChange={handleDraftChange('title')}
               onBlur={handleBlur('title')}
@@ -585,7 +585,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
           ) : (
             <button
               type="button"
-              className="tracking-wide text-left cursor-text bg-transparent border-none p-0 focus-visible:outline-none hover:text-gray-700 transition-colors"
+              className="tracking-wide text-left cursor-text bg-transparent border-none p-0 focus-visible:outline-none hover:text-gray-800 transition-colors uppercase"
               onClick={handleFieldActivate('title')}
               style={POINTER_EVENTS_STYLES.interactive}
             >
@@ -611,7 +611,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
             onClick={(event) => event.stopPropagation()}
             onMouseDown={(event) => event.stopPropagation()}
           >
-            <div className="mt-1 space-y-2">
+            <div className="space-y-2">
               {connectedContent.map((item, index) => {
                 const truncatedId = item.snippetId.slice(0, 8)
                 const connectedDisplayTitle =
@@ -620,20 +620,22 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                     : 'Snippet'
                 return (
                   <div key={`${snippet.id}-connected-${item.snippetId}-${index}-${item.type}`}>
-                    <button
-                      type="button"
-                      onClick={handleConnectedSnippetClick(item.snippetId)}
-                      onMouseDown={(event) => event.stopPropagation()}
-                      className="text-[10px] text-gray-500 font-medium mb-0.5 bg-transparent border-none p-0 hover:text-blue-600 hover:underline transition-colors text-left"
-                      style={POINTER_EVENTS_STYLES.interactive}
-                      title={`Focus snippet ${item.snippetId}`}
-                    >
-                      {connectedDisplayTitle}{' '}
-                      <span className="font-mono text-gray-400">#{truncatedId}</span>
-                    </button>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <button
+                        type="button"
+                        onClick={handleConnectedSnippetClick(item.snippetId)}
+                        onMouseDown={(event) => event.stopPropagation()}
+                        className="text-[10px] text-gray-500 font-medium bg-transparent border-none p-0 hover:text-blue-600 hover:underline transition-colors text-left"
+                        style={POINTER_EVENTS_STYLES.interactive}
+                        title={`Focus snippet ${item.snippetId}`}
+                      >
+                        {connectedDisplayTitle}
+                      </button>
+                      <p className="text-[10px] text-gray-400 font-mono">#{truncatedId}</p>
+                    </div>
                     <div className="overflow-hidden rounded border border-gray-200 bg-gray-50">
                       {item.type === 'text' ? (
-                        <p className="px-2 py-1 text-xs text-gray-700 whitespace-pre-wrap">
+                        <p className="px-2 py-1 text-sm font-medium text-gray-900 whitespace-pre-wrap">
                           {item.value}
                         </p>
                       ) : (
@@ -656,21 +658,17 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
           </div>
         )}
 
-        <div className="mt-2">
-          <button
-            type="button"
-            onClick={handleCreateUpstreamSnippetClick}
-            onMouseDown={(event) => event.stopPropagation()}
-            className="w-full text-xs font-semibold text-blue-600 border border-blue-200 rounded-md py-1 transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
-            style={POINTER_EVENTS_STYLES.interactive}
-          >
-            + snippet
-          </button>
-        </div>
-
         {/* Title / Text Field 1 */}
         {!isTextFieldLocked && !hideTextFieldDueToConnections && (
           <div className="mb-2">
+            <div className="flex items-center justify-between mb-0.5">
+              <p className="text-xs text-gray-900 font-bold">
+                {displayTitle}
+              </p>
+              <p className="text-[10px] text-gray-400 font-mono">
+                #{snippet.id.slice(0, 8)}
+              </p>
+            </div>
             {isTextFieldReadOnlyDueToConnections ? (
               <div
                 className="w-full text-sm font-medium text-gray-900 bg-gray-50 border border-gray-200 rounded-sm p-2 whitespace-pre-wrap break-words"
@@ -703,22 +701,34 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                 {(displayText1 && displayText1.trim() !== '') ? displayText1 : 'Input...'}
               </button>
             )}
+
+            {/* Large snippet indicator and expand button */}
+            {isLarge && (
+              <button
+                onClick={handleExpandToggle}
+                className="mt-2 w-full text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center justify-center gap-1 py-1 px-2 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+                style={POINTER_EVENTS_STYLES.interactive}
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                </svg>
+                View Full ({wordCount} words)
+              </button>
+            )}
           </div>
         )}
 
-        {/* Large snippet indicator and expand button */}
-        {isLarge && (
+        <div className="mt-2">
           <button
-            onClick={handleExpandToggle}
-            className="mt-2 w-full text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center justify-center gap-1 py-1 px-2 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+            type="button"
+            onClick={handleCreateUpstreamSnippetClick}
+            onMouseDown={(event) => event.stopPropagation()}
+            className="w-full text-xs font-semibold text-blue-600 border border-blue-200 rounded-md py-1 transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
             style={POINTER_EVENTS_STYLES.interactive}
           >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-            </svg>
-            View Full ({wordCount} words)
+            + snippet
           </button>
-        )}
+        </div>
 
         {/* Image Preview */}
         {snippet.imageUrl && (

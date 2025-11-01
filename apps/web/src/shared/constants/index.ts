@@ -9,11 +9,16 @@ export const CANVAS_CONSTANTS = {
   GENERATED_SNIPPET_VERTICAL_OFFSET: 500,
   GENERATED_SNIPPET_SPACING: 20, // Spacing between snippet bottom and new snippet top
   ESTIMATED_SNIPPET_HEIGHT: 280, // Estimated average snippet height
-  DEFAULT_NODE_POSITION: { x: 200, y: 200 },
+  DEFAULT_NODE_POSITION: { x: 150, y: 200 }, // x=150 is center of first column (0-300)
   MIN_NODE_WIDTH: 200,
   MAX_NODE_WIDTH: 300,
   RELATED_SNIPPET_HORIZONTAL_GAP: 60,
   VIEWPORT_PADDING: 0.2,
+  // Virtual Column Layout
+  COLUMN_WIDTH: 300, // Width of each virtual column (matches snippet width)
+  COLUMN_GAP: 50, // Horizontal gap between columns for connector visibility
+  COLUMN_GUIDE_RIGHT_PADDING: 4, // Extra visual width on the right edge for guide visibility
+  ENABLE_COLUMN_CONSTRAINTS: true, // Feature flag to enable/disable column snapping
 } as const
 
 // Form Validation
@@ -68,5 +73,3 @@ export const ERROR_MESSAGES = {
   NOT_FOUND: 'The requested resource was not found.',
   VALIDATION: 'Please check your input and try again.',
 } as const
-
-

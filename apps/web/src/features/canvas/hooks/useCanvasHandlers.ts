@@ -17,6 +17,7 @@ import {
 import { useGraphQLMutation } from '../../../hooks/useGraphQLMutation'
 import { CANVAS_CONSTANTS } from '../../../shared/constants'
 import { mutateWithInvalidate, mutateOptimisticOnly } from '../../../shared/utils/cacheHelpers'
+import { snapToColumn, getColumnIndex, getRelativeColumnX } from '../../../shared/utils/columnLayout'
 import { useModalStore } from '../../../shared/store/modalStore'
 import { useToast } from '../../../shared/store/toastStore'
 import { useCanvasStore } from '../store/canvasStore'
@@ -450,7 +451,7 @@ export function useCanvasHandlers({
       }
 
       const targetPosition = {
-        x: baseX,
+        x: snapToColumn(baseX),
         y: baseY + sourceNodeHeight + CANVAS_CONSTANTS.GENERATED_SNIPPET_SPACING
       }
 
@@ -637,22 +638,12 @@ export function useCanvasHandlers({
     const baseX = targetSnippet.position?.x ?? CANVAS_CONSTANTS.DEFAULT_NODE_POSITION.x
     const baseY = targetSnippet.position?.y ?? CANVAS_CONSTANTS.DEFAULT_NODE_POSITION.y
 
-    let targetWidth: number = CANVAS_CONSTANTS.MIN_NODE_WIDTH
-    if (reactFlowInstance?.current && typeof reactFlowInstance.current.getNode === 'function') {
-      try {
-        const node = reactFlowInstance.current.getNode(targetSnippetId)
-        const { width } = getNodeMeasurements(node)
-        if (typeof width === 'number' && !Number.isNaN(width)) {
-          targetWidth = width
-        }
-      } catch (error) {
-        console.error('Failed to measure target snippet width:', error)
-      }
-    }
+    // Calculate target column for new snippet (one column to the left)
+    const targetColumnIndex = getColumnIndex(baseX)
+    const newColumnX = getRelativeColumnX(targetColumnIndex, -1)
 
-    const horizontalOffset = targetWidth + CANVAS_CONSTANTS.MIN_NODE_WIDTH + CANVAS_CONSTANTS.RELATED_SNIPPET_HORIZONTAL_GAP
     const targetPosition = {
-      x: Math.max(0, baseX - horizontalOffset),
+      x: newColumnX,
       y: baseY
     }
 
@@ -778,13 +769,19 @@ export function useCanvasHandlers({
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
     const now = new Date().toISOString()
 
+    // Snap position to column constraints
+    const snappedPosition = {
+      x: snapToColumn(position.x),
+      y: position.y
+    }
+
     // Add optimistic snippet immediately
     addOptimisticSnippet({
       id: tempId,
       projectId,
       title: 'New snippet',
       textField1: '',
-      position,
+      position: snappedPosition,
       tags: [],
       categories: [],
       connections: [],
@@ -799,7 +796,7 @@ export function useCanvasHandlers({
         projectId,
         title: 'New snippet',
         textField1: '',
-        position,
+        position: snappedPosition,
         tags: [],
         categories: []
       }
@@ -998,9 +995,9 @@ export function useCanvasHandlers({
       }
     }
 
-    // Position new snippet below source with 20px spacing
+    // Position new snippet below source in the same column
     const targetPosition = {
-      x: baseX,
+      x: snapToColumn(baseX),
       y: baseY + sourceNodeHeight + CANVAS_CONSTANTS.GENERATED_SNIPPET_SPACING
     }
 

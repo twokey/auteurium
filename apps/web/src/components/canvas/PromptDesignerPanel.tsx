@@ -157,12 +157,17 @@ export const PromptDesignerPanel = () => {
             <div className="mt-1 space-y-2">
               {connectedContent.map((item, index) => (
                 <div key={`connected-${item.snippetId}-${index}-${item.type}`}>
-                  <p className="text-[10px] text-gray-500 font-medium mb-0.5">
-                    {item.snippetTitle ? `${item.snippetTitle} - ${item.snippetId}` : item.snippetId}
-                  </p>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <p className="text-[10px] text-gray-500 font-medium">
+                      {item.snippetTitle || 'Snippet'}
+                    </p>
+                    <p className="text-[10px] text-gray-400 font-mono">
+                      #{item.snippetId.slice(0, 8)}
+                    </p>
+                  </div>
                   <div className="overflow-hidden rounded border border-gray-200 bg-gray-50">
                     {item.type === 'text' ? (
-                      <p className="px-2 py-1 text-xs text-gray-700 whitespace-pre-wrap">
+                      <p className="px-2 py-1 text-sm font-medium text-gray-900 whitespace-pre-wrap">
                         {item.value}
                       </p>
                     ) : (
@@ -182,9 +187,14 @@ export const PromptDesignerPanel = () => {
         )}
 
         <div className="mb-3">
-          <p className="text-[10px] text-gray-500 font-medium mb-0.5">
-            {snippetTitle ? `${snippetTitle} - ${snippetId}` : snippetId}
-          </p>
+          <div className="flex items-center justify-between mb-0.5">
+            <p className="text-[10px] text-gray-500 font-medium">
+              {snippetTitle || 'Snippet'}
+            </p>
+            <p className="text-[10px] text-gray-400 font-mono">
+              #{snippetId?.slice(0, 8)}
+            </p>
+          </div>
 
           {isEditing ? (
             <textarea
@@ -203,7 +213,7 @@ export const PromptDesignerPanel = () => {
                   setIsEditing(false)
                 }
               }}
-              className="w-full rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-300"
+              className="w-full rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-sm font-medium text-gray-900 focus:outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-300"
               rows={Math.max(4, Math.min(12, prompt.split('\n').length + 1))}
             />
           ) : (
@@ -214,15 +224,22 @@ export const PromptDesignerPanel = () => {
               className="w-full cursor-text rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-left transition-colors hover:border-blue-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-300"
             >
               {prompt.trim() !== '' ? (
-                <span className="whitespace-pre-wrap break-words text-xs text-gray-700">
+                <span className="whitespace-pre-wrap break-words text-sm font-medium text-gray-900">
                   {prompt}
                 </span>
               ) : (
-                <span className="text-xs text-gray-400">Click to compose prompt...</span>
+                <span className="text-sm text-gray-400">Click to compose prompt...</span>
               )}
             </button>
           )}
         </div>
+
+        <button
+          type="button"
+          className="w-full text-xs font-semibold text-blue-600 border border-blue-200 rounded-md py-1 mb-3 transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+        >
+          + snippet
+        </button>
 
         <button
           type="button"

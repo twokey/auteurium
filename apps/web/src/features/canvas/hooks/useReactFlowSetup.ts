@@ -8,6 +8,7 @@ import { addEdge, useEdgesState, useNodesState } from 'reactflow'
 
 import { useDebouncedCallback } from '../../../shared/hooks/useDebounce'
 import { mutateWithInvalidate } from '../../../shared/utils/cacheHelpers'
+import { snapPositionToColumn } from '../../../shared/utils/columnLayout'
 import { useCanvasStore } from '../store/canvasStore'
 import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
 import { usePendingPositionsStore } from '../store/pendingPositionsStore'
@@ -247,11 +248,14 @@ export function useReactFlowSetup({
     const snippet = snippetsRef.current.find(s => s.id === node.id)
     if (!snippet || !projectId) return
 
-    // Add position to pending store (instant, no mutation yet)
-    addPendingPosition(node.id, {
+    // Snap position to column constraints (x only, y remains free)
+    const snappedPosition = snapPositionToColumn({
       x: node.position.x,
       y: node.position.y
     })
+
+    // Add snapped position to pending store (instant, no mutation yet)
+    addPendingPosition(node.id, snappedPosition)
 
     // Trigger debounced flush (will send all pending positions after 500ms delay)
     debouncedFlushPositions()

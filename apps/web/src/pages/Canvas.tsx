@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect, useCallback } from 'react'
+import { useMemo, useRef, useEffect, useCallback, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Background,
@@ -7,12 +7,14 @@ import {
   MiniMap,
   ReactFlow,
   type NodeTypes,
-  type ReactFlowInstance
+  type ReactFlowInstance,
+  type Viewport
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 
 import { CanvasInfoPanel } from '../components/canvas/CanvasInfoPanel'
 import { CanvasToolbar } from '../components/canvas/CanvasToolbar'
+import { ColumnGuides } from '../components/canvas/ColumnGuides'
 import { SnippetNode } from '../components/snippets/SnippetNode'
 import { Navigation } from '../components/ui/Navigation'
 import { LoadingSpinner } from '../shared/components/ui/LoadingSpinner'
@@ -37,6 +39,9 @@ const CanvasContent = () => {
   const { id: projectId } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { generatingImageSnippetIds } = useCanvasStore()
+
+  // Track viewport for column guides
+  const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 })
 
   // Data fetching
   const { project, snippets, loading, error, refetch } = useCanvasData(projectId)
@@ -130,8 +135,19 @@ const CanvasContent = () => {
   // Wrap onInit to write the instance to external ref while preserving setup behavior
   const onInit = useCallback((instance: ReactFlowInstance) => {
     externalReactFlowInstanceRef.current = instance
+    setViewport(instance.getViewport())
     setupOnInit(instance)
   }, [setupOnInit])
+
+  const handleMove = useCallback((_event: any, viewport: Viewport) => {
+    setViewport(viewport)
+  }, [])
+
+  // Wrap onMoveEnd to update viewport state for column guides
+  const handleMoveEnd = useCallback((event: any, viewport: Viewport) => {
+    setViewport(viewport)
+    onMoveEnd()
+  }, [onMoveEnd])
 
   // Update the ref with the actual setNodes function
   useEffect(() => {
@@ -222,7 +238,8 @@ const CanvasContent = () => {
             onConnect={onConnect}
             onInit={onInit}
             onNodeDragStop={onNodeDragStop}
-            onMoveEnd={onMoveEnd}
+            onMove={handleMove}
+            onMoveEnd={handleMoveEnd}
             nodeTypes={NODE_TYPES}
             defaultEdgeOptions={{
               style: { stroke: '#6366f1', strokeWidth: 2 }
@@ -235,6 +252,7 @@ const CanvasContent = () => {
             nodesFocusable={true}
             elementsSelectable={true}
           >
+            <ColumnGuides viewport={viewport} />
             <Background
               variant={BackgroundVariant.Dots}
               gap={16}
@@ -242,11 +260,11 @@ const CanvasContent = () => {
               color="#94a3b8"
               style={{ opacity: 0.5 }}
             />
-            <Controls 
+            <Controls
               position="bottom-right"
               showInteractive={false}
             />
-            <MiniMap 
+            <MiniMap
               position="bottom-left"
               nodeColor="#6366f1"
               maskColor="rgba(0, 0, 0, 0.1)"

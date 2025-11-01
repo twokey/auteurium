@@ -3,11 +3,13 @@
  * Handles data fetching, transformation, and memoization for the canvas
  */
 
-import { useMemo, useRef, useCallback } from 'react'
+import { useMemo, useRef, useCallback, useEffect } from 'react'
 
 import { GET_PROJECT_CONNECTIONS, GET_PROJECT_WITH_SNIPPETS } from '../../../graphql/queries'
 import { useGraphQLQueryWithCache } from '../../../shared/hooks/useGraphQLQueryWithCache'
+import { snapToColumn } from '../../../shared/utils/columnLayout'
 import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
+import { usePendingPositionsStore } from '../store/pendingPositionsStore'
 
 import type {
   Snippet,
@@ -547,6 +549,44 @@ export function useFlowNodes(
   videoModels?: AvailableModel[],
   isLoadingVideoModels?: boolean
 ): Node<SnippetNodeData>[] {
+  // Track which snippets have been migrated to column layout
+  const migratedSnippetsRef = useRef<Set<string>>(new Set())
+  const { addPendingPosition } = usePendingPositionsStore()
+
+  // Migrate existing snippets to column layout on first render
+  useEffect(() => {
+    const snippetsNeedingMigration = snippets.filter(snippet => {
+      if (!snippet.position) return false
+      if (migratedSnippetsRef.current.has(snippet.id)) return false
+
+      const currentX = snippet.position.x
+      const snappedX = snapToColumn(currentX)
+
+      // Check if position needs to be adjusted
+      return Math.abs(currentX - snappedX) > 1 // Allow 1px tolerance
+    })
+
+    if (snippetsNeedingMigration.length > 0) {
+      // Batch migrate all snippets that need adjustment
+      snippetsNeedingMigration.forEach(snippet => {
+        const snappedPosition = {
+          x: snapToColumn(snippet.position!.x),
+          y: snippet.position!.y
+        }
+
+        // Add to pending positions for batch update
+        addPendingPosition(snippet.id, snappedPosition)
+
+        // Mark as migrated
+        migratedSnippetsRef.current.add(snippet.id)
+      })
+
+      // Note: The pending positions will be flushed by the existing debounced mechanism
+      // in useReactFlowSetup, so no need to trigger flush here
+      console.log(`Migrated ${snippetsNeedingMigration.length} snippets to column layout`)
+    }
+  }, [snippets, addPendingPosition])
+
   // Memoize connection analysis separately - only recompute when snippets actually change
   const connectionAnalysis = useMemo(() => {
     return analyzeSnippetConnections(snippets)
@@ -563,7 +603,12 @@ export function useFlowNodes(
     })
 
     return sortedSnippets.map((snippet, index) => {
-      const position = snippet.position ?? { x: 0, y: 0 }
+      // Apply column snapping to position for rendering
+      const rawPosition = snippet.position ?? { x: 0, y: 0 }
+      const position = {
+        x: snapToColumn(rawPosition.x),
+        y: rawPosition.y
+      }
 
       const incomingSourceIds = incomingSourcesMap.get(snippet.id) ?? []
       const connectedSnippets = incomingSourceIds
