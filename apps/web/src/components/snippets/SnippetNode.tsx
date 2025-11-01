@@ -354,31 +354,6 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
     [commitField, snippet.title]
   )
 
-  const handleSnippetClick = useCallback((e: React.MouseEvent) => {
-    // Only trigger edit on direct click, not on context menu or expand button
-    if (activeField !== null || savingField !== null) {
-      return
-    }
-
-    if (e.button === 0) {
-      onEdit(snippet.id)
-    }
-  }, [activeField, savingField, snippet.id, onEdit])
-
-  const handleSnippetKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (activeField !== null || savingField !== null) {
-        return
-      }
-
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault()
-        onEdit(snippet.id)
-      }
-    },
-    [activeField, savingField, onEdit, snippet.id]
-  )
-
   // Count connected snippets with images
   const connectedImagesCount = connectedSnippets.filter(s => s.imageS3Key).length
   const hasMultimodalSupport = selectedImageModel === 'gemini-2.5-flash-image'
@@ -522,12 +497,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
       <Handle type="source" position={Position.Right} />
 
       <div
-        className="p-3 w-[300px] cursor-pointer hover:bg-gray-50 transition-colors"
-        onClick={handleSnippetClick}
-        onKeyDown={handleSnippetKeyDown}
-        role="button"
-        tabIndex={0}
-        aria-label={`Edit snippet ${displayTitle}`}
+        className="p-3 w-[300px]"
         data-testid="snippet-node"
         data-snippet-id={snippet.id}
       >
@@ -567,6 +537,58 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
             #{snippet.id.slice(0, 8)}
           </button>
         </div>
+
+        {/* Text Field 1 */}
+        {!isTextFieldLocked && !hideTextFieldDueToConnections && (
+          <div className="mb-2">
+            {isTextFieldReadOnlyDueToConnections ? (
+              <div
+                className="w-full text-sm font-medium text-gray-900 bg-gray-50 border border-gray-200 rounded-sm p-2 whitespace-pre-wrap break-words"
+                onClick={(event) => event.stopPropagation()}
+                onMouseDown={(event) => event.stopPropagation()}
+              >
+                {displayText1}
+              </div>
+            ) : activeField === 'textField1' ? (
+              <textarea
+                ref={textField1Ref}
+                className="w-full text-sm font-medium text-gray-900 bg-white border border-blue-200 rounded-sm p-1 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
+                value={draftValues.textField1}
+                onChange={handleDraftChange('textField1')}
+                onBlur={handleBlur('textField1')}
+                onKeyDown={handleTextareaKeyDown('textField1')}
+                onClick={(event) => event.stopPropagation()}
+                onMouseDown={(event) => event.stopPropagation()}
+                rows={Math.min(6, Math.max(2, draftValues.textField1.split('\n').length))}
+                placeholder="Input..."
+                style={POINTER_EVENTS_STYLES.interactive}
+              />
+            ) : (
+              <button
+                type="button"
+                className="w-full text-left font-medium text-sm text-gray-900 break-words cursor-text bg-transparent border-none p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-1 focus-visible:ring-offset-white rounded-sm"
+                onClick={handleFieldActivate('textField1')}
+                style={POINTER_EVENTS_STYLES.interactive}
+              >
+                {(displayText1 && displayText1.trim() !== '') ? displayText1 : 'Input...'}
+              </button>
+            )}
+
+            {/* Large snippet indicator and expand button */}
+            {isLarge && (
+              <button
+                onClick={handleExpandToggle}
+                className="mt-2 w-full text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center justify-center gap-1 py-1 px-2 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+                style={POINTER_EVENTS_STYLES.interactive}
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                </svg>
+                View Full ({wordCount} words)
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Connected content aggregate */}
         {connectedContent.length > 0 && (
@@ -620,66 +642,6 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                 )
               })}
             </div>
-          </div>
-        )}
-
-        {/* Title / Text Field 1 */}
-        {!isTextFieldLocked && !hideTextFieldDueToConnections && (
-          <div className="mb-2">
-            <div className="flex items-center justify-between mb-0.5">
-              <p className="text-xs text-gray-900 font-bold">
-                {displayTitle}
-              </p>
-              <p className="text-[10px] text-gray-400 font-mono">
-                #{snippet.id.slice(0, 8)}
-              </p>
-            </div>
-            {isTextFieldReadOnlyDueToConnections ? (
-              <div
-                className="w-full text-sm font-medium text-gray-900 bg-gray-50 border border-gray-200 rounded-sm p-2 whitespace-pre-wrap break-words"
-                onClick={(event) => event.stopPropagation()}
-                onMouseDown={(event) => event.stopPropagation()}
-              >
-                {displayText1}
-              </div>
-            ) : activeField === 'textField1' ? (
-              <textarea
-                ref={textField1Ref}
-                className="w-full text-sm font-medium text-gray-900 bg-white border border-blue-200 rounded-sm p-1 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
-                value={draftValues.textField1}
-                onChange={handleDraftChange('textField1')}
-                onBlur={handleBlur('textField1')}
-                onKeyDown={handleTextareaKeyDown('textField1')}
-                onClick={(event) => event.stopPropagation()}
-                onMouseDown={(event) => event.stopPropagation()}
-                rows={Math.min(6, Math.max(2, draftValues.textField1.split('\n').length))}
-                placeholder="Input..."
-                style={POINTER_EVENTS_STYLES.interactive}
-              />
-            ) : (
-              <button
-                type="button"
-                className="w-full text-left font-medium text-sm text-gray-900 break-words cursor-text bg-transparent border-none p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-1 focus-visible:ring-offset-white rounded-sm"
-                onClick={handleFieldActivate('textField1')}
-                style={POINTER_EVENTS_STYLES.interactive}
-              >
-                {(displayText1 && displayText1.trim() !== '') ? displayText1 : 'Input...'}
-              </button>
-            )}
-
-            {/* Large snippet indicator and expand button */}
-            {isLarge && (
-              <button
-                onClick={handleExpandToggle}
-                className="mt-2 w-full text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center justify-center gap-1 py-1 px-2 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
-                style={POINTER_EVENTS_STYLES.interactive}
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                </svg>
-                View Full ({wordCount} words)
-              </button>
-            )}
           </div>
         )}
 
