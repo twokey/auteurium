@@ -22,7 +22,9 @@ import { useCanvasData, useFlowNodes, useFlowEdges } from '../features/canvas/ho
 import { useCanvasHandlers } from '../features/canvas/hooks/useCanvasHandlers'
 import { useReactFlowSetup } from '../features/canvas/hooks/useReactFlowSetup'
 import { CanvasModals } from '../features/canvas/components/CanvasModals'
+import { ContextMenu } from '../features/canvas/components/ContextMenu'
 import { useCanvasStore } from '../features/canvas/store/canvasStore'
+import { useContextMenuStore } from '../features/canvas/store/contextMenuStore'
 import { ModelsProvider, useModels } from '../contexts/ModelsContext'
 import { PromptDesignerPanel } from '../components/canvas/PromptDesignerPanel'
 
@@ -39,6 +41,7 @@ const CanvasContent = () => {
   const { id: projectId } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { generatingImageSnippetIds } = useCanvasStore()
+  const { openContextMenu, closeContextMenu } = useContextMenuStore()
 
   // Track viewport for column guides
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 })
@@ -59,6 +62,7 @@ const CanvasContent = () => {
   // Create refs that will be populated after ReactFlow setup
   const setNodesRef = useRef<any>(() => {})
   const externalReactFlowInstanceRef = useRef<ReactFlowInstance | null>(null)
+  const reactFlowWrapperRef = useRef<HTMLDivElement>(null)
 
   // Event handlers and mutations
   const handlers = useCanvasHandlers({
@@ -144,10 +148,34 @@ const CanvasContent = () => {
   }, [])
 
   // Wrap onMoveEnd to update viewport state for column guides
-  const handleMoveEnd = useCallback((event: any, viewport: Viewport) => {
+  const handleMoveEnd = useCallback((_event: any, viewport: Viewport) => {
     setViewport(viewport)
     onMoveEnd()
   }, [onMoveEnd])
+
+  // Context menu handlers with viewport-aware positioning
+  const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: any) => {
+    event.preventDefault()
+
+    const pane = reactFlowWrapperRef.current?.getBoundingClientRect()
+    if (!pane) return
+
+    // Calculate position with boundary checking
+    // If menu doesn't fit on right/bottom, position from right/bottom edge
+    const MENU_WIDTH = 200
+    const MENU_HEIGHT = 200
+
+    openContextMenu(node.id, {
+      top: event.clientY < pane.height - MENU_HEIGHT ? event.clientY : undefined,
+      left: event.clientX < pane.width - MENU_WIDTH ? event.clientX : undefined,
+      right: event.clientX >= pane.width - MENU_WIDTH ? pane.width - event.clientX : undefined,
+      bottom: event.clientY >= pane.height - MENU_HEIGHT ? pane.height - event.clientY : undefined,
+    })
+  }, [openContextMenu])
+
+  const handlePaneClick = useCallback(() => {
+    closeContextMenu()
+  }, [closeContextMenu])
 
   // Update the ref with the actual setNodes function
   useEffect(() => {
@@ -229,7 +257,7 @@ const CanvasContent = () => {
     <>
       <Navigation currentProject={currentProjectForNav} />
       <div className="h-[calc(100vh-64px)] relative" data-testid="canvas-container">
-        <div className="h-full" data-testid="react-flow-canvas">
+        <div ref={reactFlowWrapperRef} className="h-full" data-testid="react-flow-canvas">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -238,6 +266,8 @@ const CanvasContent = () => {
             onConnect={onConnect}
             onInit={onInit}
             onNodeDragStop={onNodeDragStop}
+            onNodeContextMenu={handleNodeContextMenu}
+            onPaneClick={handlePaneClick}
             onMove={handleMove}
             onMoveEnd={handleMoveEnd}
             nodeTypes={NODE_TYPES}
@@ -303,6 +333,14 @@ const CanvasContent = () => {
         snippets={snippets}
         onCreateGeneratedSnippet={handlers.handleCreateGeneratedSnippet}
         refetch={refetch}
+      />
+
+      {/* Context Menu */}
+      <ContextMenu
+        onEdit={handlers.handleEditSnippet}
+        onDelete={handlers.handleDeleteSnippet}
+        onManageConnections={handlers.handleManageConnections}
+        onViewVersions={handlers.handleViewVersions}
       />
     </>
   )
