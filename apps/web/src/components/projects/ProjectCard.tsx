@@ -6,6 +6,7 @@ import { DELETE_PROJECT } from '../../graphql/mutations'
 import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
 import { useToast } from '../../shared/store/toastStore'
 import { formatDate, getTimeSince } from '../../shared/utils/dateFormatters'
+import { Modal } from '../../shared/components/ui/Modal'
 
 interface Project {
   id: string
@@ -164,62 +165,43 @@ export const ProjectCard = ({ project, onDeleted, onUpdated }: ProjectCardProps)
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div
-          role="button"
-          tabIndex={0}
-          aria-label="Close delete project confirmation"
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              setShowDeleteConfirm(false)
-            }
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') {
-              setShowDeleteConfirm(false)
-            }
-          }}
-          data-testid="delete-project-modal"
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={`delete-project-title-${project.id}`}
-            className="bg-white rounded-lg p-6 max-w-sm mx-4"
-            data-testid="delete-project-modal-content"
-          >
-            <h3 id={`delete-project-title-${project.id}`} className="text-lg font-medium text-gray-900 mb-2">
+      <Modal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        size="sm"
+      >
+        <div data-testid="delete-project-modal">
+          <Modal.Header>
+            <h3 id={`delete-project-title-${project.id}`} className="text-lg font-medium text-gray-900">
               Delete Project
             </h3>
-            <p className="text-sm text-gray-500 mb-6">
-              Are you sure you want to delete "{project.name}"? This action cannot be undone and will delete all snippets and connections in this project.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={(event) => {
-                  event.stopPropagation()
-                  setShowDeleteConfirm(false)
-                }}
-                className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={(event) => {
-                  event.stopPropagation()
-                  handleDeleteProject()
-                }}
-                disabled={isDeleting}
-                className="flex-1 bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors disabled:opacity-50"
-              >
-                {isDeleting ? 'Deleting...' : 'Delete'}
-              </button>
+          </Modal.Header>
+          <Modal.Body>
+            <div data-testid="delete-project-modal-content">
+              <p className="text-sm text-gray-500">
+                Are you sure you want to delete &quot;{project.name}&quot;? This action cannot be undone and will delete all snippets and connections in this project.
+              </p>
             </div>
-          </div>
+          </Modal.Body>
+          <Modal.Footer>
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(false)}
+              className="px-4 py-2 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteProject}
+              disabled={isDeleting}
+              className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </button>
+          </Modal.Footer>
         </div>
-      )}
+      </Modal>
 
       {/* Edit Project Modal */}
       <EditProjectModal

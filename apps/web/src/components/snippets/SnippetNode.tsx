@@ -265,8 +265,9 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
 
   const handleFieldActivate = useCallback(
     (field: EditableField) =>
-      (event: React.MouseEvent<HTMLButtonElement>) => {
-        event.stopPropagation()
+      () => {
+        // Don't stop propagation - allow selection to work
+        // The field will still activate, but the snippet will also be selected
 
         if (field === 'textField1' && !isTextFieldEditable) {
           return
@@ -544,8 +545,6 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
             {isTextFieldReadOnlyDueToConnections ? (
               <div
                 className="w-full text-sm font-medium text-gray-900 bg-gray-50 border border-gray-200 rounded-sm p-2 whitespace-pre-wrap break-words"
-                onClick={(event) => event.stopPropagation()}
-                onMouseDown={(event) => event.stopPropagation()}
               >
                 {displayText1}
               </div>

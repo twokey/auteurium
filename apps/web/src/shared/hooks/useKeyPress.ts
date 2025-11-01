@@ -63,10 +63,13 @@ export function useCommonKeyboardShortcuts(handlers: {
   onRedo?: () => void
 }): void {
   // Ctrl/Cmd + S for Save
-  useKeyPress('s', () => handlers.onSave?.(), { 
-    ctrlKey: true, 
+  useKeyPress('s', () => handlers.onSave?.(), {
+    ctrlKey: true,
+    preventDefault: true
+  })
+  useKeyPress('s', () => handlers.onSave?.(), {
     metaKey: true,
-    preventDefault: true 
+    preventDefault: true
   })
 
   // Escape key
@@ -80,20 +83,26 @@ export function useCommonKeyboardShortcuts(handlers: {
   })
 
   // Ctrl/Cmd + Z for Undo
-  useKeyPress('z', () => handlers.onUndo?.(), { 
-    ctrlKey: true, 
+  useKeyPress('z', () => handlers.onUndo?.(), {
+    ctrlKey: true,
+    preventDefault: true
+  })
+  useKeyPress('z', () => handlers.onUndo?.(), {
     metaKey: true,
-    preventDefault: true 
+    preventDefault: true
   })
 
   // Ctrl/Cmd + Shift + Z for Redo
-  useKeyPress('z', () => handlers.onRedo?.(), { 
-    ctrlKey: true, 
+  useKeyPress('z', () => handlers.onRedo?.(), {
+    ctrlKey: true,
+    shiftKey: true,
+    preventDefault: true
+  })
+  useKeyPress('z', () => handlers.onRedo?.(), {
     metaKey: true,
     shiftKey: true,
-    preventDefault: true 
+    preventDefault: true
   })
 }
-
 
 

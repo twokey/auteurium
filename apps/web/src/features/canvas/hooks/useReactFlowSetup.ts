@@ -3,7 +3,7 @@
  * Manages ReactFlow configuration, viewport, and node/edge updates
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { addEdge, useEdgesState, useNodesState } from 'reactflow'
 
 import { useDebouncedCallback } from '../../../shared/hooks/useDebounce'
@@ -12,6 +12,7 @@ import { snapPositionToColumn } from '../../../shared/utils/columnLayout'
 import { useCanvasStore } from '../store/canvasStore'
 import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
 import { usePendingPositionsStore } from '../store/pendingPositionsStore'
+import { useCanvasKeyboardShortcut } from '../context/canvasKeyboard'
 
 import type { Snippet, SnippetNodeData, UseGraphQLMutationResult, CreateConnectionVariables, DeleteConnectionVariables } from '../../../types'
 import type { ReactFlowInstance, Connection, Node, Edge } from 'reactflow'
@@ -254,6 +255,19 @@ export function useReactFlowSetup({
       y: node.position.y
     })
 
+    const previousPosition = snippet.position ?? undefined
+    const previousX = previousPosition?.x
+    const previousY = previousPosition?.y
+
+    const hasPositionChanged =
+      previousPosition === undefined
+      || Math.abs((previousX ?? 0) - snappedPosition.x) >= 0.5
+      || Math.abs((previousY ?? 0) - snappedPosition.y) >= 0.5
+
+    if (!hasPositionChanged) {
+      return
+    }
+
     // Add snapped position to pending store (instant, no mutation yet)
     addPendingPosition(node.id, snappedPosition)
 
@@ -336,57 +350,55 @@ export function useReactFlowSetup({
     }
   }, [])
 
-  // Handle Delete key for connections - Using ref to avoid recreating listener when edges change
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Delete' || event.key === 'Backspace') {
-        const selectedEdges = edgesRef.current.filter(edge => edge.selected)
+  const deleteEdgesShortcut = useMemo(
+    () => ({
+      keys: ['Delete', 'Backspace'],
+      preventDefault: true,
+      allowWhileTyping: false
+    }),
+    []
+  )
 
-        if (selectedEdges.length > 0 && projectId) {
-          event.preventDefault()
+  const handleDeleteEdgesShortcut = useCallback(() => {
+    const selectedEdges = edgesRef.current.filter(edge => edge.selected)
 
-          selectedEdges.forEach(edge => {
-            const connectionId = edge.data?.connectionId ?? edge.id
-            if (!connectionId) {
-              console.error('No connection ID found for edge:', edge)
-              return
-            }
-
-            // Mark connection as deleting for optimistic UI update
-            markConnectionDeleting(connectionId)
-
-            // Optimistically remove the edge from UI
-            setEdges((eds) => eds.filter(e => e.id !== edge.id))
-
-            // Delete from backend - changes list shape, so invalidate
-            mutateWithInvalidate(
-              () =>
-                deleteConnectionMutation({
-                  variables: {
-                    projectId,
-                    connectionId
-                  }
-                }),
-              ['ProjectConnections']
-            )
-              .then(() => {
-                // Connection is now deleted on server, no need to keep in deleting state
-              })
-              .catch((error) => {
-                console.error('Failed to delete connection:', error)
-                // Rollback optimistic deletion
-                rollbackConnectionDeletion(connectionId)
-                // Restore edge if deletion failed
-                setEdges((eds) => [...eds, edge])
-              })
-          })
-        }
-      }
+    if (selectedEdges.length === 0 || !projectId) {
+      return
     }
 
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [projectId, deleteConnectionMutation, setEdges, markConnectionDeleting, rollbackConnectionDeletion])
+    selectedEdges.forEach(edge => {
+      const connectionId = edge.data?.connectionId ?? edge.id
+      if (!connectionId) {
+        console.error('No connection ID found for edge:', edge)
+        return
+      }
+
+      markConnectionDeleting(connectionId)
+
+      setEdges((eds) => eds.filter(e => e.id !== edge.id))
+
+      mutateWithInvalidate(
+        () =>
+          deleteConnectionMutation({
+            variables: {
+              projectId,
+              connectionId
+            }
+          }),
+        ['ProjectConnections']
+      )
+        .then(() => {
+          // Connection is now deleted on server, no need to keep in deleting state
+        })
+        .catch((error) => {
+          console.error('Failed to delete connection:', error)
+          rollbackConnectionDeletion(connectionId)
+          setEdges((eds) => [...eds, edge])
+        })
+    })
+  }, [projectId, deleteConnectionMutation, markConnectionDeleting, rollbackConnectionDeletion, setEdges])
+
+  useCanvasKeyboardShortcut(deleteEdgesShortcut, handleDeleteEdgesShortcut)
 
   return {
     nodes,

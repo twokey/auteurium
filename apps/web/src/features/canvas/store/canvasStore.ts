@@ -12,12 +12,14 @@ interface CanvasState {
   isLoading: boolean
   generatingImageSnippetIds: Record<string, boolean>
   viewport: Viewport | null
-  
+  selectedSnippetId: string | null
+
   // Actions
   setProjectId: (projectId: string | null) => void
   setLoading: (isLoading: boolean) => void
   setGeneratingImage: (snippetId: string, isGenerating: boolean) => void
   setViewport: (viewport: Viewport) => void
+  setSelectedSnippetId: (id: string | null) => void
   saveViewportToStorage: (projectId: string, viewport: Viewport) => void
   loadViewportFromStorage: (projectId: string) => Viewport | null
   reset: () => void
@@ -28,6 +30,7 @@ const INITIAL_STATE = {
   isLoading: false,
   generatingImageSnippetIds: {},
   viewport: null,
+  selectedSnippetId: null,
 }
 
 export const useCanvasStore = create<CanvasState>((set) => ({
@@ -52,7 +55,10 @@ export const useCanvasStore = create<CanvasState>((set) => ({
     
   setViewport: (viewport) =>
     set({ viewport }),
-    
+
+  setSelectedSnippetId: (id) =>
+    set({ selectedSnippetId: id }),
+
   saveViewportToStorage: (projectId, viewport) => {
     try {
       localStorage.setItem(

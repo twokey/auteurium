@@ -21,6 +21,7 @@ import { LoadingSpinner } from '../shared/components/ui/LoadingSpinner'
 import { useCanvasData, useFlowNodes, useFlowEdges } from '../features/canvas/hooks/useCanvasData'
 import { useCanvasHandlers } from '../features/canvas/hooks/useCanvasHandlers'
 import { useReactFlowSetup } from '../features/canvas/hooks/useReactFlowSetup'
+import { useCanvasKeyboardShortcut } from '../features/canvas/context/canvasKeyboard'
 import { CanvasModals } from '../features/canvas/components/CanvasModals'
 import { ContextMenu } from '../features/canvas/components/ContextMenu'
 import { useCanvasStore } from '../features/canvas/store/canvasStore'
@@ -40,7 +41,7 @@ const NODE_TYPES: NodeTypes = {
 const CanvasContent = () => {
   const { id: projectId } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { generatingImageSnippetIds } = useCanvasStore()
+  const { generatingImageSnippetIds, setSelectedSnippetId } = useCanvasStore()
   const { openContextMenu, closeContextMenu } = useContextMenuStore()
 
   // Track viewport for column guides
@@ -71,6 +72,7 @@ const CanvasContent = () => {
     setNodes: (updateFn: any) => setNodesRef.current(updateFn),
     reactFlowInstance: externalReactFlowInstanceRef
   })
+  const { handleNumberKeyNavigation } = handlers
 
   // Create handlers object for flow nodes
   // Handlers are now stable from useCanvasHandlers (using useCallback with stable deps)
@@ -175,7 +177,26 @@ const CanvasContent = () => {
 
   const handlePaneClick = useCallback(() => {
     closeContextMenu()
+    // Note: ReactFlow will automatically deselect nodes and trigger onSelectionChange
   }, [closeContextMenu])
+
+  const numberKeyNavigationShortcut = useMemo(() => ({
+    matcher: (event: KeyboardEvent) => /^[0-9]$/.test(event.key),
+    allowWhileTyping: false
+  }), [])
+
+  const handleNumberKeyNavigationShortcut = useCallback((event: KeyboardEvent) => {
+    handleNumberKeyNavigation(event.key)
+  }, [handleNumberKeyNavigation])
+
+  useCanvasKeyboardShortcut(numberKeyNavigationShortcut, handleNumberKeyNavigationShortcut)
+
+  // Sync ReactFlow selection with Zustand store
+  const handleSelectionChange = useCallback((params: { nodes: any[] }) => {
+    // Update Zustand store with the first selected node's ID (or null if none selected)
+    const selectedNode = params.nodes[0]
+    setSelectedSnippetId(selectedNode?.id ?? null)
+  }, [setSelectedSnippetId])
 
   // Update the ref with the actual setNodes function
   useEffect(() => {
@@ -266,6 +287,7 @@ const CanvasContent = () => {
             onConnect={onConnect}
             onInit={onInit}
             onNodeDragStop={onNodeDragStop}
+            onSelectionChange={handleSelectionChange}
             onNodeContextMenu={handleNodeContextMenu}
             onPaneClick={handlePaneClick}
             onMove={handleMove}

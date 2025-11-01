@@ -122,6 +122,7 @@ export interface UseCanvasHandlersResult {
   handleGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
   handleFocusSnippet: (snippetId: string) => void
   handleCreateUpstreamSnippet: (targetSnippetId: string) => Promise<void>
+  handleNumberKeyNavigation: (key: string) => void
 
   // Canvas Operations
   handleCreateSnippet: (position: { x: number; y: number }) => void
@@ -1127,6 +1128,20 @@ export function useCanvasHandlers({
         return
       }
 
+      // Update ReactFlow selection so downstream subscribers stay in sync
+      setNodes((currentNodes: any[]) =>
+        currentNodes.map((currentNode: any) => {
+          const shouldSelect = currentNode.id === snippetId
+          if (currentNode.selected === shouldSelect) {
+            return currentNode
+          }
+          return {
+            ...currentNode,
+            selected: shouldSelect
+          }
+        })
+      )
+
       // Get viewport dimensions
       const viewportElement = document.querySelector('.react-flow__viewport')
       if (!viewportElement) {
@@ -1159,7 +1174,48 @@ export function useCanvasHandlers({
     } catch (error) {
       console.error('Failed to focus on snippet:', error)
     }
-  }, [reactFlowInstance])
+  }, [reactFlowInstance, setNodes])
+
+  // Navigate to connected snippet using number key
+  const handleNumberKeyNavigation = useCallback((key: string) => {
+    const { selectedSnippetId } = useCanvasStore.getState()
+
+    if (!selectedSnippetId || !reactFlowInstance?.current) {
+      return
+    }
+
+    // Find the selected snippet
+    const selectedSnippet = snippets.find(s => s.id === selectedSnippetId)
+    if (!selectedSnippet) {
+      return
+    }
+
+    // Parse key to index (1 -> 0, 2 -> 1, etc.)
+    const keyNumber = parseInt(key, 10)
+    if (isNaN(keyNumber) || keyNumber < 1) {
+      return
+    }
+    const index = keyNumber - 1
+
+    // Get connectedContent from snippet
+    const node = reactFlowInstance.current.getNode(selectedSnippetId)
+    const connectedContent = node?.data?.snippet?.connectedContent
+
+    if (!connectedContent || connectedContent.length === 0) {
+      return
+    }
+
+    // Check if index is valid
+    if (index >= connectedContent.length) {
+      return
+    }
+
+    // Get the target snippet ID
+    const targetSnippetId = connectedContent[index].snippetId
+
+    // Navigate to the target snippet (focus handler now updates selection state)
+    handleFocusSnippet(targetSnippetId)
+  }, [snippets, reactFlowInstance, handleFocusSnippet])
 
   return {
     // Snippet Handlers
@@ -1172,6 +1228,7 @@ export function useCanvasHandlers({
     handleGenerateImage,
     handleCreateUpstreamSnippet,
     handleFocusSnippet,
+    handleNumberKeyNavigation,
 
     // Canvas Operations
     handleCreateSnippet,

@@ -672,7 +672,8 @@ export function useFlowNodes(
     imageModels,
     isLoadingImageModels,
     videoModels,
-    isLoadingVideoModels
+    isLoadingVideoModels,
+    connectionAnalysis
   ])
 }
 
