@@ -72,6 +72,22 @@ export type CreateProjectInput = {
   name: Scalars['String']['input'];
 };
 
+export type CreateScenesInput = {
+  maxTokens?: InputMaybe<Scalars['Int']['input']>;
+  modelId: Scalars['ID']['input'];
+  systemPrompt?: InputMaybe<Scalars['String']['input']>;
+  temperature?: InputMaybe<Scalars['Float']['input']>;
+};
+
+export type CreateScenesResult = {
+  __typename?: 'CreateScenesResult';
+  cost: Scalars['Float']['output'];
+  generationTimeMs: Scalars['Int']['output'];
+  modelUsed: Scalars['String']['output'];
+  scenes: Array<Snippet>;
+  tokensUsed: Scalars['Int']['output'];
+};
+
 export type CreateSnippetInput = {
   categories?: InputMaybe<Array<Scalars['String']['input']>>;
   position: PositionInput;
@@ -185,6 +201,7 @@ export type Mutation = {
   combineSnippetConnections: Snippet;
   createConnection: Connection;
   createProject: Project;
+  createScenes: CreateScenesResult;
   createSnippet: Snippet;
   createUser: User;
   deleteConnection: Scalars['Boolean']['output'];
@@ -216,6 +233,13 @@ export type MutationCreateConnectionArgs = {
 
 export type MutationCreateProjectArgs = {
   input: CreateProjectInput;
+};
+
+
+export type MutationCreateScenesArgs = {
+  input: CreateScenesInput;
+  projectId: Scalars['ID']['input'];
+  snippetId: Scalars['ID']['input'];
 };
 
 
@@ -412,6 +436,7 @@ export type Snippet = {
   __typename?: 'Snippet';
   categories: Array<Scalars['String']['output']>;
   createdAt: Scalars['String']['output'];
+  createdFrom?: Maybe<Scalars['ID']['output']>;
   id: Scalars['ID']['output'];
   imageMetadata?: Maybe<ImageMetadata>;
   imageS3Key?: Maybe<Scalars['String']['output']>;
@@ -575,6 +600,8 @@ export type ResolversTypes = ResolversObject<{
   ConnectionTypeCount: ResolverTypeWrapper<ConnectionTypeCount>;
   CreateConnectionInput: CreateConnectionInput;
   CreateProjectInput: CreateProjectInput;
+  CreateScenesInput: CreateScenesInput;
+  CreateScenesResult: ResolverTypeWrapper<CreateScenesResult>;
   CreateSnippetInput: CreateSnippetInput;
   Float: ResolverTypeWrapper<Scalars['Float']['output']>;
   GenerateContentInput: GenerateContentInput;
@@ -616,6 +643,8 @@ export type ResolversParentTypes = ResolversObject<{
   ConnectionTypeCount: ConnectionTypeCount;
   CreateConnectionInput: CreateConnectionInput;
   CreateProjectInput: CreateProjectInput;
+  CreateScenesInput: CreateScenesInput;
+  CreateScenesResult: CreateScenesResult;
   CreateSnippetInput: CreateSnippetInput;
   Float: Scalars['Float']['output'];
   GenerateContentInput: GenerateContentInput;
@@ -666,6 +695,14 @@ export type ConnectionStatsResolvers<ContextType = GraphQLContext, ParentType ex
 export type ConnectionTypeCountResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['ConnectionTypeCount'] = ResolversParentTypes['ConnectionTypeCount']> = ResolversObject<{
   count?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   type?: Resolver<ResolversTypes['ConnectionType'], ParentType, ContextType>;
+}>;
+
+export type CreateScenesResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['CreateScenesResult'] = ResolversParentTypes['CreateScenesResult']> = ResolversObject<{
+  cost?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  generationTimeMs?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  modelUsed?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  scenes?: Resolver<Array<ResolversTypes['Snippet']>, ParentType, ContextType>;
+  tokensUsed?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
 }>;
 
 export type GenerationRecordResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['GenerationRecord'] = ResolversParentTypes['GenerationRecord']> = ResolversObject<{
@@ -734,6 +771,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   combineSnippetConnections?: Resolver<ResolversTypes['Snippet'], ParentType, ContextType, RequireFields<MutationCombineSnippetConnectionsArgs, 'projectId' | 'snippetId'>>;
   createConnection?: Resolver<ResolversTypes['Connection'], ParentType, ContextType, RequireFields<MutationCreateConnectionArgs, 'input'>>;
   createProject?: Resolver<ResolversTypes['Project'], ParentType, ContextType, RequireFields<MutationCreateProjectArgs, 'input'>>;
+  createScenes?: Resolver<ResolversTypes['CreateScenesResult'], ParentType, ContextType, RequireFields<MutationCreateScenesArgs, 'input' | 'projectId' | 'snippetId'>>;
   createSnippet?: Resolver<ResolversTypes['Snippet'], ParentType, ContextType, RequireFields<MutationCreateSnippetArgs, 'input'>>;
   createUser?: Resolver<ResolversTypes['User'], ParentType, ContextType, RequireFields<MutationCreateUserArgs, 'email' | 'name' | 'temporaryPassword'>>;
   deleteConnection?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType, RequireFields<MutationDeleteConnectionArgs, 'connectionId' | 'projectId'>>;
@@ -787,6 +825,7 @@ export type QueryResolvers<ContextType = GraphQLContext, ParentType extends Reso
 export type SnippetResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Snippet'] = ResolversParentTypes['Snippet']> = ResolversObject<{
   categories?: Resolver<Array<ResolversTypes['String']>, ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  createdFrom?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   imageMetadata?: Resolver<Maybe<ResolversTypes['ImageMetadata']>, ParentType, ContextType>;
   imageS3Key?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
@@ -840,6 +879,7 @@ export type Resolvers<ContextType = GraphQLContext> = ResolversObject<{
   Connection?: ConnectionResolvers<ContextType>;
   ConnectionStats?: ConnectionStatsResolvers<ContextType>;
   ConnectionTypeCount?: ConnectionTypeCountResolvers<ContextType>;
+  CreateScenesResult?: CreateScenesResultResolvers<ContextType>;
   GenerationRecord?: GenerationRecordResolvers<ContextType>;
   GenerationResult?: GenerationResultResolvers<ContextType>;
   GenerationStreamEvent?: GenerationStreamEventResolvers<ContextType>;

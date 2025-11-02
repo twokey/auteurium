@@ -9,6 +9,7 @@ export const CANVAS_CONSTANTS = {
   GENERATED_SNIPPET_VERTICAL_OFFSET: 500,
   GENERATED_SNIPPET_SPACING: 20, // Spacing between snippet bottom and new snippet top
   ESTIMATED_SNIPPET_HEIGHT: 280, // Estimated average snippet height
+  SCENE_VERTICAL_SPACING: 50, // Vertical gap between stacked scene snippets
   DEFAULT_NODE_POSITION: { x: 150, y: 200 }, // x=150 is center of first column (0-300)
   MIN_NODE_WIDTH: 200,
   MAX_NODE_WIDTH: 300,

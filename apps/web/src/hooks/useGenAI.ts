@@ -3,14 +3,24 @@ import { useCallback, useRef, useState } from 'react'
 import {
   GENERATE_CONTENT,
   GENERATE_CONTENT_STREAM,
-  GENERATION_STREAM_SUBSCRIPTION
+  GENERATION_STREAM_SUBSCRIPTION,
+  CREATE_SCENES
 } from '../graphql/genai'
 import { useModels } from '../contexts/ModelsContext'
 import { getClient } from '../services/graphql'
 import { useGraphQLMutation } from './useGraphQLMutation'
+import type { Snippet } from '../types'
 
 type GenerateContentResult = {
   content: string
+  tokensUsed: number
+  cost: number
+  modelUsed: string
+  generationTimeMs: number
+}
+
+type CreateScenesResult = {
+  scenes: Snippet[]
   tokensUsed: number
   cost: number
   modelUsed: string
@@ -32,6 +42,21 @@ type GenerateContentData = {
 
 type GenerateContentStreamData = {
   generateContentStream: GenerateContentResult
+}
+
+type CreateScenesVariables = {
+  projectId: string
+  snippetId: string
+  input: {
+    modelId: string
+    systemPrompt?: string
+    temperature?: number
+    maxTokens?: number
+  }
+}
+
+type CreateScenesData = {
+  createScenes: CreateScenesResult
 }
 
 type GenerationStreamSubscriptionData = {
@@ -154,6 +179,11 @@ export const useGenAI = (options: UseGenAIOptions = {}) => {
     GenerateContentStreamData,
     GenerateContentVariables
   >(GENERATE_CONTENT_STREAM)
+
+  const { mutate: createScenesMutation, loading: isCreatingScenes } = useGraphQLMutation<
+    CreateScenesData,
+    CreateScenesVariables
+  >(CREATE_SCENES)
 
   const generate = useCallback(
     async (projectId: string, snippetId: string, modelId: string, prompt: string) => {
@@ -288,6 +318,23 @@ export const useGenAI = (options: UseGenAIOptions = {}) => {
     [markStreamingUnsupported]
   )
 
+  const createScenes = useCallback(
+    async (projectId: string, snippetId: string, modelId: string) => {
+      const result = await createScenesMutation({
+        variables: {
+          projectId,
+          snippetId,
+          input: {
+            modelId
+          }
+        }
+      })
+
+      return result?.createScenes
+    },
+    [createScenesMutation]
+  )
+
   return {
     models: textModels,
     isLoadingModels: enabled ? isLoadingModels : false,
@@ -296,7 +343,9 @@ export const useGenAI = (options: UseGenAIOptions = {}) => {
     generate,
     generateStream,
     subscribeToGenerationStream,
+    createScenes,
     isGenerating: isGeneratingMutation || isStreamingMutation,
+    isCreatingScenes,
     isStreamingSupported,
     streamingFallbackReason
   }

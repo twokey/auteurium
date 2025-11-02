@@ -28,6 +28,16 @@ export const generationHistoryInputSchema = z.object({
   snippetId: z.string().min(1, 'Snippet ID is required')
 })
 
+export const createScenesInputSchema = z.object({
+  modelId: z.string().min(1, 'Model ID is required'),
+  systemPrompt: z.string().max(10000, 'System prompt exceeds maximum length').optional(),
+  temperature: z.number().min(0).max(2).optional(),
+  maxTokens: z.number().min(1).max(8192).optional()
+})
+
+export const MAX_SCENES = 100
+
 export type GenerateContentInput = z.infer<typeof generateContentInputSchema>
 export type AvailableModelsInput = z.infer<typeof availableModelsInputSchema>
 export type GenerationHistoryInput = z.infer<typeof generationHistoryInputSchema>
+export type CreateScenesInput = z.infer<typeof createScenesInputSchema>

@@ -221,21 +221,55 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       }
     })
 
+    // Lambda function for createScenes mutation
+    const createScenesFunction = new lambdaNodejs.NodejsFunction(this, `CreateScenesFunction-${stage}`, {
+      functionName: `auteurium-genai-create-scenes-${stage}`,
+      runtime: lambda.Runtime.NODEJS_22_X,
+      entry: path.join(__dirname, '../../../../services/api/src/resolvers/genai/createScenes.ts'),
+      handler: 'handler',
+      timeout: cdk.Duration.seconds(90), // Longer timeout for LLM generation + batch snippet creation
+      memorySize: 1024,
+      bundling: {
+        format: lambdaNodejs.OutputFormat.CJS,
+        target: 'node22',
+        sourceMap: true,
+        tsconfig: path.join(__dirname, '../../../../services/api/tsconfig.json'),
+        nodeModules: ['@google/genai'] // Include Gemini SDK
+      },
+      depsLockFilePath: path.join(__dirname, '../../../../package-lock.json'),
+      environment: {
+        STAGE: stage,
+        SNIPPETS_TABLE: snippetsTable.tableName,
+        VERSIONS_TABLE: dynamodb.Table.fromTableName(this, 'VersionsTable', `auteurium-versions-${stage}`).tableName,
+        GENERATIONS_TABLE: this.generationsTable.tableName,
+        LLM_API_KEYS_SECRET_ARN: llmApiKeysSecret.secretArn,
+        USER_POOL_ID: userPool.userPoolId,
+        USER_POOL_CLIENT_ID: userPoolClient.userPoolClientId
+      }
+    })
+
     // Grant permissions
     llmApiKeysSecret.grantRead(generateContentFunction)
     llmApiKeysSecret.grantRead(generateContentStreamFunction)
     llmApiKeysSecret.grantRead(generateImageFunction)
+    llmApiKeysSecret.grantRead(createScenesFunction)
     this.generationsTable.grantReadWriteData(generateContentFunction)
     this.generationsTable.grantReadWriteData(generateContentStreamFunction)
     this.generationsTable.grantReadWriteData(generationHistoryFunction)
     this.generationsTable.grantReadWriteData(generateImageFunction)
+    this.generationsTable.grantReadWriteData(createScenesFunction)
     snippetsTable.grantReadData(generateContentFunction)
     snippetsTable.grantReadData(generateContentStreamFunction)
     snippetsTable.grantReadWriteData(generateImageFunction)
+    snippetsTable.grantReadWriteData(createScenesFunction) // Need write access to create scene snippets
     projectsTable.grantReadData(generateContentFunction)
     projectsTable.grantReadData(generateContentStreamFunction)
     connectionsTable.grantReadData(generateImageFunction) // Need to query connections for multimodal image generation
     mediaBucket.grantReadWrite(generateImageFunction)
+
+    // Grant versions table write access for createScenes
+    const versionsTable = dynamodb.Table.fromTableName(this, 'VersionsTableForScenes', `auteurium-versions-${stage}`)
+    versionsTable.grantWriteData(createScenesFunction)
 
     // Grant GSI query permissions
     generateContentFunction.addToRolePolicy(new iam.PolicyStatement({
@@ -282,6 +316,15 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       ]
     }))
 
+    // Grant GSI query permissions for createScenesFunction
+    createScenesFunction.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['dynamodb:Query'],
+      resources: [
+        `${this.generationsTable.tableArn}/index/*`,
+        `${snippetsTable.tableArn}/index/*`
+      ]
+    }))
+
     // Create AppSync data sources
     const generateContentDataSource = new appsync.LambdaDataSource(this, `GenerateContentDataSource-${stage}`, {
       api: graphqlApi,
@@ -311,6 +354,12 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       api: graphqlApi,
       name: `genai-generate-image-${stage}`,
       lambdaFunction: generateImageFunction
+    })
+
+    const createScenesDataSource = new appsync.LambdaDataSource(this, `CreateScenesDataSource-${stage}`, {
+      api: graphqlApi,
+      name: `genai-create-scenes-${stage}`,
+      lambdaFunction: createScenesFunction
     })
 
     const generationStreamEventsDataSource = new appsync.NoneDataSource(this, `GenerationStreamEventsDataSource-${stage}`, {
@@ -352,6 +401,13 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       typeName: 'Mutation',
       fieldName: 'generateSnippetImage',
       dataSource: generateImageDataSource
+    })
+
+    new appsync.Resolver(this, `CreateScenesResolver-${stage}`, {
+      api: graphqlApi,
+      typeName: 'Mutation',
+      fieldName: 'createScenes',
+      dataSource: createScenesDataSource
     })
 
     new appsync.Resolver(this, `PublishGenerationStreamEventResolver-${stage}`, {

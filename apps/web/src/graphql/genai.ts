@@ -46,3 +46,31 @@ export const GENERATION_STREAM_SUBSCRIPTION = /* GraphQL */ `
   }
 `
 
+export const CREATE_SCENES = /* GraphQL */ `
+  mutation CreateScenes($projectId: ID!, $snippetId: ID!, $input: CreateScenesInput!) {
+    createScenes(projectId: $projectId, snippetId: $snippetId, input: $input) {
+      scenes {
+        id
+        projectId
+        userId
+        title
+        textField1
+        position {
+          x
+          y
+        }
+        tags
+        categories
+        version
+        createdAt
+        updatedAt
+        createdFrom
+      }
+      tokensUsed
+      cost
+      modelUsed
+      generationTimeMs
+    }
+  }
+`
+

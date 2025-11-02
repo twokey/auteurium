@@ -45,6 +45,7 @@ type Snippet {
   imageS3Key: String
   imageMetadata: ImageMetadata
   versions: [SnippetVersion!]!
+  createdFrom: ID
 }
 
 type SnippetVersion {
@@ -216,6 +217,7 @@ type Mutation {
   generateContent(projectId: ID!, snippetId: ID!, input: GenerateContentInput!): GenerationResult!
   generateContentStream(projectId: ID!, snippetId: ID!, input: GenerateContentInput!): GenerationResult!
   publishGenerationStreamEvent(input: GenerationStreamEventInput!): GenerationStreamEvent!
+  createScenes(projectId: ID!, snippetId: ID!, input: CreateScenesInput!): CreateScenesResult!
 }
 
 type SystemAnalytics {
@@ -303,6 +305,21 @@ input GenerateContentInput {
   systemPrompt: String
   temperature: Float
   maxTokens: Int
+}
+
+input CreateScenesInput {
+  modelId: ID!
+  systemPrompt: String
+  temperature: Float
+  maxTokens: Int
+}
+
+type CreateScenesResult {
+  scenes: [Snippet!]!
+  tokensUsed: Int!
+  cost: Float!
+  modelUsed: String!
+  generationTimeMs: Int!
 }
 
 schema {
