@@ -5,13 +5,13 @@
 
 import { useCallback, useEffect } from 'react'
 
-import { useCanvasStore } from '../store/canvasStore'
 import { useContextMenuStore } from '../store/contextMenuStore'
 
 interface ContextMenuProps {
   onEdit: (snippetId: string) => void
   onDelete: (snippetId: string) => void
   onDeleteMultiple: (snippetIds: string[]) => void
+  onConnectMultiple: (snippetIds: string[]) => void
   onManageConnections: (snippetId: string) => void
   onViewVersions: (snippetId: string) => void
 }
@@ -20,12 +20,12 @@ export const ContextMenu = ({
   onEdit,
   onDelete,
   onDeleteMultiple,
+  onConnectMultiple,
   onManageConnections,
   onViewVersions,
 }: ContextMenuProps) => {
-  const { isOpen, snippetId, position, closeContextMenu } = useContextMenuStore()
-  const { selectedSnippetIds } = useCanvasStore()
-  const selectionCount = selectedSnippetIds.size
+  const { isOpen, snippetIds, position, closeContextMenu } = useContextMenuStore()
+  const selectionCount = snippetIds.length
   const isMultiSelect = selectionCount > 1
 
   // Close context menu on Escape key
@@ -43,34 +43,39 @@ export const ContextMenu = ({
   }, [isOpen, closeContextMenu])
 
   const handleEdit = useCallback(() => {
-    if (!snippetId) return
+    if (snippetIds.length === 0) return
     closeContextMenu()
-    onEdit(snippetId)
-  }, [snippetId, onEdit, closeContextMenu])
+    onEdit(snippetIds[0])
+  }, [snippetIds, onEdit, closeContextMenu])
 
   const handleDelete = useCallback(() => {
     closeContextMenu()
     if (isMultiSelect) {
-      const snippetIdsArray = Array.from(selectedSnippetIds)
-      onDeleteMultiple(snippetIdsArray)
-    } else if (snippetId) {
-      onDelete(snippetId)
+      onDeleteMultiple(snippetIds)
+    } else if (snippetIds.length > 0) {
+      onDelete(snippetIds[0])
     }
-  }, [snippetId, isMultiSelect, selectedSnippetIds, onDelete, onDeleteMultiple, closeContextMenu])
+  }, [snippetIds, isMultiSelect, onDelete, onDeleteMultiple, closeContextMenu])
 
   const handleManageConnections = useCallback(() => {
-    if (!snippetId) return
+    if (snippetIds.length === 0) return
     closeContextMenu()
-    onManageConnections(snippetId)
-  }, [snippetId, onManageConnections, closeContextMenu])
+    onManageConnections(snippetIds[0])
+  }, [snippetIds, onManageConnections, closeContextMenu])
 
   const handleViewVersions = useCallback(() => {
-    if (!snippetId) return
+    if (snippetIds.length === 0) return
     closeContextMenu()
-    onViewVersions(snippetId)
-  }, [snippetId, onViewVersions, closeContextMenu])
+    onViewVersions(snippetIds[0])
+  }, [snippetIds, onViewVersions, closeContextMenu])
 
-  if (!isOpen || !snippetId) {
+  const handleConnect = useCallback(() => {
+    if (snippetIds.length === 0) return
+    closeContextMenu()
+    onConnectMultiple(snippetIds)
+  }, [snippetIds, onConnectMultiple, closeContextMenu])
+
+  if (!isOpen || snippetIds.length === 0) {
     return null
   }
 
@@ -147,6 +152,22 @@ export const ContextMenu = ({
           </svg>
           Version History
         </button>
+
+        {isMultiSelect && (
+          <>
+            <div className="border-t border-gray-200 my-1" />
+
+            <button
+              onClick={handleConnect}
+              className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Connect {selectionCount} snippets
+            </button>
+          </>
+        )}
 
         <div className="border-t border-gray-200 my-1" />
 

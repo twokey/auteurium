@@ -158,6 +158,7 @@ const CanvasContent = () => {
   // Context menu handlers with viewport-aware positioning
   const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: any) => {
     event.preventDefault()
+    event.stopPropagation()
 
     const pane = reactFlowWrapperRef.current?.getBoundingClientRect()
     if (!pane) return
@@ -167,7 +168,42 @@ const CanvasContent = () => {
     const MENU_WIDTH = 200
     const MENU_HEIGHT = 200
 
-    openContextMenu(node.id, {
+    // Check if right-clicked node is part of current selection
+    const { selectedSnippetIds } = useCanvasStore.getState()
+    const isClickedNodeSelected = selectedSnippetIds.has(node.id)
+
+    // If node is selected and there are multiple selections, use all selected IDs
+    // Otherwise, use only the clicked node ID
+    const snippetIdsToShow = isClickedNodeSelected && selectedSnippetIds.size > 1
+      ? Array.from(selectedSnippetIds)
+      : [node.id]
+
+    openContextMenu(snippetIdsToShow, {
+      top: event.clientY < pane.height - MENU_HEIGHT ? event.clientY : undefined,
+      left: event.clientX < pane.width - MENU_WIDTH ? event.clientX : undefined,
+      right: event.clientX >= pane.width - MENU_WIDTH ? pane.width - event.clientX : undefined,
+      bottom: event.clientY >= pane.height - MENU_HEIGHT ? pane.height - event.clientY : undefined,
+    })
+  }, [openContextMenu])
+
+  const handlePaneContextMenu = useCallback((event: React.MouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    const { selectedSnippetIds } = useCanvasStore.getState()
+    if (selectedSnippetIds.size <= 1) {
+      return
+    }
+
+    const pane = reactFlowWrapperRef.current?.getBoundingClientRect()
+    if (!pane) return
+
+    const MENU_WIDTH = 200
+    const MENU_HEIGHT = 200
+
+    const snippetIdsToShow = Array.from(selectedSnippetIds)
+
+    openContextMenu(snippetIdsToShow, {
       top: event.clientY < pane.height - MENU_HEIGHT ? event.clientY : undefined,
       left: event.clientX < pane.width - MENU_WIDTH ? event.clientX : undefined,
       right: event.clientX >= pane.width - MENU_WIDTH ? pane.width - event.clientX : undefined,
@@ -348,6 +384,7 @@ const CanvasContent = () => {
             onNodeDragStop={onNodeDragStop}
             onSelectionChange={handleSelectionChange}
             onNodeContextMenu={handleNodeContextMenu}
+            onPaneContextMenu={handlePaneContextMenu}
             onPaneClick={handlePaneClick}
             onMove={handleMove}
             onMoveEnd={handleMoveEnd}
@@ -426,6 +463,7 @@ const CanvasContent = () => {
         onEdit={handlers.handleEditSnippet}
         onDelete={handlers.handleDeleteSnippet}
         onDeleteMultiple={handlers.handleDeleteMultiple}
+        onConnectMultiple={handlers.handleConnectMultiple}
         onManageConnections={handlers.handleManageConnections}
         onViewVersions={handlers.handleViewVersions}
       />

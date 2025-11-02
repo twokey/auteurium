@@ -116,6 +116,7 @@ export interface UseCanvasHandlersResult {
   handleEditSnippet: (snippetId: string) => void
   handleDeleteSnippet: (snippetId: string) => void
   handleDeleteMultiple: (snippetIds: string[]) => void
+  handleConnectMultiple: (snippetIds: string[]) => Promise<void>
   handleManageConnections: (snippetId: string) => void
   handleViewVersions: (snippetId: string) => void
   handleUpdateSnippetContent: (snippetId: string, changes: SnippetContentChanges) => Promise<void>
@@ -244,6 +245,160 @@ export function useCanvasHandlers({
       openDeleteMultipleSnippets(snippetsToDelete, projectId)
     }
   }, [projectId, openDeleteMultipleSnippets])
+
+  const handleConnectMultiple = useCallback(async (snippetIds: string[]) => {
+    if (!projectId || snippetIds.length === 0) {
+      console.error('Cannot connect snippets: no project ID or empty selection')
+      return
+    }
+
+    const selectedSnippets = snippetsRef.current.filter(s => snippetIds.includes(s.id))
+    if (selectedSnippets.length === 0) {
+      console.error('Cannot connect snippets: no snippets found')
+      return
+    }
+
+    // Calculate position for new snippet
+    // X: Rightmost column + 1
+    const columnIndices = selectedSnippets.map(s =>
+      getColumnIndex(s.position?.x ?? CANVAS_CONSTANTS.DEFAULT_NODE_POSITION.x)
+    )
+    const rightmostColumn = Math.max(...columnIndices)
+    const newX = getRelativeColumnX(rightmostColumn, 1)
+
+    // Y: Average Y position of selected snippets
+    const avgY = selectedSnippets.reduce((sum, s) =>
+      sum + (s.position?.y ?? CANVAS_CONSTANTS.DEFAULT_NODE_POSITION.y), 0
+    ) / selectedSnippets.length
+
+    const targetPosition = {
+      x: newX,
+      y: avgY
+    }
+
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+    const now = new Date().toISOString()
+
+    // Add optimistic snippet
+    addOptimisticSnippet({
+      id: tempId,
+      projectId,
+      title: 'New snippet',
+      textField1: '',
+      position: targetPosition,
+      tags: [],
+      categories: [],
+      connections: [],
+      createdAt: now,
+      updatedAt: now,
+      version: 1,
+      isOptimistic: true
+    })
+
+    try {
+      // Create snippet
+      const creationResult = await mutateWithInvalidate(
+        () =>
+          createSnippetMutation({
+            variables: {
+              input: {
+                projectId,
+                title: 'New snippet',
+                textField1: '',
+                position: targetPosition,
+                tags: [],
+                categories: []
+              }
+            }
+          }),
+        ['ProjectWithSnippets']
+      )
+
+      const createdSnippet = creationResult?.createSnippet
+      if (!createdSnippet) {
+        throw new Error('Failed to create snippet: missing response data')
+      }
+
+      replaceOptimisticSnippet(tempId, createdSnippet)
+
+      // Create connections FROM each selected snippet TO the new snippet
+      let successCount = 0
+      let failCount = 0
+
+      for (const sourceSnippet of selectedSnippets) {
+        const optimisticConnectionId = `temp-conn-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+        const connectionTimestamp = new Date().toISOString()
+
+        addOptimisticConnection({
+          id: optimisticConnectionId,
+          projectId,
+          sourceSnippetId: sourceSnippet.id,
+          targetSnippetId: createdSnippet.id,
+          label: '',
+          createdAt: connectionTimestamp,
+          updatedAt: connectionTimestamp,
+          isOptimistic: true
+        })
+
+        try {
+          const connectionResult = await mutateWithInvalidate(
+            () =>
+              createConnectionMutation({
+                variables: {
+                  input: {
+                    projectId,
+                    sourceSnippetId: sourceSnippet.id,
+                    targetSnippetId: createdSnippet.id,
+                    label: ''
+                  }
+                }
+              }),
+            ['ProjectConnections']
+          )
+
+          const createdConnection = connectionResult?.createConnection
+          if (createdConnection) {
+            replaceOptimisticConnection(optimisticConnectionId, createdConnection)
+            successCount++
+          } else {
+            console.warn('createConnection mutation returned no data; optimistic connection will remain until refresh')
+            successCount++
+          }
+        } catch (connectionError) {
+          console.error('Failed to create connection:', connectionError)
+          removeOptimisticConnection(optimisticConnectionId)
+          failCount++
+        }
+      }
+
+      // Show result toast
+      if (failCount === 0) {
+        toast.success(`Connected ${successCount} snippet${successCount !== 1 ? 's' : ''} to new snippet`)
+      } else if (successCount > 0) {
+        toast.warning(
+          `Partially connected: ${successCount} succeeded, ${failCount} failed`,
+          'Some connections could not be created'
+        )
+      } else {
+        toast.error('Failed to create connections', 'All connection attempts failed')
+      }
+    } catch (error) {
+      console.error('Failed to create snippet for connections:', error)
+      removeOptimisticSnippet(tempId)
+      toast.error('Failed to create snippet', error instanceof Error ? error.message : 'Unknown error')
+    }
+  }, [
+    projectId,
+    addOptimisticSnippet,
+    createSnippetMutation,
+    replaceOptimisticSnippet,
+    createConnectionMutation,
+    addOptimisticConnection,
+    replaceOptimisticConnection,
+    removeOptimisticConnection,
+    toast,
+    removeOptimisticSnippet
+  ])
 
   const handleManageConnections = useCallback((snippetId: string) => {
     const snippet = snippetsRef.current.find(s => s.id === snippetId)
@@ -1236,6 +1391,7 @@ export function useCanvasHandlers({
     handleEditSnippet,
     handleDeleteSnippet,
     handleDeleteMultiple,
+    handleConnectMultiple,
     handleManageConnections,
     handleViewVersions,
     handleUpdateSnippetContent,
