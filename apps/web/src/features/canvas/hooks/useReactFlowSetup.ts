@@ -245,35 +245,51 @@ export function useReactFlowSetup({
 
   // Handle node drag - Using ref to avoid recreating callback when snippets change
   // Positions are added to pending store and flushed in batch after 500ms delay
+  // Supports multi-select: all selected nodes are moved together
   const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
-    const snippet = snippetsRef.current.find(s => s.id === node.id)
-    if (!snippet || !projectId) return
+    if (!projectId || !reactFlowInstance.current) return
 
-    // Snap position to column constraints (x only, y remains free)
-    const snappedPosition = snapPositionToColumn({
-      x: node.position.x,
-      y: node.position.y
+    // Get all nodes from ReactFlow instance to check for selected ones
+    const allNodes = reactFlowInstance.current.getNodes()
+    const selectedNodes = allNodes.filter(n => n.selected)
+
+    // If no nodes are selected, fallback to single node behavior
+    const nodesToUpdate = selectedNodes.length > 0 ? selectedNodes : [node]
+
+    let hasAnyPositionChanged = false
+
+    // Process each node that was moved
+    nodesToUpdate.forEach(n => {
+      const snippet = snippetsRef.current.find(s => s.id === n.id)
+      if (!snippet) return
+
+      // Snap position to column constraints (x only, y remains free)
+      const snappedPosition = snapPositionToColumn({
+        x: n.position.x,
+        y: n.position.y
+      })
+
+      const previousPosition = snippet.position ?? undefined
+      const previousX = previousPosition?.x
+      const previousY = previousPosition?.y
+
+      const hasPositionChanged =
+        previousPosition === undefined
+        || Math.abs((previousX ?? 0) - snappedPosition.x) >= 0.5
+        || Math.abs((previousY ?? 0) - snappedPosition.y) >= 0.5
+
+      if (hasPositionChanged) {
+        // Add snapped position to pending store (instant, no mutation yet)
+        addPendingPosition(n.id, snappedPosition)
+        hasAnyPositionChanged = true
+      }
     })
 
-    const previousPosition = snippet.position ?? undefined
-    const previousX = previousPosition?.x
-    const previousY = previousPosition?.y
-
-    const hasPositionChanged =
-      previousPosition === undefined
-      || Math.abs((previousX ?? 0) - snappedPosition.x) >= 0.5
-      || Math.abs((previousY ?? 0) - snappedPosition.y) >= 0.5
-
-    if (!hasPositionChanged) {
-      return
+    // Trigger debounced flush if any positions changed
+    if (hasAnyPositionChanged) {
+      debouncedFlushPositions()
     }
-
-    // Add snapped position to pending store (instant, no mutation yet)
-    addPendingPosition(node.id, snappedPosition)
-
-    // Trigger debounced flush (will send all pending positions after 500ms delay)
-    debouncedFlushPositions()
-  }, [projectId, addPendingPosition, debouncedFlushPositions])
+  }, [projectId, addPendingPosition, debouncedFlushPositions, reactFlowInstance])
 
   // Save viewport when it changes
   const onMoveEnd = useCallback(() => {

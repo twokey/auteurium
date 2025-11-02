@@ -18,7 +18,14 @@ interface ModalState {
     isOpen: boolean
     snippet: Snippet | null
   }
-  
+
+  // Delete Multiple Snippets Modal
+  deleteMultipleSnippets: {
+    isOpen: boolean
+    snippets: Snippet[]
+    projectId: string | null
+  }
+
   // Manage Connections Modal
   manageConnections: {
     isOpen: boolean
@@ -45,7 +52,10 @@ interface ModalState {
   
   openDeleteSnippet: (snippet: Snippet) => void
   closeDeleteSnippet: () => void
-  
+
+  openDeleteMultipleSnippets: (snippets: Snippet[], projectId: string) => void
+  closeDeleteMultipleSnippets: () => void
+
   openManageConnections: (snippet: Snippet) => void
   closeManageConnections: () => void
   
@@ -70,7 +80,13 @@ export const useModalStore = create<ModalState>((set) => ({
     isOpen: false,
     snippet: null,
   },
-  
+
+  deleteMultipleSnippets: {
+    isOpen: false,
+    snippets: [],
+    projectId: null,
+  },
+
   manageConnections: {
     isOpen: false,
     snippet: null,
@@ -103,7 +119,13 @@ export const useModalStore = create<ModalState>((set) => ({
     
   closeDeleteSnippet: () =>
     set({ deleteSnippet: { isOpen: false, snippet: null } }),
-    
+
+  openDeleteMultipleSnippets: (snippets, projectId) =>
+    set({ deleteMultipleSnippets: { isOpen: true, snippets, projectId } }),
+
+  closeDeleteMultipleSnippets: () =>
+    set({ deleteMultipleSnippets: { isOpen: false, snippets: [], projectId: null } }),
+
   openManageConnections: (snippet) =>
     set({ manageConnections: { isOpen: true, snippet } }),
     
@@ -148,6 +170,7 @@ export const useModalStore = create<ModalState>((set) => ({
     set({
       editSnippet: { isOpen: false, snippet: null },
       deleteSnippet: { isOpen: false, snippet: null },
+      deleteMultipleSnippets: { isOpen: false, snippets: [], projectId: null },
       manageConnections: { isOpen: false, snippet: null },
       versionHistory: { isOpen: false, snippet: null },
       generatedSnippetPreview: { isOpen: false, sourceSnippetId: null, content: '', isCreating: false },

@@ -41,7 +41,7 @@ const NODE_TYPES: NodeTypes = {
 const CanvasContent = () => {
   const { id: projectId } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { generatingImageSnippetIds, setSelectedSnippetId } = useCanvasStore()
+  const { generatingImageSnippetIds, setSelectedSnippetIds } = useCanvasStore()
   const { openContextMenu, closeContextMenu } = useContextMenuStore()
 
   // Track viewport for column guides
@@ -180,6 +180,9 @@ const CanvasContent = () => {
     // Note: ReactFlow will automatically deselect nodes and trigger onSelectionChange
   }, [closeContextMenu])
 
+  // React Flow now handles all selection logic natively via multiSelectionKeyCode="Meta"
+  // No custom node click handler needed
+
   const numberKeyNavigationShortcut = useMemo(() => ({
     matcher: (event: KeyboardEvent) => /^[0-9]$/.test(event.key),
     allowWhileTyping: false
@@ -191,12 +194,68 @@ const CanvasContent = () => {
 
   useCanvasKeyboardShortcut(numberKeyNavigationShortcut, handleNumberKeyNavigationShortcut)
 
+  // Cmd/Ctrl+A: Select all snippets
+  const selectAllShortcut = useMemo(() => ({
+    matcher: (event: KeyboardEvent) =>
+      event.key.toLowerCase() === 'a' && (event.metaKey || event.ctrlKey),
+    allowWhileTyping: false
+  }), [])
+
+  const handleSelectAll = useCallback((event: KeyboardEvent) => {
+    event.preventDefault()
+    // Select all nodes in ReactFlow
+    setNodes((currentNodes: any) =>
+      currentNodes.map((node: any) => ({
+        ...node,
+        selected: true
+      }))
+    )
+  }, [setNodes])
+
+  useCanvasKeyboardShortcut(selectAllShortcut, handleSelectAll)
+
+  // Escape: Deselect all snippets
+  const deselectShortcut = useMemo(() => ({
+    matcher: (event: KeyboardEvent) => event.key === 'Escape',
+    allowWhileTyping: false
+  }), [])
+
+  const handleDeselect = useCallback(() => {
+    // Deselect all nodes in ReactFlow
+    setNodes((currentNodes: any) =>
+      currentNodes.map((node: any) => ({
+        ...node,
+        selected: false
+      }))
+    )
+    closeContextMenu()
+  }, [setNodes, closeContextMenu])
+
+  useCanvasKeyboardShortcut(deselectShortcut, handleDeselect)
+
+  // Delete/Backspace: Delete selected snippets
+  const deleteShortcut = useMemo(() => ({
+    matcher: (event: KeyboardEvent) =>
+      event.key === 'Delete' || event.key === 'Backspace',
+    allowWhileTyping: false
+  }), [])
+
+  const handleDeleteSelected = useCallback(() => {
+    const { selectedSnippetIds } = useCanvasStore.getState()
+    if (selectedSnippetIds.size > 0) {
+      const snippetIdsArray = Array.from(selectedSnippetIds)
+      handlers.handleDeleteMultiple(snippetIdsArray)
+    }
+  }, [handlers])
+
+  useCanvasKeyboardShortcut(deleteShortcut, handleDeleteSelected)
+
   // Sync ReactFlow selection with Zustand store
   const handleSelectionChange = useCallback((params: { nodes: any[] }) => {
-    // Update Zustand store with the first selected node's ID (or null if none selected)
-    const selectedNode = params.nodes[0]
-    setSelectedSnippetId(selectedNode?.id ?? null)
-  }, [setSelectedSnippetId])
+    // Update Zustand store with all selected node IDs
+    const selectedIds = new Set(params.nodes.map(node => node.id))
+    setSelectedSnippetIds(selectedIds)
+  }, [setSelectedSnippetIds])
 
   // Update the ref with the actual setNodes function
   useEffect(() => {
@@ -303,6 +362,11 @@ const CanvasContent = () => {
             nodesConnectable={true}
             nodesFocusable={true}
             elementsSelectable={true}
+            selectionOnDrag={false}
+            panOnDrag={true}
+            selectionKeyCode="Shift"
+            multiSelectionKeyCode="Meta"
+            deleteKeyCode={null}
           >
             <ColumnGuides viewport={viewport} />
             <Background
@@ -361,6 +425,7 @@ const CanvasContent = () => {
       <ContextMenu
         onEdit={handlers.handleEditSnippet}
         onDelete={handlers.handleDeleteSnippet}
+        onDeleteMultiple={handlers.handleDeleteMultiple}
         onManageConnections={handlers.handleManageConnections}
         onViewVersions={handlers.handleViewVersions}
       />

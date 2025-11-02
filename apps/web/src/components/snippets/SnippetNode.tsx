@@ -267,7 +267,13 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
 
   const handleFieldActivate = useCallback(
     (field: EditableField) =>
-      () => {
+      (event?: React.MouseEvent) => {
+        // Don't activate fields if Cmd/Ctrl is held (user is multi-selecting)
+        if (event && (event.metaKey || event.ctrlKey)) {
+          event.preventDefault()
+          return
+        }
+
         // Don't stop propagation - allow selection to work
         // The field will still activate, but the snippet will also be selected
 
@@ -376,6 +382,11 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
 
   const handleExpandToggle = useCallback((e: React.MouseEvent) => {
     e.stopPropagation() // Prevent triggering the snippet click handler
+    // Don't expand if Cmd/Ctrl is held (user is multi-selecting)
+    if (e.metaKey || e.ctrlKey) {
+      e.preventDefault()
+      return
+    }
     if (isLarge) {
       onEdit(snippet.id)
     }
@@ -383,12 +394,22 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
 
   const handleIdClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
+    // Don't trigger focus if Cmd/Ctrl is held (user is multi-selecting)
+    if (e.metaKey || e.ctrlKey) {
+      e.preventDefault()
+      return
+    }
     onFocusSnippet(snippet.id)
   }, [onFocusSnippet, snippet.id])
 
   const handleConnectedSnippetClick = useCallback(
     (connectedSnippetId: string) => (event: React.MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation()
+      // Don't navigate if Cmd/Ctrl is held (user is multi-selecting)
+      if (event.metaKey || event.ctrlKey) {
+        event.preventDefault()
+        return
+      }
       onFocusSnippet(connectedSnippetId)
     },
     [onFocusSnippet]
@@ -397,6 +418,11 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
   const handleCreateUpstreamSnippetClick = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation()
+      // Don't create snippet if Cmd/Ctrl is held (user is multi-selecting)
+      if (event.metaKey || event.ctrlKey) {
+        event.preventDefault()
+        return
+      }
       if (!onCreateUpstreamSnippet) {
         return
       }
@@ -800,6 +826,11 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
             type="button"
             onClick={(e) => {
               e.stopPropagation()
+              // Don't toggle if Cmd/Ctrl is held (user is multi-selecting)
+              if (e.metaKey || e.ctrlKey) {
+                e.preventDefault()
+                return
+              }
               setIsGenerateExpanded(!isGenerateExpanded)
             }}
             className="w-full flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700 transition-colors py-1"
@@ -845,6 +876,11 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                   className="inline-flex items-center justify-center p-2 text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
                   onClick={(event) => {
                     event.stopPropagation()
+                    // Don't open prompt designer if Cmd/Ctrl is held (user is multi-selecting)
+                    if (event.metaKey || event.ctrlKey) {
+                      event.preventDefault()
+                      return
+                    }
                     openPromptDesigner({
                       snippetId: snippet.id,
                       snippetTitle: displayTitle,
@@ -909,6 +945,11 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                   className="inline-flex items-center justify-center px-3 py-1 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed rounded transition-colors"
                   onClick={(event) => {
                     event.stopPropagation()
+                    // Don't open prompt designer if Cmd/Ctrl is held (user is multi-selecting)
+                    if (event.metaKey || event.ctrlKey) {
+                      event.preventDefault()
+                      return
+                    }
                     openPromptDesigner({
                       snippetId: snippet.id,
                       snippetTitle: displayTitle,
@@ -971,6 +1012,11 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                   className="inline-flex items-center justify-center p-2 text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
                   onClick={(event) => {
                     event.stopPropagation()
+                    // Don't open prompt designer if Cmd/Ctrl is held (user is multi-selecting)
+                    if (event.metaKey || event.ctrlKey) {
+                      event.preventDefault()
+                      return
+                    }
                     openPromptDesigner({
                       snippetId: snippet.id,
                       snippetTitle: displayTitle,
@@ -1054,6 +1100,11 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                   className="inline-flex items-center justify-center p-2 text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
                   onClick={(event) => {
                     event.stopPropagation()
+                    // Don't open prompt designer if Cmd/Ctrl is held (user is multi-selecting)
+                    if (event.metaKey || event.ctrlKey) {
+                      event.preventDefault()
+                      return
+                    }
                     openPromptDesigner({
                       snippetId: snippet.id,
                       snippetTitle: displayTitle,

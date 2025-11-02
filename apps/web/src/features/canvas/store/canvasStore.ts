@@ -12,14 +12,18 @@ interface CanvasState {
   isLoading: boolean
   generatingImageSnippetIds: Record<string, boolean>
   viewport: Viewport | null
-  selectedSnippetId: string | null
+  selectedSnippetIds: Set<string>
 
   // Actions
   setProjectId: (projectId: string | null) => void
   setLoading: (isLoading: boolean) => void
   setGeneratingImage: (snippetId: string, isGenerating: boolean) => void
   setViewport: (viewport: Viewport) => void
-  setSelectedSnippetId: (id: string | null) => void
+  setSelectedSnippetIds: (ids: Set<string>) => void
+  addToSelection: (id: string) => void
+  removeFromSelection: (id: string) => void
+  clearSelection: () => void
+  toggleSelection: (id: string) => void
   saveViewportToStorage: (projectId: string, viewport: Viewport) => void
   loadViewportFromStorage: (projectId: string) => Viewport | null
   reset: () => void
@@ -30,7 +34,7 @@ const INITIAL_STATE = {
   isLoading: false,
   generatingImageSnippetIds: {},
   viewport: null,
-  selectedSnippetId: null,
+  selectedSnippetIds: new Set<string>(),
 }
 
 export const useCanvasStore = create<CanvasState>((set) => ({
@@ -56,8 +60,36 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   setViewport: (viewport) =>
     set({ viewport }),
 
-  setSelectedSnippetId: (id) =>
-    set({ selectedSnippetId: id }),
+  setSelectedSnippetIds: (ids) =>
+    set({ selectedSnippetIds: new Set(ids) }),
+
+  addToSelection: (id) =>
+    set((state) => {
+      const newSelection = new Set(state.selectedSnippetIds)
+      newSelection.add(id)
+      return { selectedSnippetIds: newSelection }
+    }),
+
+  removeFromSelection: (id) =>
+    set((state) => {
+      const newSelection = new Set(state.selectedSnippetIds)
+      newSelection.delete(id)
+      return { selectedSnippetIds: newSelection }
+    }),
+
+  clearSelection: () =>
+    set({ selectedSnippetIds: new Set<string>() }),
+
+  toggleSelection: (id) =>
+    set((state) => {
+      const newSelection = new Set(state.selectedSnippetIds)
+      if (newSelection.has(id)) {
+        newSelection.delete(id)
+      } else {
+        newSelection.add(id)
+      }
+      return { selectedSnippetIds: newSelection }
+    }),
 
   saveViewportToStorage: (projectId, viewport) => {
     try {

@@ -115,6 +115,7 @@ export interface UseCanvasHandlersResult {
   // Snippet Handlers
   handleEditSnippet: (snippetId: string) => void
   handleDeleteSnippet: (snippetId: string) => void
+  handleDeleteMultiple: (snippetIds: string[]) => void
   handleManageConnections: (snippetId: string) => void
   handleViewVersions: (snippetId: string) => void
   handleUpdateSnippetContent: (snippetId: string, changes: SnippetContentChanges) => Promise<void>
@@ -148,6 +149,7 @@ export function useCanvasHandlers({
   const {
     openEditSnippet,
   openDeleteSnippet,
+  openDeleteMultipleSnippets,
   openManageConnections,
   openVersionHistory,
   closeGeneratedSnippetPreview,
@@ -233,6 +235,15 @@ export function useCanvasHandlers({
     const snippet = snippetsRef.current.find(s => s.id === snippetId)
     if (snippet) openDeleteSnippet(snippet)
   }, [openDeleteSnippet])
+
+  const handleDeleteMultiple = useCallback((snippetIds: string[]) => {
+    if (!projectId || snippetIds.length === 0) return
+
+    const snippetsToDelete = snippetsRef.current.filter(s => snippetIds.includes(s.id))
+    if (snippetsToDelete.length > 0) {
+      openDeleteMultipleSnippets(snippetsToDelete, projectId)
+    }
+  }, [projectId, openDeleteMultipleSnippets])
 
   const handleManageConnections = useCallback((snippetId: string) => {
     const snippet = snippetsRef.current.find(s => s.id === snippetId)
@@ -1178,11 +1189,14 @@ export function useCanvasHandlers({
 
   // Navigate to connected snippet using number key
   const handleNumberKeyNavigation = useCallback((key: string) => {
-    const { selectedSnippetId } = useCanvasStore.getState()
+    const { selectedSnippetIds } = useCanvasStore.getState()
 
-    if (!selectedSnippetId || !reactFlowInstance?.current) {
+    // Only navigate if exactly one snippet is selected
+    if (selectedSnippetIds.size !== 1 || !reactFlowInstance?.current) {
       return
     }
+
+    const selectedSnippetId = Array.from(selectedSnippetIds)[0]
 
     // Find the selected snippet
     const selectedSnippet = snippets.find(s => s.id === selectedSnippetId)
@@ -1221,6 +1235,7 @@ export function useCanvasHandlers({
     // Snippet Handlers
     handleEditSnippet,
     handleDeleteSnippet,
+    handleDeleteMultiple,
     handleManageConnections,
     handleViewVersions,
     handleUpdateSnippetContent,

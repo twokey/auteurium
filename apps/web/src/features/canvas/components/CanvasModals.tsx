@@ -4,6 +4,7 @@
  */
 
 import { DeleteSnippetConfirmation } from '../../../components/modals/DeleteSnippetConfirmation'
+import { DeleteMultipleSnippetsConfirmation } from '../../../components/modals/DeleteMultipleSnippetsConfirmation'
 import { EditSnippetModal } from '../../../components/modals/EditSnippetModal'
 import { GeneratedSnippetPreviewModal } from '../../../components/modals/GeneratedSnippetPreviewModal'
 import { ManageConnectionsModal } from '../../../components/modals/ManageConnectionsModal'
@@ -28,6 +29,8 @@ export const CanvasModals = ({
     closeEditSnippet,
     deleteSnippet,
     closeDeleteSnippet,
+    deleteMultipleSnippets,
+    closeDeleteMultipleSnippets,
     manageConnections,
     closeManageConnections,
     versionHistory,
@@ -73,6 +76,17 @@ export const CanvasModals = ({
           isOpen={true}
           onClose={closeDeleteSnippet}
           snippet={currentDeleteSnippet}
+          onDeleted={refetch}
+        />
+      )}
+
+      {/* Delete Multiple Snippets Confirmation */}
+      {deleteMultipleSnippets.isOpen && deleteMultipleSnippets.snippets.length > 0 && (
+        <DeleteMultipleSnippetsConfirmation
+          isOpen={true}
+          onClose={closeDeleteMultipleSnippets}
+          snippets={deleteMultipleSnippets.snippets}
+          projectId={deleteMultipleSnippets.projectId ?? ''}
           onDeleted={refetch}
         />
       )}
