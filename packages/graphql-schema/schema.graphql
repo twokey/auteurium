@@ -142,6 +142,7 @@ input CreateSnippetInput {
   position: PositionInput!
   tags: [String!]
   categories: [String!]
+  createdFrom: ID
 }
 
 input UpdateSnippetInput {
@@ -309,7 +310,7 @@ input GenerateContentInput {
 
 input CreateScenesInput {
   modelId: ID!
-  systemPrompt: String
+  prompt: String!
   temperature: Float
   maxTokens: Int
 }

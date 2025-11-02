@@ -49,7 +49,7 @@ type CreateScenesVariables = {
   snippetId: string
   input: {
     modelId: string
-    systemPrompt?: string
+    prompt: string
     temperature?: number
     maxTokens?: number
   }
@@ -319,13 +319,14 @@ export const useGenAI = (options: UseGenAIOptions = {}) => {
   )
 
   const createScenes = useCallback(
-    async (projectId: string, snippetId: string, modelId: string) => {
+    async (projectId: string, snippetId: string, modelId: string, prompt: string) => {
       const result = await createScenesMutation({
         variables: {
           projectId,
           snippetId,
           input: {
-            modelId
+            modelId,
+            prompt
           }
         }
       })

@@ -24,6 +24,7 @@ export interface Snippet {
   imageUrl?: string
   imageS3Key?: string
   imageMetadata?: ImageMetadata
+  createdFrom?: string
 }
 
 export interface SnippetVersion {
@@ -47,6 +48,7 @@ export interface SnippetInput {
   position?: Position
   tags?: string[]
   categories?: string[]
+  createdFrom?: string
 }
 
 export interface UpdateSnippetInput {

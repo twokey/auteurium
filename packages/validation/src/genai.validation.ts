@@ -30,7 +30,9 @@ export const generationHistoryInputSchema = z.object({
 
 export const createScenesInputSchema = z.object({
   modelId: z.string().min(1, 'Model ID is required'),
-  systemPrompt: z.string().max(10000, 'System prompt exceeds maximum length').optional(),
+  prompt: z.string()
+    .min(1, 'Prompt cannot be empty')
+    .max(50000, 'Prompt exceeds maximum length of 50000 characters'),
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().min(1).max(8192).optional()
 })

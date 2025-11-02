@@ -63,7 +63,7 @@ const POINTER_EVENTS_STYLES = {
 export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
   const toast = useToast()
   const { id: projectId } = useParams<{ id: string }>()
-  const { generateStream } = useGenAI({ enabled: true })
+  const { generateStream, createScenes } = useGenAI({ enabled: true })
   const openPromptDesigner = usePromptDesignerStore((state) => state.open)
   const { markSnippetDirty, clearSnippetDirty, markSnippetSaving, clearSnippetSaving } = useOptimisticUpdatesStore()
 
@@ -106,7 +106,9 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
   const [selectedTextModel, setSelectedTextModel] = useState<string>('')
   const [selectedImageModel, setSelectedImageModel] = useState<string>('')
   const [selectedVideoModel, setSelectedVideoModel] = useState<string>('')
+  const [selectedSceneModel, setSelectedSceneModel] = useState<string>('')
   const [isGeneratingText, setIsGeneratingText] = useState(false)
+  const [isGeneratingScenes, setIsGeneratingScenes] = useState(false)
   const [isGenerateExpanded, setIsGenerateExpanded] = useState(false)
 
   useEffect(() => {
@@ -491,6 +493,87 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
     }
   }, [selectedTextModel, projectId, generateStream, snippet.id, onGenerateText, toast])
 
+  const runSceneGeneration = useCallback(async (prompt: string) => {
+    const trimmedPrompt = prompt.trim()
+
+    if (trimmedPrompt === '') {
+      toast.warning('Please provide prompt content before generating scenes')
+      const handledError = new Error('Missing prompt content')
+      Object.assign(handledError, { handled: true })
+      throw handledError
+    }
+
+    if (!selectedSceneModel || selectedSceneModel === '') {
+      toast.warning('Please select a scene model')
+      const handledError = new Error('Missing scene model selection')
+      Object.assign(handledError, { handled: true })
+      throw handledError
+    }
+
+    if (!projectId) {
+      toast.error('Cannot generate scenes: missing project ID')
+      const handledError = new Error('Missing project identifier')
+      Object.assign(handledError, { handled: true })
+      throw handledError
+    }
+
+    setIsGeneratingScenes(true)
+
+    try {
+      // Log the generation call
+      // eslint-disable-next-line no-console
+      console.log('=== Scene Generation Request ===')
+      // eslint-disable-next-line no-console
+      console.log('Model ID:', selectedSceneModel)
+      // eslint-disable-next-line no-console
+      console.log('Prompt:', trimmedPrompt)
+      // eslint-disable-next-line no-console
+      console.log('Snippet ID:', snippet.id)
+      // eslint-disable-next-line no-console
+      console.log('Project ID:', projectId)
+
+      // Call scene generation API (creates scenes in backend)
+      const result = await createScenes(
+        projectId,
+        snippet.id,
+        selectedSceneModel,
+        trimmedPrompt
+      )
+
+      // Log the result
+      // eslint-disable-next-line no-console
+      console.log('=== Scene Generation Response ===')
+      // eslint-disable-next-line no-console
+      console.log('Scenes created:', result?.scenes?.length ?? 0)
+
+      if (!result?.scenes || result.scenes.length === 0) {
+        toast.warning(
+          'No scenes were generated',
+          'Please try again with different content or model'
+        )
+        const handledError = new Error('Empty scenes result')
+        Object.assign(handledError, { handled: true })
+        throw handledError
+      }
+
+      // Show success message
+      toast.success(`Created ${result.scenes.length} scenes from story!`)
+    } catch (error) {
+      console.error('=== Scene Generation Error ===')
+      console.error('Error:', error)
+      if (!(error instanceof Error && 'handled' in error && (error as { handled?: boolean }).handled)) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        toast.error('Failed to generate scenes', message)
+        if (error instanceof Error) {
+          Object.assign(error, { handled: true })
+        }
+      }
+      throw error
+    } finally {
+      setIsGeneratingScenes(false)
+    }
+  }, [selectedSceneModel, projectId, createScenes, snippet.id, toast])
+
   return (
     <>
       {/* React Flow handles for connections */}
@@ -795,6 +878,68 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
+                  )}
+                </button>
+              </div>
+
+              {/* Scene Generation Row */}
+              <div className="flex gap-2">
+                <select
+                  value={selectedSceneModel}
+                  onChange={(e) => {
+                    e.stopPropagation()
+                    setSelectedSceneModel(e.target.value)
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex-1 text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  disabled={savingField !== null}
+                  style={POINTER_EVENTS_STYLES.interactive}
+                >
+                  <option value="" disabled>
+                    {isLoadingTextModels ? 'Loading scene models...' : 'Select scene model...'}
+                  </option>
+                  {textModels.map((model) => (
+                    <option key={model.id} value={model.id} title={model.description ?? undefined}>
+                      {model.displayName}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center px-3 py-1 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed rounded transition-colors"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    openPromptDesigner({
+                      snippetId: snippet.id,
+                      snippetTitle: displayTitle,
+                      mode: 'scenes',
+                      initialPrompt: snippet.textField1,
+                      connectedContent: connectedContent,
+                      onGenerate: (nextPrompt) => runSceneGeneration(nextPrompt)
+                    })
+                  }}
+                  disabled={isGeneratingScenes || isLoadingTextModels || (!selectedSceneModel && textModels.length > 0) || savingField !== null}
+                  style={POINTER_EVENTS_STYLES.interactive}
+                  aria-label="Generate scenes from story"
+                  title={
+                    isLoadingTextModels
+                      ? 'Loading models...'
+                      : !selectedSceneModel
+                        ? 'Please select a scene model first'
+                        : 'Generate scenes from story'
+                  }
+                >
+                  {isGeneratingScenes ? (
+                    <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                  ) : (
+                    'S'
                   )}
                 </button>
               </div>

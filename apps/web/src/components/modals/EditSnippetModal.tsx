@@ -48,7 +48,6 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
   const [isGeneratingPrimary, setIsGeneratingPrimary] = useState(false)
   const [activeField, setActiveField] = useState<EditableField | null>(null)
   const [savingField, setSavingField] = useState<EditableField | null>(null)
-  const [selectedModelScenes, setSelectedModelScenes] = useState('')
 
   const {
     models,
@@ -56,8 +55,6 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
     modelsError,
     generateStream,
     subscribeToGenerationStream,
-    createScenes,
-    isCreatingScenes,
     isStreamingSupported,
     streamingFallbackReason
   } = useGenAI({ enabled: isOpen })
@@ -79,7 +76,6 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
     setTagInput('')
     setCategoryInput('')
     setSelectedModelPrimary('')
-    setSelectedModelScenes('')
     setIsDeleting(false)
     setStreamError(null)
     setIsStreaming(false)
@@ -427,69 +423,6 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
     }
   }, [generateImageMutation, snippet.projectId, snippet.id, textField1, toast])
 
-  const handleCreateScenes = useCallback(async () => {
-    if (!selectedModelScenes) {
-      toast.warning('Please select a model for scene generation')
-      return
-    }
-
-    if (!textField1.trim()) {
-      toast.warning('Please provide a story in Text Field 1 to split into scenes')
-      return
-    }
-
-    try {
-      const result = await createScenes(snippet.projectId, snippet.id, selectedModelScenes)
-
-      if (result && result.scenes) {
-        toast.success(`Created ${result.scenes.length} scenes from story!`)
-        // Close modal after successful scene creation
-        onClose()
-      }
-    } catch (error) {
-      console.error('Failed to create scenes - Full error object:', error)
-
-      // Try to extract error details
-      const errorObj = error as any
-      console.log('Error details:', {
-        message: errorObj?.message,
-        originalError: errorObj?.originalError,
-        errors: errorObj?.originalError?.errors,
-        extensions: errorObj?.originalError?.errors?.[0]?.extensions
-      })
-
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-
-      // DEBUG MODE: Display raw model response
-      if (errorMessage.includes('DEBUG_RAW_RESPONSE')) {
-        const extensions = errorObj?.originalError?.errors?.[0]?.extensions
-        console.log('\n\n========================================')
-        console.log('🔍 DEBUG: RAW MODEL RESPONSE')
-        console.log('========================================')
-        console.log('Model used:', extensions?.modelUsed)
-        console.log('Response length:', extensions?.responseLength, 'characters')
-        console.log('----------------------------------------')
-        console.log('RAW RESPONSE:')
-        console.log(extensions?.rawResponse)
-        console.log('========================================\n\n')
-        toast.warning('Debug Mode Active', 'Raw model response logged to console. Check browser console (F12).')
-        return
-      }
-
-      if (errorMessage.includes('INVALID_MODEL_RESPONSE')) {
-        toast.error('Invalid response from AI model', 'The model returned an invalid format. Check browser console for details.')
-      } else if (errorMessage.includes('EMPTY_SCENES')) {
-        toast.error('No scenes generated', 'The model did not generate any scenes. Please try again.')
-      } else if (errorMessage.includes('TOO_MANY_SCENES')) {
-        toast.error('Too many scenes', 'The model returned more than 100 scenes. Please try again with a shorter story.')
-      } else if (errorMessage.includes('EMPTY_SOURCE_SNIPPET')) {
-        toast.error('Empty story', 'Please add text to the snippet before creating scenes.')
-      } else {
-        toast.error('Failed to create scenes', 'Please try again')
-      }
-    }
-  }, [createScenes, selectedModelScenes, snippet.projectId, snippet.id, textField1, toast, onClose])
-
   const handleFieldActivate = useCallback((field: EditableField) => {
     if (isSaving || isDeleting) {
       return
@@ -703,53 +636,6 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
             {streamError && (
               <p className="text-sm text-red-600 mt-2">{streamError}</p>
             )}
-
-            {/* Create Scenes Section */}
-            <div className="flex items-end gap-3">
-              <div className="flex-1 min-w-[200px]">
-                <label htmlFor="scenesModel" className="block text-sm font-medium text-gray-700 mb-1">
-                  Scene Generation Model
-                </label>
-                <select
-                  id="scenesModel"
-                  value={selectedModelScenes}
-                  onChange={(e) => setSelectedModelScenes(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  disabled={isSaving || isDeleting || isCreatingScenes || isLoadingModels}
-                >
-                  <option value="" disabled>
-                    {isLoadingModels ? 'Loading models...' : 'Select a model...'}
-                  </option>
-                  {models.map((model) => (
-                    <option key={model.id} value={model.id} title={model.description ?? undefined}>
-                      {model.displayName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <button
-                onClick={() => {
-                  void handleCreateScenes()
-                }}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors disabled:bg-indigo-400 flex items-center gap-2"
-                disabled={
-                  isSaving ||
-                  isDeleting ||
-                  isCreatingScenes ||
-                  !selectedModelScenes ||
-                  !textField1.trim() ||
-                  isLoadingModels
-                }
-              >
-                {isCreatingScenes && (
-                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                )}
-                {isCreatingScenes ? 'Creating Scenes...' : 'Create Scenes'}
-              </button>
-            </div>
 
             {/* Tags */}
             <div>

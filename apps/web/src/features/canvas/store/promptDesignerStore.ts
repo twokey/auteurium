@@ -2,7 +2,7 @@ import { create } from 'zustand'
 
 import type { ConnectedContentItem } from '../../../types/components'
 
-type PromptDesignerMode = 'text' | 'image' | 'video'
+type PromptDesignerMode = 'text' | 'image' | 'video' | 'scenes'
 
 interface PromptDesignerOpenPayload {
   snippetId: string

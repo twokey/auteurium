@@ -10,7 +10,8 @@ export const createSnippetSchema = z.object({
   textField1: z.string().max(50000).optional().default(''),
   position: positionSchema,
   tags: z.array(z.string().min(1).max(50)).optional().default([]),
-  categories: z.array(z.string().min(1).max(50)).optional().default([])
+  categories: z.array(z.string().min(1).max(50)).optional().default([]),
+  createdFrom: z.string().uuid().optional()
 })
 
 export const updateSnippetSchema = z.object({

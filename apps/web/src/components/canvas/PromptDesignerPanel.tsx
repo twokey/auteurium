@@ -3,10 +3,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
 import { useToast } from '../../shared/store/toastStore'
 
-const MODE_LABEL: Record<'text' | 'image' | 'video', string> = {
+const MODE_LABEL: Record<'text' | 'image' | 'video' | 'scenes', string> = {
   text: 'Text generation',
   image: 'Image generation',
-  video: 'Video generation'
+  video: 'Video generation',
+  scenes: 'Scene generation'
 }
 
 export const PromptDesignerPanel = () => {

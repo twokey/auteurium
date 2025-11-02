@@ -31,7 +31,7 @@ const ESTIMATED_SNIPPET_HEIGHT = 200
 
 interface CreateScenesInput {
   modelId: string
-  systemPrompt?: string
+  prompt: string
   temperature?: number
   maxTokens?: number
 }
@@ -80,25 +80,6 @@ const snapToColumn = (x: number): number => {
   const columnIndex = getColumnIndex(x)
   return getColumnXPosition(columnIndex)
 }
-
-const DEFAULT_SYSTEM_PROMPT = `Analyze the provided story and split it into distinct scenes.
-Return a JSON object with this exact structure:
-
-{
-  "scenes": [
-    {
-      "title": "Descriptive scene title",
-      "content": "Full text content for this scene"
-    }
-  ]
-}
-
-Requirements:
-- Each scene must have both "title" and "content" fields
-- Scene titles should be descriptive (e.g., "Scene 1: Opening in the archive")
-- Scene content should contain the full text for that scene
-- Return valid JSON only, no additional text
-- Maximum ${MAX_SCENES} scenes`.trim()
 
 /**
  * Validates and parses the LLM response
@@ -334,26 +315,20 @@ export const handler: AppSyncResolverHandler<CreateScenesArgs, CreateScenesResul
     orchestrator.setApiKey('gemini', apiKeys.gemini)
     orchestrator.setApiKey('openai', apiKeys.openai || '')
 
-    // Generate content with story as prompt
-    const systemPrompt = validatedInput.systemPrompt || DEFAULT_SYSTEM_PROMPT
-
     // Log the full prompt being sent to the model
     logger.info('Sending prompt to LLM for scene generation', {
       userId,
       snippetId,
       modelId: validatedInput.modelId,
-      systemPrompt,
-      userStory: sourceSnippet.textField1,
-      systemPromptLength: systemPrompt.length,
-      userStoryLength: sourceSnippet.textField1.length,
+      prompt: validatedInput.prompt,
+      promptLength: validatedInput.prompt.length,
       temperature: validatedInput.temperature,
       maxTokens: validatedInput.maxTokens
     })
 
     const response = await orchestrator.generate({
       modelId: validatedInput.modelId,
-      prompt: sourceSnippet.textField1,
-      systemPrompt,
+      prompt: validatedInput.prompt,
       temperature: validatedInput.temperature,
       maxTokens: validatedInput.maxTokens
     }, {
@@ -453,8 +428,7 @@ export const handler: AppSyncResolverHandler<CreateScenesArgs, CreateScenesResul
         projectId,
         modelProvider: response.modelUsed.split('-')[0], // Extract provider from model name
         modelId: validatedInput.modelId,
-        prompt: sourceSnippet.textField1,
-        systemPrompt,
+        prompt: validatedInput.prompt,
         result: response.content,
         tokensUsed: response.tokensUsed,
         cost: response.cost,

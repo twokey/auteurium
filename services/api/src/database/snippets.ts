@@ -108,7 +108,8 @@ const buildSnippet = (input: SnippetInput, userId: string, now: string): Snippet
   categories: input.categories ?? [],
   version: 1,
   createdAt: now,
-  updatedAt: now
+  updatedAt: now,
+  ...(input.createdFrom && { createdFrom: input.createdFrom })
 })
 
 const createSnippetVersion = async (snippet: Snippet): Promise<void> => {

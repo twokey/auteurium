@@ -75,7 +75,7 @@ export type CreateProjectInput = {
 export type CreateScenesInput = {
   maxTokens?: InputMaybe<Scalars['Int']['input']>;
   modelId: Scalars['ID']['input'];
-  systemPrompt?: InputMaybe<Scalars['String']['input']>;
+  prompt: Scalars['String']['input'];
   temperature?: InputMaybe<Scalars['Float']['input']>;
 };
 
@@ -90,6 +90,7 @@ export type CreateScenesResult = {
 
 export type CreateSnippetInput = {
   categories?: InputMaybe<Array<Scalars['String']['input']>>;
+  createdFrom?: InputMaybe<Scalars['ID']['input']>;
   position: PositionInput;
   projectId: Scalars['ID']['input'];
   tags?: InputMaybe<Array<Scalars['String']['input']>>;
