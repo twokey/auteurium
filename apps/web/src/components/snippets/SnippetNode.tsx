@@ -403,7 +403,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
   }, [onFocusSnippet, snippet.id])
 
   const handleConnectedSnippetClick = useCallback(
-    (connectedSnippetId: string) => (event: React.MouseEvent<HTMLButtonElement>) => {
+    (connectedSnippetId: string) => (event: React.MouseEvent<HTMLElement>) => {
       event.stopPropagation()
       // Don't navigate if Cmd/Ctrl is held (user is multi-selecting)
       if (event.metaKey || event.ctrlKey) {
@@ -411,6 +411,20 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
         return
       }
       onFocusSnippet(connectedSnippetId)
+    },
+    [onFocusSnippet]
+  )
+
+  const handleConnectedSnippetKeyDown = useCallback(
+    (connectedSnippetId: string) => (event: React.KeyboardEvent<HTMLElement>) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        event.stopPropagation()
+        if (event.metaKey || event.ctrlKey) {
+          return
+        }
+        onFocusSnippet(connectedSnippetId)
+      }
     },
     [onFocusSnippet]
   )
@@ -714,38 +728,37 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
                     ? item.snippetTitle.trim()
                     : 'Snippet'
                 return (
-                  <div key={`${snippet.id}-connected-${item.snippetId}-${index}-${item.type}`}>
-                    <div className="flex items-center justify-between mb-0.5">
-                      <button
-                        type="button"
-                        onClick={handleConnectedSnippetClick(item.snippetId)}
-                        onMouseDown={(event) => event.stopPropagation()}
-                        className="text-[10px] text-gray-500 font-medium bg-transparent border-none p-0 hover:text-blue-600 hover:underline transition-colors text-left"
-                        style={POINTER_EVENTS_STYLES.interactive}
-                        title={`Focus snippet ${item.snippetId}`}
-                      >
+                  <div
+                    key={`${snippet.id}-connected-${item.snippetId}-${index}-${item.type}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={handleConnectedSnippetClick(item.snippetId)}
+                    onKeyDown={handleConnectedSnippetKeyDown(item.snippetId)}
+                    onMouseDown={(event) => event.stopPropagation()}
+                    className="group overflow-hidden rounded border border-gray-200 bg-gray-50 transition-colors hover:border-blue-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-1 focus-visible:ring-offset-white"
+                    style={POINTER_EVENTS_STYLES.interactive}
+                    title={`Focus snippet ${item.snippetId}`}
+                  >
+                    <div className="flex items-center justify-between px-2 pt-1.5 pb-1">
+                      <p className="text-[10px] text-gray-500 font-medium transition-colors group-hover:text-blue-600 group-hover:underline">
                         {connectedDisplayTitle}
-                      </button>
+                      </p>
                       <p className="text-[10px] text-gray-400 font-mono">#{truncatedId}</p>
                     </div>
-                    <div className="overflow-hidden rounded border border-gray-200 bg-gray-50">
-                      {item.type === 'text' ? (
-                        <p className="px-2 py-1 text-sm font-medium text-gray-900 whitespace-pre-wrap">
-                          {item.value}
-                        </p>
-                      ) : (
-                        <img
-                          src={item.value}
-                          alt={`Connected from snippet ${item.snippetId}`}
-                          className="block w-full h-auto max-h-48 object-cover"
-                          loading="lazy"
-                          decoding="async"
-                          onClick={(event) => event.stopPropagation()}
-                          onMouseDown={(event) => event.stopPropagation()}
-                          draggable={false}
-                        />
-                      )}
-                    </div>
+                    {item.type === 'text' ? (
+                      <p className="px-2 pb-1.5 text-sm font-medium text-gray-900 whitespace-pre-wrap">
+                        {item.value}
+                      </p>
+                    ) : (
+                      <img
+                        src={item.value}
+                        alt={`Connected from snippet ${item.snippetId}`}
+                        className="block w-full h-auto max-h-48 object-cover"
+                        loading="lazy"
+                        decoding="async"
+                        draggable={false}
+                      />
+                    )}
                   </div>
                 )
               })}
