@@ -32,6 +32,7 @@ export class AuteuriumGenAIStack extends cdk.Stack {
     const snippetsTable = dynamodb.Table.fromTableName(this, 'SnippetsTable', `auteurium-snippets-${stage}`)
     const projectsTable = dynamodb.Table.fromTableName(this, 'ProjectsTable', `auteurium-projects-${stage}`)
     const connectionsTable = dynamodb.Table.fromTableName(this, 'ConnectionsTable', `auteurium-connections-${stage}`)
+    const usersTable = dynamodb.Table.fromTableName(this, 'UsersTable', `auteurium-users-${stage}`)
 
     // Create Secrets Manager secret for LLM API keys
     const llmApiKeysSecret = new secretsmanager.Secret(this, `LLMApiKeysSecret-${stage}`, {
@@ -107,6 +108,7 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       depsLockFilePath: path.join(__dirname, '../../../../package-lock.json'),
       environment: {
         STAGE: stage,
+        USERS_TABLE: usersTable.tableName,
         GENERATIONS_TABLE: this.generationsTable.tableName,
         SNIPPETS_TABLE: snippetsTable.tableName,
         PROJECTS_TABLE: projectsTable.tableName,
@@ -134,6 +136,7 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       depsLockFilePath: path.join(__dirname, '../../../../package-lock.json'),
       environment: {
         STAGE: stage,
+        USERS_TABLE: usersTable.tableName,
         GENERATIONS_TABLE: this.generationsTable.tableName,
         SNIPPETS_TABLE: snippetsTable.tableName,
         PROJECTS_TABLE: projectsTable.tableName,
@@ -187,6 +190,7 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       depsLockFilePath: path.join(__dirname, '../../../../package-lock.json'),
       environment: {
         STAGE: stage,
+        USERS_TABLE: usersTable.tableName,
         GENERATIONS_TABLE: this.generationsTable.tableName,
         USER_POOL_ID: userPool.userPoolId,
         USER_POOL_CLIENT_ID: userPoolClient.userPoolClientId
@@ -211,6 +215,7 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       depsLockFilePath: path.join(__dirname, '../../../../package-lock.json'),
       environment: {
         STAGE: stage,
+        USERS_TABLE: usersTable.tableName,
         SNIPPETS_TABLE: snippetsTable.tableName,
         CONNECTIONS_TABLE: connectionsTable.tableName, // Add connections table for multimodal image generation
         GENERATIONS_TABLE: this.generationsTable.tableName,
@@ -239,6 +244,7 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       depsLockFilePath: path.join(__dirname, '../../../../package-lock.json'),
       environment: {
         STAGE: stage,
+        USERS_TABLE: usersTable.tableName,
         SNIPPETS_TABLE: snippetsTable.tableName,
         VERSIONS_TABLE: dynamodb.Table.fromTableName(this, 'VersionsTable', `auteurium-versions-${stage}`).tableName,
         GENERATIONS_TABLE: this.generationsTable.tableName,
@@ -253,6 +259,11 @@ export class AuteuriumGenAIStack extends cdk.Stack {
     llmApiKeysSecret.grantRead(generateContentStreamFunction)
     llmApiKeysSecret.grantRead(generateImageFunction)
     llmApiKeysSecret.grantRead(createScenesFunction)
+    usersTable.grantReadWriteData(generateContentFunction)
+    usersTable.grantReadWriteData(generateContentStreamFunction)
+    usersTable.grantReadWriteData(generationHistoryFunction)
+    usersTable.grantReadWriteData(generateImageFunction)
+    usersTable.grantReadWriteData(createScenesFunction)
     this.generationsTable.grantReadWriteData(generateContentFunction)
     this.generationsTable.grantReadWriteData(generateContentStreamFunction)
     this.generationsTable.grantReadWriteData(generationHistoryFunction)
@@ -277,7 +288,8 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       resources: [
         `${this.generationsTable.tableArn}/index/*`,
         `${snippetsTable.tableArn}/index/*`,
-        `${projectsTable.tableArn}/index/*`
+        `${projectsTable.tableArn}/index/*`,
+        `${usersTable.tableArn}/index/*`
       ]
     }))
 
@@ -286,7 +298,8 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       resources: [
         `${this.generationsTable.tableArn}/index/*`,
         `${snippetsTable.tableArn}/index/*`,
-        `${projectsTable.tableArn}/index/*`
+        `${projectsTable.tableArn}/index/*`,
+        `${usersTable.tableArn}/index/*`
       ]
     }))
 
@@ -303,7 +316,8 @@ export class AuteuriumGenAIStack extends cdk.Stack {
     generationHistoryFunction.addToRolePolicy(new iam.PolicyStatement({
       actions: ['dynamodb:Query'],
       resources: [
-        `${this.generationsTable.tableArn}/index/*`
+        `${this.generationsTable.tableArn}/index/*`,
+        `${usersTable.tableArn}/index/*`
       ]
     }))
 
@@ -312,7 +326,8 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       actions: ['dynamodb:Query'],
       resources: [
         `${connectionsTable.tableArn}/index/*`, // Need to query connections by targetSnippetId
-        `${snippetsTable.tableArn}/index/*`
+        `${snippetsTable.tableArn}/index/*`,
+        `${usersTable.tableArn}/index/*`
       ]
     }))
 
@@ -321,7 +336,8 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       actions: ['dynamodb:Query'],
       resources: [
         `${this.generationsTable.tableArn}/index/*`,
-        `${snippetsTable.tableArn}/index/*`
+        `${snippetsTable.tableArn}/index/*`,
+        `${usersTable.tableArn}/index/*`
       ]
     }))
 

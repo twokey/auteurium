@@ -336,6 +336,20 @@ export const handler: AppSyncResolverHandler<CreateScenesArgs, CreateScenesResul
 
     // Generate content with story as prompt
     const systemPrompt = validatedInput.systemPrompt || DEFAULT_SYSTEM_PROMPT
+
+    // Log the full prompt being sent to the model
+    logger.info('Sending prompt to LLM for scene generation', {
+      userId,
+      snippetId,
+      modelId: validatedInput.modelId,
+      systemPrompt,
+      userStory: sourceSnippet.textField1,
+      systemPromptLength: systemPrompt.length,
+      userStoryLength: sourceSnippet.textField1.length,
+      temperature: validatedInput.temperature,
+      maxTokens: validatedInput.maxTokens
+    })
+
     const response = await orchestrator.generate({
       modelId: validatedInput.modelId,
       prompt: sourceSnippet.textField1,
