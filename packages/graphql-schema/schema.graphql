@@ -153,6 +153,11 @@ input UpdateSnippetInput {
   categories: [String!]
 }
 
+input UpdateSnippetPositionInput {
+  snippetId: ID!
+  position: PositionInput!
+}
+
 input CreateConnectionInput {
   projectId: ID!
   sourceSnippetId: ID!
@@ -199,6 +204,7 @@ type Mutation {
   # Snippet mutations
   createSnippet(input: CreateSnippetInput!): Snippet!
   updateSnippet(projectId: ID!, id: ID!, input: UpdateSnippetInput!): Snippet!
+  updateSnippetPositions(projectId: ID!, updates: [UpdateSnippetPositionInput!]!): [Snippet!]!
   deleteSnippet(projectId: ID!, id: ID!): Boolean!
   revertSnippet(projectId: ID!, id: ID!, version: Int!): Snippet!
   generateSnippetImage(projectId: ID!, snippetId: ID!, modelId: ID): Snippet!

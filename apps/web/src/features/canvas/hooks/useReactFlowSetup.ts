@@ -9,16 +9,41 @@ import { addEdge, useEdgesState, useNodesState } from 'reactflow'
 import { useDebouncedCallback } from '../../../shared/hooks/useDebounce'
 import { mutateWithInvalidate } from '../../../shared/utils/cacheHelpers'
 import { snapPositionToColumn } from '../../../shared/utils/columnLayout'
+import { UPDATE_SNIPPET_POSITIONS } from '../../../graphql/mutations'
+import { CANVAS_CONSTANTS } from '../../../shared/constants'
+import { getClient } from '../../../services/graphql'
 import { useCanvasStore } from '../store/canvasStore'
 import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
 import { usePendingPositionsStore } from '../store/pendingPositionsStore'
 import { useCanvasKeyboardShortcut } from '../context/canvasKeyboard'
 
-import type { Snippet, SnippetNodeData, UseGraphQLMutationResult, CreateConnectionVariables, DeleteConnectionVariables } from '../../../types'
+import type {
+  Snippet,
+  SnippetNodeData,
+  UseGraphQLMutationResult,
+  CreateConnectionVariables,
+  DeleteConnectionVariables,
+  UpdateSnippetPositionsMutationData,
+  UpdateSnippetPositionsVariables
+} from '../../../types'
 import type { ReactFlowInstance, Connection, Node, Edge } from 'reactflow'
 
 interface ConnectionEdgeData {
   connectionId?: string
+}
+
+const BULK_POSITION_CHUNK_SIZE = 20 // Conservative chunk size to stay well below AppSync limits
+const BULK_POSITION_SUPPORT_STORAGE_KEY = 'canvas-bulk-position-mutation-supported-v2'
+const BULK_POSITION_SUPPORT_RETRY_MS = 30 * 60 * 1000 // Retry bulk detection every 30 minutes
+
+type GraphQLClient = {
+  graphql: <TData = unknown, TVariables = Record<string, unknown>>(input: {
+    query: string
+    variables?: TVariables
+  }) => Promise<{
+    data?: TData | null
+    errors?: Array<{ message?: string }>
+  }>
 }
 
 const haveNodesChanged = (
@@ -133,11 +158,43 @@ export function useReactFlowSetup({
     replaceOptimisticConnection,
     removeOptimisticConnection,
     markConnectionDeleting,
-    rollbackConnectionDeletion,
-    updateSnippetPosition
-  } = useOptimisticUpdatesStore()
+  rollbackConnectionDeletion,
+  updateSnippetPosition
+} = useOptimisticUpdatesStore()
   const { addPendingPosition, getPendingPositions, clearAll: clearPendingPositions } = usePendingPositionsStore()
   const [isFlushing, setIsFlushing] = useState(false)
+  const allowBulkPositionMutation = Boolean(CANVAS_CONSTANTS.ENABLE_BULK_POSITION_MUTATION)
+  const bulkUpdateSupportedRef = useRef<boolean>(allowBulkPositionMutation)
+
+  useEffect(() => {
+    if (!allowBulkPositionMutation || typeof window === 'undefined') {
+      return
+    }
+
+    try {
+      window.localStorage.removeItem('canvas-bulk-position-mutation-supported')
+
+      const storedValue = window.localStorage.getItem(BULK_POSITION_SUPPORT_STORAGE_KEY)
+      if (!storedValue) {
+        return
+      }
+
+      const parsed = JSON.parse(storedValue) as { status?: 'supported' | 'unsupported'; updatedAt?: number }
+
+      if (parsed?.status === 'unsupported') {
+        const lastCheckedAt = parsed.updatedAt ?? 0
+        const ageMs = Date.now() - lastCheckedAt
+
+        if (ageMs < BULK_POSITION_SUPPORT_RETRY_MS) {
+          bulkUpdateSupportedRef.current = false
+        } else {
+          window.localStorage.removeItem(BULK_POSITION_SUPPORT_STORAGE_KEY)
+        }
+      }
+    } catch (error) {
+      console.debug('[useReactFlowSetup] Failed to read bulk position support flag from storage.', error)
+    }
+  }, [allowBulkPositionMutation])
 
   // Use refs to avoid recreating callbacks when snippets/edges change
   const snippetsRef = useRef<Snippet[]>(snippets)
@@ -173,59 +230,170 @@ export function useReactFlowSetup({
   }, [edges])
 
   // Flush all pending position updates to backend
-  // This sends all accumulated position changes in batch (max one per snippet)
+  // Prefer bulk mutation in chunks; fall back to legacy per-snippet updates if needed
   const flushPendingPositions = useCallback(async () => {
+    if (!projectId || isFlushing) {
+      return
+    }
+
     const pendingPositions = getPendingPositions()
     const snippetIds = Object.keys(pendingPositions)
 
-    if (snippetIds.length === 0 || !projectId || isFlushing) {
+    if (snippetIds.length === 0) {
+      return
+    }
+
+    const preparedUpdates = snippetIds.reduce<Array<{
+      snippetId: string
+      position: { x: number; y: number }
+      fallbackSnippet?: Snippet
+    }>>((acc, snippetId) => {
+      const position = pendingPositions[snippetId]
+      if (!position) {
+        return acc
+      }
+
+      const snapshot = snippetsRef.current.find(s => s.id === snippetId)
+      const fallbackSnippet = snapshot
+        ? {
+            ...snapshot,
+            position: snapshot.position ? { ...snapshot.position } : null
+          }
+        : undefined
+
+      acc.push({
+        snippetId,
+        position: { x: position.x, y: position.y },
+        fallbackSnippet
+      })
+
+      return acc
+    }, [])
+
+    if (preparedUpdates.length === 0) {
       return
     }
 
     setIsFlushing(true)
 
     try {
-      // Send each pending position update sequentially
-      // In a future optimization, could batch these into a single mutation
-      await Promise.all(
-        snippetIds.map(async (snippetId) => {
-          const position = pendingPositions[snippetId]
-          const snapshot = snippetsRef.current.find(s => s.id === snippetId)
-          const fallbackSnippet = snapshot
-            ? {
-                ...snapshot,
-                position: snapshot.position ? { ...snapshot.position } : null
+      preparedUpdates.forEach(({ snippetId, position, fallbackSnippet }) => {
+        updateSnippetPosition(snippetId, position, fallbackSnippet)
+      })
+
+      const updates = preparedUpdates.map(({ snippetId, position }) => ({
+        snippetId,
+        position
+      }))
+
+      let bulkSucceeded = false
+      const attemptedBulk = allowBulkPositionMutation && bulkUpdateSupportedRef.current
+      const bulkErrors: string[] = []
+
+      if (attemptedBulk) {
+        try {
+          const client = getClient() as GraphQLClient
+          bulkSucceeded = true
+
+          for (let i = 0; i < updates.length; i += BULK_POSITION_CHUNK_SIZE) {
+            const chunk = updates.slice(i, i + BULK_POSITION_CHUNK_SIZE)
+            const { data, errors } = await client.graphql<UpdateSnippetPositionsMutationData, UpdateSnippetPositionsVariables>({
+              query: UPDATE_SNIPPET_POSITIONS,
+              variables: {
+                projectId,
+                updates: chunk
               }
-            : undefined
+            })
 
-          updateSnippetPosition(snippetId, { x: position.x, y: position.y }, fallbackSnippet)
+            if (errors && errors.length > 0) {
+              bulkErrors.push(...errors.map(error => error?.message ?? 'Unknown bulk position error'))
+              bulkSucceeded = false
+              break
+            }
 
+            if (!data?.updateSnippetPositions) {
+              bulkErrors.push('Bulk mutation returned no data.')
+              bulkSucceeded = false
+              break
+            }
+          }
+        } catch (error) {
+          console.warn('[useReactFlowSetup] Bulk position mutation failed, falling back to single updates.', error)
+          if (error instanceof Error && error.message) {
+            bulkErrors.push(error.message)
+          }
+          bulkSucceeded = false
+        }
+
+        if (!bulkSucceeded) {
+          bulkUpdateSupportedRef.current = false
+
+          if (typeof window !== 'undefined') {
+            try {
+              window.localStorage.setItem(
+                BULK_POSITION_SUPPORT_STORAGE_KEY,
+                JSON.stringify({ status: 'unsupported', updatedAt: Date.now() })
+              )
+            } catch (error) {
+              console.debug('[useReactFlowSetup] Failed to persist bulk position support flag.', error)
+            }
+          }
+        }
+      }
+
+      if (bulkSucceeded) {
+        if (typeof window !== 'undefined') {
+          try {
+            window.localStorage.setItem(
+              BULK_POSITION_SUPPORT_STORAGE_KEY,
+              JSON.stringify({ status: 'supported', updatedAt: Date.now() })
+            )
+          } catch (error) {
+            console.debug('[useReactFlowSetup] Failed to persist bulk position support flag.', error)
+          }
+        }
+
+        clearPendingPositions()
+        return
+      }
+
+      if (attemptedBulk) {
+        console.warn('[useReactFlowSetup] Bulk position update failed, falling back to single mutations', {
+          errors: bulkErrors
+        })
+      }
+
+      await Promise.all(
+        preparedUpdates.map(async ({ snippetId, position }) => {
           try {
             await updateSnippetMutation({
               variables: {
                 projectId,
                 id: snippetId,
                 input: {
-                  position: {
-                    x: position.x,
-                    y: position.y
-                  }
+                  position
                 }
               }
             })
           } catch (error: unknown) {
             console.error(`Failed to save position for snippet ${snippetId}:`, error)
-            // On failure, position overrides remain; next successful flush will resync
           }
         })
       )
 
-      // Clear all pending positions after successful flush
       clearPendingPositions()
     } finally {
       setIsFlushing(false)
     }
-  }, [projectId, getPendingPositions, updateSnippetMutation, isFlushing, clearPendingPositions, updateSnippetPosition])
+  }, [
+    projectId,
+    isFlushing,
+    getPendingPositions,
+    updateSnippetPosition,
+    clearPendingPositions,
+    updateSnippetMutation,
+    allowBulkPositionMutation
+  ])
 
   // Debounced version of flush (500ms delay)
   const debouncedFlushPositions = useDebouncedCallback(flushPendingPositions, 500)
@@ -257,6 +425,7 @@ export function useReactFlowSetup({
     const nodesToUpdate = selectedNodes.length > 0 ? selectedNodes : [node]
 
     let hasAnyPositionChanged = false
+    const snappedPositions = new Map<string, { x: number; y: number }>()
 
     // Process each node that was moved
     nodesToUpdate.forEach(n => {
@@ -282,14 +451,54 @@ export function useReactFlowSetup({
         // Add snapped position to pending store (instant, no mutation yet)
         addPendingPosition(n.id, snappedPosition)
         hasAnyPositionChanged = true
+        snappedPositions.set(n.id, snappedPosition)
       }
     })
+
+    if (snappedPositions.size > 0) {
+      // Update local node state so ReactFlow reflects snapped columns immediately (multi-select friendly)
+      setNodes((currentNodes: Node<SnippetNodeData>[]) =>
+        currentNodes.map(existingNode => {
+          const snapped = snappedPositions.get(existingNode.id)
+          if (!snapped) {
+            return existingNode
+          }
+
+          const hasNodePositionChanged =
+            Math.abs(existingNode.position.x - snapped.x) >= 0.5
+            || Math.abs(existingNode.position.y - snapped.y) >= 0.5
+
+          if (!hasNodePositionChanged) {
+            return existingNode
+          }
+
+          return {
+            ...existingNode,
+            position: {
+              ...existingNode.position,
+              x: snapped.x,
+              y: snapped.y
+            },
+            positionAbsolute: existingNode.positionAbsolute
+              ? {
+                  ...existingNode.positionAbsolute,
+                  x: snapped.x,
+                  y: snapped.y
+                }
+              : {
+                  x: snapped.x,
+                  y: snapped.y
+                }
+          }
+        })
+      )
+    }
 
     // Trigger debounced flush if any positions changed
     if (hasAnyPositionChanged) {
       debouncedFlushPositions()
     }
-  }, [projectId, addPendingPosition, debouncedFlushPositions, reactFlowInstance])
+  }, [projectId, addPendingPosition, debouncedFlushPositions, reactFlowInstance, setNodes])
 
   // Save viewport when it changes
   const onMoveEnd = useCallback(() => {

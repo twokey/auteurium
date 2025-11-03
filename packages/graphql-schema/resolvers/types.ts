@@ -218,6 +218,7 @@ export type Mutation = {
   updateConnection: Connection;
   updateProject: Project;
   updateSnippet: Snippet;
+  updateSnippetPositions: Array<Snippet>;
 };
 
 
@@ -332,6 +333,12 @@ export type MutationUpdateSnippetArgs = {
   id: Scalars['ID']['input'];
   input: UpdateSnippetInput;
   projectId: Scalars['ID']['input'];
+};
+
+
+export type MutationUpdateSnippetPositionsArgs = {
+  projectId: Scalars['ID']['input'];
+  updates: Array<UpdateSnippetPositionInput>;
 };
 
 export type Position = {
@@ -504,6 +511,11 @@ export type UpdateSnippetInput = {
   title?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type UpdateSnippetPositionInput = {
+  position: PositionInput;
+  snippetId: Scalars['ID']['input'];
+};
+
 export type User = {
   __typename?: 'User';
   createdAt: Scalars['String']['output'];
@@ -632,6 +644,7 @@ export type ResolversTypes = ResolversObject<{
   UpdateConnectionInput: UpdateConnectionInput;
   UpdateProjectInput: UpdateProjectInput;
   UpdateSnippetInput: UpdateSnippetInput;
+  UpdateSnippetPositionInput: UpdateSnippetPositionInput;
   User: ResolverTypeWrapper<User>;
   UserRole: UserRole;
 }>;
@@ -673,6 +686,7 @@ export type ResolversParentTypes = ResolversObject<{
   UpdateConnectionInput: UpdateConnectionInput;
   UpdateProjectInput: UpdateProjectInput;
   UpdateSnippetInput: UpdateSnippetInput;
+  UpdateSnippetPositionInput: UpdateSnippetPositionInput;
   User: User;
 }>;
 
@@ -788,6 +802,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   updateConnection?: Resolver<ResolversTypes['Connection'], ParentType, ContextType, RequireFields<MutationUpdateConnectionArgs, 'id' | 'input'>>;
   updateProject?: Resolver<ResolversTypes['Project'], ParentType, ContextType, RequireFields<MutationUpdateProjectArgs, 'id' | 'input'>>;
   updateSnippet?: Resolver<ResolversTypes['Snippet'], ParentType, ContextType, RequireFields<MutationUpdateSnippetArgs, 'id' | 'input' | 'projectId'>>;
+  updateSnippetPositions?: Resolver<Array<ResolversTypes['Snippet']>, ParentType, ContextType, RequireFields<MutationUpdateSnippetPositionsArgs, 'projectId' | 'updates'>>;
 }>;
 
 export type PositionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Position'] = ResolversParentTypes['Position']> = ResolversObject<{

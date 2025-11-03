@@ -72,6 +72,26 @@ export const UPDATE_SNIPPET = /* GraphQL */ `
   }
 `
 
+export const UPDATE_SNIPPET_POSITIONS = /* GraphQL */ `
+  mutation UpdateSnippetPositions($projectId: ID!, $updates: [UpdateSnippetPositionInput!]!) {
+    updateSnippetPositions(projectId: $projectId, updates: $updates) {
+      id
+      projectId
+      title
+      textField1
+      position {
+        x
+        y
+      }
+      tags
+      categories
+      version
+      createdAt
+      updatedAt
+    }
+  }
+`
+
 export const DELETE_SNIPPET = /* GraphQL */ `
   mutation DeleteSnippet($projectId: ID!, $id: ID!) {
     deleteSnippet(projectId: $projectId, id: $id)

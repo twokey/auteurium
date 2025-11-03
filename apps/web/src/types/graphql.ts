@@ -131,6 +131,16 @@ export interface UpdateSnippetVariables {
   input: UpdateSnippetInput
 }
 
+export interface UpdateSnippetPositionVariables {
+  snippetId: string
+  position: Position
+}
+
+export interface UpdateSnippetPositionsVariables {
+  projectId: string
+  updates: UpdateSnippetPositionVariables[]
+}
+
 export interface DeleteSnippetVariables {
   projectId: string
   id: string
@@ -208,6 +218,10 @@ export interface CreateSnippetMutationData {
 
 export interface UpdateSnippetMutationData {
   updateSnippet: Snippet
+}
+
+export interface UpdateSnippetPositionsMutationData {
+  updateSnippetPositions: Snippet[]
 }
 
 export interface DeleteSnippetMutationData {

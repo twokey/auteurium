@@ -20,6 +20,7 @@ export const CANVAS_CONSTANTS = {
   COLUMN_GAP: 50, // Horizontal gap between columns for connector visibility
   COLUMN_GUIDE_RIGHT_PADDING: 4, // Extra visual width on the right edge for guide visibility
   ENABLE_COLUMN_CONSTRAINTS: true, // Feature flag to enable/disable column snapping
+  ENABLE_BULK_POSITION_MUTATION: true, // Enable bulk position persistence when backend supports the mutation
 } as const
 
 // Form Validation
