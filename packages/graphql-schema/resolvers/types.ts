@@ -194,7 +194,8 @@ export enum ModelProvider {
   Anthropic = 'ANTHROPIC',
   Custom = 'CUSTOM',
   Gemini = 'GEMINI',
-  Openai = 'OPENAI'
+  Openai = 'OPENAI',
+  Vidu = 'VIDU'
 }
 
 export type Mutation = {
@@ -212,6 +213,7 @@ export type Mutation = {
   generateContent: GenerationResult;
   generateContentStream: GenerationResult;
   generateSnippetImage: Snippet;
+  generateSnippetVideo: Snippet;
   publishGenerationStreamEvent: GenerationStreamEvent;
   resetUserPassword: Scalars['String']['output'];
   revertSnippet: Snippet;
@@ -297,6 +299,19 @@ export type MutationGenerateSnippetImageArgs = {
   modelId?: InputMaybe<Scalars['ID']['input']>;
   projectId: Scalars['ID']['input'];
   snippetId: Scalars['ID']['input'];
+};
+
+
+export type MutationGenerateSnippetVideoArgs = {
+  aspectRatio?: InputMaybe<Scalars['String']['input']>;
+  duration?: InputMaybe<Scalars['Int']['input']>;
+  modelId: Scalars['ID']['input'];
+  movementAmplitude?: InputMaybe<Scalars['String']['input']>;
+  projectId: Scalars['ID']['input'];
+  resolution?: InputMaybe<Scalars['String']['input']>;
+  seed?: InputMaybe<Scalars['Int']['input']>;
+  snippetId: Scalars['ID']['input'];
+  style?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -458,6 +473,9 @@ export type Snippet = {
   userId: Scalars['ID']['output'];
   version: Scalars['Int']['output'];
   versions: Array<SnippetVersion>;
+  videoMetadata?: Maybe<VideoMetadata>;
+  videoS3Key?: Maybe<Scalars['String']['output']>;
+  videoUrl?: Maybe<Scalars['String']['output']>;
 };
 
 export type SnippetConnectionStat = {
@@ -530,6 +548,18 @@ export enum UserRole {
   Admin = 'ADMIN',
   Standard = 'STANDARD'
 }
+
+export type VideoMetadata = {
+  __typename?: 'VideoMetadata';
+  aspectRatio: Scalars['String']['output'];
+  duration: Scalars['Int']['output'];
+  fileSize?: Maybe<Scalars['Int']['output']>;
+  format: Scalars['String']['output'];
+  movementAmplitude?: Maybe<Scalars['String']['output']>;
+  resolution: Scalars['String']['output'];
+  seed?: Maybe<Scalars['Int']['output']>;
+  style?: Maybe<Scalars['String']['output']>;
+};
 
 export type WithIndex<TObject> = TObject & Record<string, any>;
 export type ResolversObject<TObject> = WithIndex<TObject>;
@@ -647,6 +677,7 @@ export type ResolversTypes = ResolversObject<{
   UpdateSnippetPositionInput: UpdateSnippetPositionInput;
   User: ResolverTypeWrapper<User>;
   UserRole: UserRole;
+  VideoMetadata: ResolverTypeWrapper<VideoMetadata>;
 }>;
 
 /** Mapping between all available schema types and the resolvers parents */
@@ -688,6 +719,7 @@ export type ResolversParentTypes = ResolversObject<{
   UpdateSnippetInput: UpdateSnippetInput;
   UpdateSnippetPositionInput: UpdateSnippetPositionInput;
   User: User;
+  VideoMetadata: VideoMetadata;
 }>;
 
 export type ConnectionResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['Connection'] = ResolversParentTypes['Connection']> = ResolversObject<{
@@ -796,6 +828,7 @@ export type MutationResolvers<ContextType = GraphQLContext, ParentType extends R
   generateContent?: Resolver<ResolversTypes['GenerationResult'], ParentType, ContextType, RequireFields<MutationGenerateContentArgs, 'input' | 'projectId' | 'snippetId'>>;
   generateContentStream?: Resolver<ResolversTypes['GenerationResult'], ParentType, ContextType, RequireFields<MutationGenerateContentStreamArgs, 'input' | 'projectId' | 'snippetId'>>;
   generateSnippetImage?: Resolver<ResolversTypes['Snippet'], ParentType, ContextType, RequireFields<MutationGenerateSnippetImageArgs, 'projectId' | 'snippetId'>>;
+  generateSnippetVideo?: Resolver<ResolversTypes['Snippet'], ParentType, ContextType, RequireFields<MutationGenerateSnippetVideoArgs, 'modelId' | 'projectId' | 'snippetId'>>;
   publishGenerationStreamEvent?: Resolver<ResolversTypes['GenerationStreamEvent'], ParentType, ContextType, RequireFields<MutationPublishGenerationStreamEventArgs, 'input'>>;
   resetUserPassword?: Resolver<ResolversTypes['String'], ParentType, ContextType, RequireFields<MutationResetUserPasswordArgs, 'id'>>;
   revertSnippet?: Resolver<ResolversTypes['Snippet'], ParentType, ContextType, RequireFields<MutationRevertSnippetArgs, 'id' | 'projectId' | 'version'>>;
@@ -855,6 +888,9 @@ export type SnippetResolvers<ContextType = GraphQLContext, ParentType extends Re
   userId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   version?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   versions?: Resolver<Array<ResolversTypes['SnippetVersion']>, ParentType, ContextType>;
+  videoMetadata?: Resolver<Maybe<ResolversTypes['VideoMetadata']>, ParentType, ContextType>;
+  videoS3Key?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  videoUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
 }>;
 
 export type SnippetConnectionStatResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['SnippetConnectionStat'] = ResolversParentTypes['SnippetConnectionStat']> = ResolversObject<{
@@ -891,6 +927,17 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
   updatedAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
 }>;
 
+export type VideoMetadataResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['VideoMetadata'] = ResolversParentTypes['VideoMetadata']> = ResolversObject<{
+  aspectRatio?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  duration?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
+  fileSize?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
+  format?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  movementAmplitude?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  resolution?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  seed?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
+  style?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+}>;
+
 export type Resolvers<ContextType = GraphQLContext> = ResolversObject<{
   Connection?: ConnectionResolvers<ContextType>;
   ConnectionStats?: ConnectionStatsResolvers<ContextType>;
@@ -913,5 +960,6 @@ export type Resolvers<ContextType = GraphQLContext> = ResolversObject<{
   Subscription?: SubscriptionResolvers<ContextType>;
   SystemAnalytics?: SystemAnalyticsResolvers<ContextType>;
   User?: UserResolvers<ContextType>;
+  VideoMetadata?: VideoMetadataResolvers<ContextType>;
 }>;
 

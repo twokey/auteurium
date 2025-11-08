@@ -2,6 +2,7 @@ export enum ModelProvider {
   GEMINI = 'gemini',
   OPENAI = 'openai',
   ANTHROPIC = 'anthropic',
+  VIDU = 'vidu',
   CUSTOM = 'custom'
 }
 
@@ -70,4 +71,39 @@ export interface StreamingChunk {
   content: string
   isComplete: boolean
   tokensUsed?: number
+}
+
+// Video Generation Types
+export interface VideoMetadata {
+  duration: number // in seconds
+  resolution: string // e.g., "720p", "1080p"
+  aspectRatio: string // e.g., "16:9", "9:16", "1:1"
+  style?: string // e.g., "general", "anime"
+  seed?: number
+  format: string // e.g., "mp4"
+  fileSize?: number // in bytes
+  movementAmplitude?: string // e.g., "auto", "small", "medium", "large"
+}
+
+export interface VideoGenerationRequest {
+  modelId: string
+  prompt: string
+  duration?: number // 4 or 8 seconds
+  aspectRatio?: string // e.g., "16:9", "9:16", "1:1", "default"
+  resolution?: string // e.g., "720p", "1080p", "512"
+  style?: string // e.g., "general", "anime"
+  seed?: number
+  movementAmplitude?: string // e.g., "auto", "small", "medium", "large"
+  inputImages?: string[] // URLs or S3 keys for reference images (image-to-video)
+}
+
+export interface VideoGenerationResponse {
+  videoUrl: string
+  videoBuffer?: Buffer
+  metadata: VideoMetadata
+  tokensUsed?: number
+  cost: number
+  modelUsed: string
+  generationTimeMs: number
+  taskId?: string // For async tracking
 }

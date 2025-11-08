@@ -29,6 +29,17 @@ type ImageMetadata {
   aspectRatio: String!
 }
 
+type VideoMetadata {
+  duration: Int!
+  resolution: String!
+  aspectRatio: String!
+  style: String
+  seed: Int
+  format: String!
+  fileSize: Int
+  movementAmplitude: String
+}
+
 type Snippet {
   id: ID!
   projectId: ID!
@@ -44,6 +55,9 @@ type Snippet {
   imageUrl: String
   imageS3Key: String
   imageMetadata: ImageMetadata
+  videoUrl: String
+  videoS3Key: String
+  videoMetadata: VideoMetadata
   versions: [SnippetVersion!]!
   createdFrom: ID
 }
@@ -208,6 +222,7 @@ type Mutation {
   deleteSnippet(projectId: ID!, id: ID!): Boolean!
   revertSnippet(projectId: ID!, id: ID!, version: Int!): Snippet!
   generateSnippetImage(projectId: ID!, snippetId: ID!, modelId: ID): Snippet!
+  generateSnippetVideo(projectId: ID!, snippetId: ID!, modelId: ID!, duration: Int, aspectRatio: String, resolution: String, style: String, seed: Int, movementAmplitude: String): Snippet!
   combineSnippetConnections(projectId: ID!, snippetId: ID!): Snippet!
 
   # Connection mutations
@@ -245,6 +260,7 @@ enum ModelProvider {
   GEMINI
   OPENAI
   ANTHROPIC
+  VIDU
   CUSTOM
 }
 

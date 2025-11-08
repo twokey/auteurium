@@ -67,6 +67,31 @@ export const IMAGE_GENERATION = {
   },
 } as const
 
+// Video Generation
+export const VIDEO_GENERATION = {
+  MAX_REFERENCE_IMAGES: 7, // Vidu Q1 supports up to 7 images
+  DEFAULT_MODEL: 'vidu-q2-turbo',
+  DEFAULT_DURATION: 4,
+  DEFAULT_ASPECT_RATIO: '16:9',
+  DEFAULT_RESOLUTION: '720p',
+  DEFAULT_STYLE: 'general',
+  DEFAULT_MOVEMENT_AMPLITUDE: 'auto',
+  DURATIONS: [4, 8] as const,
+  ASPECT_RATIOS: ['default', '16:9', '9:16', '1:1'] as const,
+  RESOLUTIONS: ['512', '720p', '1080p'] as const,
+  STYLES: ['general', 'anime'] as const,
+  MOVEMENT_AMPLITUDES: ['auto', 'small', 'medium', 'large'] as const,
+  MODELS: {
+    Q2_PRO: 'vidu-q2-pro',
+    Q2_TURBO: 'vidu-q2-turbo',
+    Q2: 'vidu-q2',
+    Q1: 'vidu-q1',
+    Q1_CLASSIC: 'vidu-q1-classic',
+    VIDU_2_0: 'vidu-2.0',
+    VIDU_1_5: 'vidu-1.5',
+  },
+} as const
+
 // Error Messages
 export const ERROR_MESSAGES = {
   GENERIC: 'An error occurred. Please try again.',

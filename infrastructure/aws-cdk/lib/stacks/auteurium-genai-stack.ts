@@ -37,11 +37,12 @@ export class AuteuriumGenAIStack extends cdk.Stack {
     // Create Secrets Manager secret for LLM API keys
     const llmApiKeysSecret = new secretsmanager.Secret(this, `LLMApiKeysSecret-${stage}`, {
       secretName: `auteurium/genai/api-keys-${stage}`,
-      description: 'API keys for LLM providers (Gemini, OpenAI, etc.)',
+      description: 'API keys for LLM providers (Gemini, OpenAI, Vidu, etc.)',
       generateSecretString: {
         secretStringTemplate: JSON.stringify({
           gemini: 'REPLACE_WITH_ACTUAL_GEMINI_API_KEY',
-          openai: 'REPLACE_WITH_ACTUAL_OPENAI_API_KEY'
+          openai: 'REPLACE_WITH_ACTUAL_OPENAI_API_KEY',
+          vidu: 'REPLACE_WITH_ACTUAL_VIDU_API_KEY'
         }),
         generateStringKey: 'placeholder'
       }
@@ -226,6 +227,35 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       }
     })
 
+    // Lambda function for generateSnippetVideo mutation
+    const generateVideoFunction = new lambdaNodejs.NodejsFunction(this, `GenerateVideoFunction-${stage}`, {
+      functionName: `auteurium-genai-generate-video-${stage}`,
+      runtime: lambda.Runtime.NODEJS_22_X,
+      entry: path.join(__dirname, '../../../../services/api/src/resolvers/snippet/generateVideo.ts'),
+      handler: 'handler',
+      timeout: cdk.Duration.seconds(300), // 5 minutes for video generation (longer than image)
+      memorySize: 2048, // More memory for video processing
+      bundling: {
+        format: lambdaNodejs.OutputFormat.CJS,
+        target: 'node22',
+        sourceMap: true,
+        tsconfig: path.join(__dirname, '../../../../services/api/tsconfig.json'),
+        nodeModules: ['@google/genai'] // Include for shared types
+      },
+      depsLockFilePath: path.join(__dirname, '../../../../package-lock.json'),
+      environment: {
+        STAGE: stage,
+        USERS_TABLE: usersTable.tableName,
+        SNIPPETS_TABLE: snippetsTable.tableName,
+        CONNECTIONS_TABLE: connectionsTable.tableName, // Add connections table for multimodal video generation
+        GENERATIONS_TABLE: this.generationsTable.tableName,
+        MEDIA_BUCKET_NAME: mediaBucket.bucketName,
+        LLM_API_KEYS_SECRET_ARN: llmApiKeysSecret.secretArn,
+        USER_POOL_ID: userPool.userPoolId,
+        USER_POOL_CLIENT_ID: userPoolClient.userPoolClientId
+      }
+    })
+
     // Lambda function for createScenes mutation
     const createScenesFunction = new lambdaNodejs.NodejsFunction(this, `CreateScenesFunction-${stage}`, {
       functionName: `auteurium-genai-create-scenes-${stage}`,
@@ -258,25 +288,31 @@ export class AuteuriumGenAIStack extends cdk.Stack {
     llmApiKeysSecret.grantRead(generateContentFunction)
     llmApiKeysSecret.grantRead(generateContentStreamFunction)
     llmApiKeysSecret.grantRead(generateImageFunction)
+    llmApiKeysSecret.grantRead(generateVideoFunction)
     llmApiKeysSecret.grantRead(createScenesFunction)
     usersTable.grantReadWriteData(generateContentFunction)
     usersTable.grantReadWriteData(generateContentStreamFunction)
     usersTable.grantReadWriteData(generationHistoryFunction)
     usersTable.grantReadWriteData(generateImageFunction)
+    usersTable.grantReadWriteData(generateVideoFunction)
     usersTable.grantReadWriteData(createScenesFunction)
     this.generationsTable.grantReadWriteData(generateContentFunction)
     this.generationsTable.grantReadWriteData(generateContentStreamFunction)
     this.generationsTable.grantReadWriteData(generationHistoryFunction)
     this.generationsTable.grantReadWriteData(generateImageFunction)
+    this.generationsTable.grantReadWriteData(generateVideoFunction)
     this.generationsTable.grantReadWriteData(createScenesFunction)
     snippetsTable.grantReadData(generateContentFunction)
     snippetsTable.grantReadData(generateContentStreamFunction)
     snippetsTable.grantReadWriteData(generateImageFunction)
+    snippetsTable.grantReadWriteData(generateVideoFunction)
     snippetsTable.grantReadWriteData(createScenesFunction) // Need write access to create scene snippets
     projectsTable.grantReadData(generateContentFunction)
     projectsTable.grantReadData(generateContentStreamFunction)
     connectionsTable.grantReadData(generateImageFunction) // Need to query connections for multimodal image generation
+    connectionsTable.grantReadData(generateVideoFunction) // Need to query connections for multimodal video generation
     mediaBucket.grantReadWrite(generateImageFunction)
+    mediaBucket.grantReadWrite(generateVideoFunction)
 
     // Grant versions table write access for createScenes
     const versionsTable = dynamodb.Table.fromTableName(this, 'VersionsTableForScenes', `auteurium-versions-${stage}`)
@@ -331,6 +367,16 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       ]
     }))
 
+    // Grant GSI query permissions for generateVideoFunction
+    generateVideoFunction.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['dynamodb:Query'],
+      resources: [
+        `${connectionsTable.tableArn}/index/*`, // Need to query connections by targetSnippetId
+        `${snippetsTable.tableArn}/index/*`,
+        `${usersTable.tableArn}/index/*`
+      ]
+    }))
+
     // Grant GSI query permissions for createScenesFunction
     createScenesFunction.addToRolePolicy(new iam.PolicyStatement({
       actions: ['dynamodb:Query'],
@@ -370,6 +416,12 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       api: graphqlApi,
       name: `genai-generate-image-${stage}`,
       lambdaFunction: generateImageFunction
+    })
+
+    const generateVideoDataSource = new appsync.LambdaDataSource(this, `GenerateVideoDataSource-${stage}`, {
+      api: graphqlApi,
+      name: `genai-generate-video-${stage}`,
+      lambdaFunction: generateVideoFunction
     })
 
     const createScenesDataSource = new appsync.LambdaDataSource(this, `CreateScenesDataSource-${stage}`, {
@@ -417,6 +469,13 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       typeName: 'Mutation',
       fieldName: 'generateSnippetImage',
       dataSource: generateImageDataSource
+    })
+
+    new appsync.Resolver(this, `GenerateSnippetVideoResolver-${stage}`, {
+      api: graphqlApi,
+      typeName: 'Mutation',
+      fieldName: 'generateSnippetVideo',
+      dataSource: generateVideoDataSource
     })
 
     new appsync.Resolver(this, `CreateScenesResolver-${stage}`, {

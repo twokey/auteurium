@@ -1,10 +1,11 @@
 import { Logger } from '@aws-lambda-powertools/logger'
-import type { GenerationRequest, GenerationResponse, GenerationRecord, StreamingChunk } from '@auteurium/shared-types'
-import { GenerationModality } from '@auteurium/shared-types'
+import type { GenerationRequest, GenerationResponse, GenerationRecord, StreamingChunk, VideoGenerationRequest, VideoGenerationResponse } from '@auteurium/shared-types'
+import { GenerationModality, ModelProvider } from '@auteurium/shared-types'
 import { ProviderRegistry } from '../providers/registry'
 import { getModelConfig } from '../config/models'
 import type { ImageGenerationRequest, ImageGenerationResponse } from '../providers/base/IImageProvider'
 import { GeminiImageProvider, GeminiFlashImageProvider } from '../providers/gemini'
+import { ViduVideoProvider } from '../providers/vidu'
 
 const logger = new Logger({ serviceName: 'generation-orchestrator' })
 
@@ -283,6 +284,81 @@ export class GenerationOrchestrator {
       return response as ImageGenerationResponse & { imageData: unknown }
     } catch (error) {
       logger.error('Image generation failed', {
+        error: error instanceof Error ? error.message : String(error),
+        userId: context.userId,
+        snippetId: context.snippetId,
+        modelId: request.modelId
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Generate video using specified model
+   * Supports both text-to-video and image-to-video (with reference images)
+   * @param request - Video generation parameters
+   * @param context - User and snippet context
+   * @returns Generated video with metadata
+   */
+  async generateVideo(
+    request: VideoGenerationRequest,
+    context: OrchestrationContext
+  ): Promise<VideoGenerationResponse> {
+    const startTime = Date.now()
+
+    try {
+      // Get model configuration
+      const modelConfig = getModelConfig(request.modelId)
+      if (!modelConfig) {
+        throw new Error(`Model not found: ${request.modelId}`)
+      }
+
+      if (!modelConfig.enabled) {
+        throw new Error(`Model is disabled: ${request.modelId}`)
+      }
+
+      logger.info('Starting video generation', {
+        userId: context.userId,
+        snippetId: context.snippetId,
+        projectId: context.projectId,
+        modelId: request.modelId,
+        provider: modelConfig.provider,
+        modality: modelConfig.modality,
+        inputImagesCount: request.inputImages?.length ?? 0,
+        duration: request.duration,
+        aspectRatio: request.aspectRatio
+      })
+
+      const apiKey = this.apiKeys.get(modelConfig.provider)
+      if (!apiKey) {
+        throw new Error(`API key not configured for provider: ${modelConfig.provider}`)
+      }
+
+      // Select provider based on provider type
+      let provider
+      if (modelConfig.provider === ModelProvider.VIDU) {
+        provider = new ViduVideoProvider()
+      } else {
+        throw new Error(`Video generation not supported for provider: ${modelConfig.provider}`)
+      }
+
+      await provider.initialize(apiKey)
+
+      const response = await provider.generateVideo(request)
+
+      const totalTime = Date.now() - startTime
+      logger.info('Video generation completed', {
+        userId: context.userId,
+        snippetId: context.snippetId,
+        modelId: request.modelId,
+        cost: response.cost,
+        totalTimeMs: totalTime,
+        videoSizeBytes: response.metadata.fileSize
+      })
+
+      return response
+    } catch (error) {
+      logger.error('Video generation failed', {
         error: error instanceof Error ? error.message : String(error),
         userId: context.userId,
         snippetId: context.snippetId,

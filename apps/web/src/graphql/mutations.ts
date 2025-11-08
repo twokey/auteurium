@@ -145,6 +145,58 @@ export const GENERATE_SNIPPET_IMAGE = /* GraphQL */ `
   }
 `
 
+export const GENERATE_SNIPPET_VIDEO = /* GraphQL */ `
+  mutation GenerateSnippetVideo(
+    $projectId: ID!
+    $snippetId: ID!
+    $modelId: ID!
+    $duration: Int
+    $aspectRatio: String
+    $resolution: String
+    $style: String
+    $seed: Int
+    $movementAmplitude: String
+  ) {
+    generateSnippetVideo(
+      projectId: $projectId
+      snippetId: $snippetId
+      modelId: $modelId
+      duration: $duration
+      aspectRatio: $aspectRatio
+      resolution: $resolution
+      style: $style
+      seed: $seed
+      movementAmplitude: $movementAmplitude
+    ) {
+      id
+      projectId
+      title
+      textField1
+      position {
+        x
+        y
+      }
+      tags
+      categories
+      version
+      createdAt
+      updatedAt
+      videoUrl
+      videoS3Key
+      videoMetadata {
+        duration
+        resolution
+        aspectRatio
+        style
+        seed
+        format
+        fileSize
+        movementAmplitude
+      }
+    }
+  }
+`
+
 export const COMBINE_SNIPPET_CONNECTIONS = /* GraphQL */ `
   mutation CombineSnippetConnections($projectId: ID!, $snippetId: ID!) {
     combineSnippetConnections(projectId: $projectId, snippetId: $snippetId) {
