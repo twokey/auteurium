@@ -54,6 +54,7 @@ export interface Snippet {
   imageS3Key?: string | null
   imageMetadata?: ImageMetadata | null
   connections?: Connection[]
+  snippetType?: 'text' | 'video'
 }
 
 export interface Project {

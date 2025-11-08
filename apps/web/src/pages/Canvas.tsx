@@ -432,6 +432,7 @@ const CanvasContent = () => {
         {/* Canvas Toolbar */}
         <CanvasToolbar
           onCreateSnippet={handlers.handleCreateSnippet}
+          onCreateVideoSnippet={handlers.handleCreateVideoSnippet}
           onSaveCanvas={handlers.handleSaveCanvas}
           onZoomToFit={onZoomToFit}
           isLoading={false}

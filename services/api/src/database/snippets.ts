@@ -109,6 +109,7 @@ const buildSnippet = (input: SnippetInput, userId: string, now: string): Snippet
   version: 1,
   createdAt: now,
   updatedAt: now,
+  snippetType: input.snippetType ?? 'text',
   ...(input.createdFrom && { createdFrom: input.createdFrom })
 })
 

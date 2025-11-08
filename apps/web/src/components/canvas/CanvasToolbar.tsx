@@ -6,6 +6,7 @@ import type { ReactFlowInstance } from 'reactflow'
 
 interface CanvasToolbarProps {
   onCreateSnippet: (position: { x: number; y: number }) => void
+  onCreateVideoSnippet: (position: { x: number; y: number }) => void
   onSaveCanvas: () => void
   onZoomToFit: () => void
   isLoading?: boolean
@@ -14,17 +15,16 @@ interface CanvasToolbarProps {
 
 export const CanvasToolbar = ({
   onCreateSnippet,
+  onCreateVideoSnippet,
   onSaveCanvas,
   onZoomToFit,
   isLoading = false,
   reactFlowInstance
 }: CanvasToolbarProps) => {
   const [isCreating, setIsCreating] = useState(false)
+  const [isCreatingVideo, setIsCreatingVideo] = useState(false)
 
-  const handleCreateSnippet = () => {
-    setIsCreating(true)
-
-    // Calculate center position of current viewport
+  const getCenterPosition = (): { x: number; y: number } => {
     let centerPosition: { x: number; y: number } = { x: CANVAS_CONSTANTS.DEFAULT_NODE_POSITION.x, y: CANVAS_CONSTANTS.DEFAULT_NODE_POSITION.y }
 
     if (reactFlowInstance) {
@@ -39,8 +39,19 @@ export const CanvasToolbar = ({
       }
     }
 
-    onCreateSnippet(centerPosition)
+    return centerPosition
+  }
+
+  const handleCreateSnippet = () => {
+    setIsCreating(true)
+    onCreateSnippet(getCenterPosition())
     setIsCreating(false)
+  }
+
+  const handleCreateVideoSnippet = () => {
+    setIsCreatingVideo(true)
+    onCreateVideoSnippet(getCenterPosition())
+    setIsCreatingVideo(false)
   }
 
   return (
@@ -61,6 +72,20 @@ export const CanvasToolbar = ({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
           </svg>
           {isCreating ? 'Creating...' : 'New Snippet'}
+        </button>
+
+        {/* Create Video Snippet Button */}
+        <button
+          onClick={handleCreateVideoSnippet}
+          disabled={isCreatingVideo || isLoading}
+          className="flex items-center px-3 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 rounded-md transition-colors"
+          title="Create new video snippet"
+          data-testid="create-video-snippet"
+        >
+          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+          {isCreatingVideo ? 'Creating...' : 'Video Snippet'}
         </button>
 
         {/* Divider */}

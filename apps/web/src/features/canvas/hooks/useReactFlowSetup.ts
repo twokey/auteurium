@@ -79,6 +79,7 @@ const haveNodesChanged = (
         previousSnippet.title !== nextSnippet.title ||
         previousSnippet.textField1 !== nextSnippet.textField1 ||
         previousSnippet.connectionCount !== nextSnippet.connectionCount ||
+        previousSnippet.snippetType !== nextSnippet.snippetType ||
         previousSnippet.imageUrl !== nextSnippet.imageUrl ||
         previousSnippet.imageS3Key !== nextSnippet.imageS3Key
       ) {

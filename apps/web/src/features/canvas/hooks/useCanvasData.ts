@@ -273,6 +273,7 @@ const areSnippetsEqual = (a: Snippet[], b: Snippet[]): boolean => {
       (snippetA.title ?? '') !== (snippetB.title ?? '') ||
       snippetA.textField1 !== snippetB.textField1 ||
       snippetA.version !== snippetB.version ||
+      snippetA.snippetType !== snippetB.snippetType ||
       snippetA.imageUrl !== snippetB.imageUrl ||
       snippetA.imageS3Key !== snippetB.imageS3Key ||
       snippetA.position?.x !== snippetB.position?.x ||
@@ -625,6 +626,10 @@ export function useFlowNodes(
         })
         .filter(conn => conn !== null) as Array<{ id: string; title?: string }>
 
+      const isVideoSnippet = snippet.snippetType === 'video'
+      const nodeBackground = isVideoSnippet ? '#ede9fe' : '#dbeafe' // purple-100 vs blue-100
+      const nodeBorder = isVideoSnippet ? '2px solid #c4b5fd' : '2px solid #93c5fd'
+
       return {
         id: snippet.id,
         type: 'snippet',
@@ -642,7 +647,8 @@ export function useFlowNodes(
             imageS3Key: snippet.imageS3Key,
             imageMetadata: snippet.imageMetadata,
             connectedContent,
-            downstreamConnections
+            downstreamConnections,
+            snippetType: snippet.snippetType
           },
           ...handlers,
           isGeneratingImage: Boolean(generatingImageSnippetIds[snippet.id]),
@@ -655,8 +661,8 @@ export function useFlowNodes(
           isLoadingVideoModels
         },
         style: {
-          background: '#fff',
-          border: '2px solid #e5e7eb',
+          background: nodeBackground,
+          border: nodeBorder,
           borderRadius: '8px',
           minWidth: 200,
           boxShadow: '0 10px 15px -3px rgba(15, 23, 42, 0.08)'

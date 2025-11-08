@@ -19,6 +19,7 @@ interface OptimisticSnippet {
   updatedAt: string
   version: number
   isOptimistic: true
+  snippetType?: 'text' | 'video'
 }
 
 interface OptimisticConnection {

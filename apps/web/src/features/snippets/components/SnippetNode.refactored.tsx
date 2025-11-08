@@ -72,7 +72,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
       <Handle type="source" position={Position.Right} />
 
       <div
-        className="p-3 min-w-[200px] max-w-[300px] cursor-pointer hover:bg-gray-50 transition-colors"
+        className="p-3 min-w-[600px] max-w-[900px] cursor-pointer hover:bg-gray-50 transition-colors"
         onContextMenu={(e) => {
           e.preventDefault()
         }}

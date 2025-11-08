@@ -48,6 +48,7 @@ export const CREATE_SNIPPET = /* GraphQL */ `
       version
       createdAt
       updatedAt
+      snippetType
     }
   }
 `
@@ -68,6 +69,7 @@ export const UPDATE_SNIPPET = /* GraphQL */ `
       version
       createdAt
       updatedAt
+      snippetType
     }
   }
 `
@@ -88,6 +90,7 @@ export const UPDATE_SNIPPET_POSITIONS = /* GraphQL */ `
       version
       createdAt
       updatedAt
+      snippetType
     }
   }
 `
@@ -114,6 +117,7 @@ export const REVERT_SNIPPET = /* GraphQL */ `
       version
       createdAt
       updatedAt
+      snippetType
     }
   }
 `
@@ -220,6 +224,7 @@ export const COMBINE_SNIPPET_CONNECTIONS = /* GraphQL */ `
         height
         aspectRatio
       }
+      snippetType
     }
   }
 `

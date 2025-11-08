@@ -26,7 +26,8 @@ const createSnippetSchema = z.object({
       y: z.number()
     }).optional().default({ x: 0, y: 0 }),
     tags: z.array(z.string()).optional().default([]),
-    categories: z.array(z.string()).optional().default([])
+    categories: z.array(z.string()).optional().default([]),
+    snippetType: z.enum(['text', 'video']).optional().default('text')
   })
 })
 

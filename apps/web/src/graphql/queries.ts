@@ -89,6 +89,7 @@ export const GET_PROJECT_WITH_SNIPPETS = /* GraphQL */ `
           height
           aspectRatio
         }
+        snippetType
       }
     }
   }

@@ -121,6 +121,7 @@ export interface SnippetNodeData {
     } | null
     connectedContent?: ConnectedContentItem[]
     downstreamConnections?: Array<{ id: string; title?: string }>
+    snippetType?: 'text' | 'video'
   }
   onEdit: (snippetId: string) => void
   onDelete: (snippetId: string) => void

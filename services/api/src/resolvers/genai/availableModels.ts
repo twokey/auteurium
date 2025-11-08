@@ -13,7 +13,7 @@ import type { AppSyncResolverHandler } from 'aws-lambda'
 
 const logger = new Logger({ serviceName: 'genai-available-models' })
 
-type GraphQLModelProvider = 'GEMINI' | 'OPENAI' | 'ANTHROPIC' | 'CUSTOM'
+type GraphQLModelProvider = 'GEMINI' | 'OPENAI' | 'ANTHROPIC' | 'VIDU' | 'CUSTOM'
 type GraphQLGenerationModality = 'TEXT_TO_TEXT' | 'TEXT_TO_IMAGE' | 'TEXT_AND_IMAGE_TO_IMAGE' | 'TEXT_TO_VIDEO' | 'TEXT_TO_AUDIO'
 
 interface GraphQLModelConfig {
@@ -32,6 +32,7 @@ const providerToGraphQL: Record<OrchestratorModelProvider, GraphQLModelProvider>
   gemini: 'GEMINI',
   openai: 'OPENAI',
   anthropic: 'ANTHROPIC',
+  vidu: 'VIDU',
   custom: 'CUSTOM'
 }
 

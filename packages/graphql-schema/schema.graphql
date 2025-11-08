@@ -60,6 +60,7 @@ type Snippet {
   videoMetadata: VideoMetadata
   versions: [SnippetVersion!]!
   createdFrom: ID
+  snippetType: String
 }
 
 type SnippetVersion {
@@ -157,6 +158,7 @@ input CreateSnippetInput {
   tags: [String!]
   categories: [String!]
   createdFrom: ID
+  snippetType: String
 }
 
 input UpdateSnippetInput {

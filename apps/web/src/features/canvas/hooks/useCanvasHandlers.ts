@@ -128,6 +128,7 @@ export interface UseCanvasHandlersResult {
 
   // Canvas Operations
   handleCreateSnippet: (position: { x: number; y: number }) => void
+  handleCreateVideoSnippet: (position: { x: number; y: number }) => void
   handleSaveCanvas: () => void
 
   // Mutations
@@ -987,6 +988,69 @@ export function useCanvasHandlers({
       })
   }, [projectId, createSnippetMutation, addOptimisticSnippet, replaceOptimisticSnippet, removeOptimisticSnippet])
 
+  const handleCreateVideoSnippet = useCallback((position: { x: number; y: number }) => {
+    if (!projectId) {
+      console.error('Cannot create video snippet: no project ID')
+      return
+    }
+
+    // Generate temporary ID for optimistic update
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+    const now = new Date().toISOString()
+
+    // Snap position to column constraints
+    const snappedPosition = {
+      x: snapToColumn(position.x),
+      y: position.y
+    }
+
+    // Add optimistic video snippet immediately
+    addOptimisticSnippet({
+      id: tempId,
+      projectId,
+      title: 'Video Snippet',
+      textField1: '',
+      position: snappedPosition,
+      tags: [],
+      categories: [],
+      connections: [],
+      createdAt: now,
+      updatedAt: now,
+      version: 1,
+      isOptimistic: true,
+      snippetType: 'video'
+    })
+
+    const variables = {
+      input: {
+        projectId,
+        title: 'Video Snippet',
+        textField1: '',
+        position: snappedPosition,
+        tags: [],
+        categories: [],
+        snippetType: 'video'
+      }
+    } as Record<string, unknown> & CreateSnippetVariables
+
+    mutateWithInvalidate(
+      () => createSnippetMutation({ variables }),
+      ['ProjectWithSnippets']
+    )
+      .then(async (result) => {
+        if (result) {
+          const createdSnippet = (result as any).createSnippet as Snippet
+          // Replace optimistic snippet with real one from server
+          replaceOptimisticSnippet(tempId, createdSnippet)
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to create video snippet:', error)
+        // Remove optimistic snippet on failure
+        removeOptimisticSnippet(tempId)
+      })
+  }, [projectId, createSnippetMutation, addOptimisticSnippet, replaceOptimisticSnippet, removeOptimisticSnippet])
+
   const handleSaveCanvas = useCallback(() => {
     setLoading(true)
     // For now, just simulate saving
@@ -1403,6 +1467,7 @@ export function useCanvasHandlers({
 
     // Canvas Operations
     handleCreateSnippet,
+    handleCreateVideoSnippet,
     handleSaveCanvas,
 
     // Mutations

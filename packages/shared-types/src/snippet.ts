@@ -1,3 +1,5 @@
+import type { VideoMetadata } from './genai'
+
 export interface Position {
   x: number
   y: number
@@ -24,7 +26,11 @@ export interface Snippet {
   imageUrl?: string
   imageS3Key?: string
   imageMetadata?: ImageMetadata
+  videoUrl?: string
+  videoS3Key?: string
+  videoMetadata?: VideoMetadata
   createdFrom?: string
+  snippetType?: 'text' | 'video'
 }
 
 export interface SnippetVersion {
@@ -49,6 +55,7 @@ export interface SnippetInput {
   tags?: string[]
   categories?: string[]
   createdFrom?: string
+  snippetType?: 'text' | 'video'
 }
 
 export interface UpdateSnippetInput {

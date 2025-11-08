@@ -8,6 +8,7 @@ import { useGenAI } from '../../hooks/useGenAI'
 import { CANVAS_CONSTANTS } from '../../shared/constants'
 import { useToast } from '../../shared/store/toastStore'
 import { countWords, truncateToWords } from '../../shared/utils/textUtils'
+import { VideoSnippetNode } from './VideoSnippetNode'
 
 import type { AvailableModel, ConnectedContentItem } from '../../types'
 
@@ -30,6 +31,7 @@ interface SnippetNodeProps {
       } | null
       connectedContent?: ConnectedContentItem[]
       downstreamConnections?: Array<{ id: string; title?: string }>
+      snippetType?: 'text' | 'video'
     }
     onEdit: (snippetId: string) => void
     onDelete: (snippetId: string) => void
@@ -60,7 +62,13 @@ const POINTER_EVENTS_STYLES = {
   interactive: { pointerEvents: 'auto' as const }
 } as const
 
-export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
+export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
+  // Route to VideoSnippetNode if this is a video snippet
+  if (data.snippet.snippetType === 'video') {
+    return <VideoSnippetNode id={id} data={data} />
+  }
+
+  // Otherwise, render regular snippet UI
   const toast = useToast()
   const { id: projectId } = useParams<{ id: string }>()
   const { generateStream, createScenes } = useGenAI({ enabled: true })
@@ -621,7 +629,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
       <Handle type="source" position={Position.Right} />
 
       <div
-        className="p-3 w-[300px]"
+        className="p-3 w-[900px]"
         data-testid="snippet-node"
         data-snippet-id={snippet.id}
       >

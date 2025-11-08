@@ -93,6 +93,7 @@ export type CreateSnippetInput = {
   createdFrom?: InputMaybe<Scalars['ID']['input']>;
   position: PositionInput;
   projectId: Scalars['ID']['input'];
+  snippetType?: InputMaybe<Scalars['String']['input']>;
   tags?: InputMaybe<Array<Scalars['String']['input']>>;
   textField1?: InputMaybe<Scalars['String']['input']>;
   title?: InputMaybe<Scalars['String']['input']>;
@@ -466,6 +467,7 @@ export type Snippet = {
   imageUrl?: Maybe<Scalars['String']['output']>;
   position: Position;
   projectId: Scalars['ID']['output'];
+  snippetType?: Maybe<Scalars['String']['output']>;
   tags: Array<Scalars['String']['output']>;
   textField1: Scalars['String']['output'];
   title?: Maybe<Scalars['String']['output']>;
@@ -881,6 +883,7 @@ export type SnippetResolvers<ContextType = GraphQLContext, ParentType extends Re
   imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   position?: Resolver<ResolversTypes['Position'], ParentType, ContextType>;
   projectId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  snippetType?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   tags?: Resolver<Array<ResolversTypes['String']>, ParentType, ContextType>;
   textField1?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   title?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
