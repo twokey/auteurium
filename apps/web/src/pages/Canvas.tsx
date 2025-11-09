@@ -155,6 +155,14 @@ const CanvasContent = () => {
     onMoveEnd()
   }, [onMoveEnd])
 
+  // Handle zoom level indicator click to reset to 100%
+  const handleZoomLevelClick = useCallback(() => {
+    if (externalReactFlowInstanceRef.current) {
+      // Use zoomTo for smooth animation, preserving current view center
+      externalReactFlowInstanceRef.current.zoomTo(1, { duration: 300 })
+    }
+  }, [])
+
   // Context menu handlers with viewport-aware positioning
   const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: any) => {
     event.preventDefault()
@@ -426,6 +434,25 @@ const CanvasContent = () => {
                 border: '1px solid #e5e7eb'
               }}
             />
+            {/* Zoom Level Indicator */}
+            <div
+              className="react-flow__panel bottom left"
+              style={{
+                bottom: 110,
+                left: 10,
+                zIndex: 5
+              }}
+            >
+              <button
+                onClick={handleZoomLevelClick}
+                className="bg-white border border-gray-300 rounded px-3 py-1.5 shadow-sm hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer"
+                title="Click to zoom to 100%"
+              >
+                <span className="text-sm font-medium text-gray-700">
+                  {Math.round(viewport.zoom * 100)}%
+                </span>
+              </button>
+            </div>
           </ReactFlow>
         </div>
         

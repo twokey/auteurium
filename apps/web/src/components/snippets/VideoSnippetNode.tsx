@@ -1,8 +1,11 @@
-import { memo, useState } from 'react'
+import { memo, useState, useRef, useCallback, useEffect } from 'react'
 import { Handle, Position } from 'reactflow'
 import { Accordion } from '../../shared/components/ui/Accordion'
+import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisticUpdatesStore'
+import { useToast } from '../../shared/store/toastStore'
+import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
 
-import type { ConnectedContentItem } from '../../types'
+import type { AvailableModel, ConnectedContentItem } from '../../types'
 
 interface VideoSnippetNodeProps {
   id: string
@@ -10,9 +13,13 @@ interface VideoSnippetNodeProps {
     snippet: {
       id: string
       title?: string
+      textField1?: string
       connectedContent?: ConnectedContentItem[]
     }
     onFocusSnippet: (snippetId: string) => void
+    onUpdateContent: (snippetId: string, changes: Partial<Record<'textField1' | 'title', string>>) => Promise<void>
+    videoModels?: AvailableModel[]
+    isLoadingVideoModels?: boolean
   }
 }
 
@@ -101,12 +108,17 @@ const TextareaField = ({
 }: TextareaFieldProps) => {
   return (
     <div className="space-y-1">
+      {/* Field Label - Increased font size by 2 steps (sm -> base -> lg) */}
+      <div className="text-lg font-semibold text-gray-800 mb-1">
+        {label}
+      </div>
+
       <div className="flex items-start gap-2">
         <div className="flex-1">
           <textarea
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="w-full text-2xl font-medium text-gray-900 bg-white border border-gray-200 rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none leading-relaxed"
+            className="w-full text-2xl font-medium text-gray-900 bg-white border border-gray-200 rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-blue-300 hover:border-blue-400 resize-none leading-relaxed transition-colors"
             placeholder={placeholder}
             rows={rows}
             maxLength={maxLength}
@@ -123,8 +135,16 @@ const TextareaField = ({
   )
 }
 
+// Inline styles outside component to prevent object recreation on every render
+const POINTER_EVENTS_STYLES = {
+  interactive: { pointerEvents: 'auto' as const }
+} as const
+
 export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
-  const { snippet, onFocusSnippet } = data
+  const { snippet, onFocusSnippet, onUpdateContent, videoModels = [], isLoadingVideoModels = false } = data
+  const toast = useToast()
+  const { markSnippetDirty, clearSnippetDirty, markSnippetSaving, clearSnippetSaving } = useOptimisticUpdatesStore()
+  const openPromptDesigner = usePromptDesignerStore((state) => state.open)
 
   // Local state for all form fields (ephemeral - not persisted)
   const [formData, setFormData] = useState<VideoFormData>({
@@ -148,6 +168,37 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
     audioDetails: true // Expanded by default
   })
 
+  // Editable title state
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [draftTitle, setDraftTitle] = useState(snippet.title ?? '')
+  const [isSavingTitle, setIsSavingTitle] = useState(false)
+  const titleInputRef = useRef<HTMLInputElement | null>(null)
+
+  // Video generation state
+  const [selectedVideoModel, setSelectedVideoModel] = useState<string>('')
+
+  // Auto-select first video model when models load
+  useEffect(() => {
+    if (videoModels.length > 0 && selectedVideoModel === '') {
+      setSelectedVideoModel(videoModels[0].id)
+    }
+  }, [videoModels, selectedVideoModel])
+
+  // Sync draft title when snippet.title changes (if not editing)
+  useEffect(() => {
+    if (!isEditingTitle) {
+      setDraftTitle(snippet.title ?? '')
+    }
+  }, [snippet.title, isEditingTitle])
+
+  // Auto-focus title input when editing starts
+  useEffect(() => {
+    if (isEditingTitle && titleInputRef.current) {
+      titleInputRef.current.focus()
+      titleInputRef.current.select()
+    }
+  }, [isEditingTitle])
+
   const handleFieldChange = (field: keyof VideoFormData) => (value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
@@ -159,6 +210,69 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
   const handleIdClick = () => {
     onFocusSnippet(snippet.id)
   }
+
+  const handleTitleActivate = useCallback((event?: React.MouseEvent) => {
+    // Don't activate if Cmd/Ctrl is held (user is multi-selecting)
+    if (event && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault()
+      return
+    }
+
+    setIsEditingTitle(true)
+    markSnippetDirty(snippet.id)
+    setDraftTitle(snippet.title ?? '')
+  }, [snippet.id, snippet.title, markSnippetDirty])
+
+  const commitTitle = useCallback(async () => {
+    const newValue = draftTitle.trim()
+    const currentValue = snippet.title ?? ''
+
+    if (newValue === currentValue) {
+      clearSnippetDirty(snippet.id)
+      setIsEditingTitle(false)
+      return
+    }
+
+    setIsSavingTitle(true)
+    markSnippetSaving(snippet.id)
+
+    try {
+      await onUpdateContent(snippet.id, { title: newValue })
+      clearSnippetDirty(snippet.id)
+      setIsEditingTitle(false)
+    } catch (error) {
+      console.error('Failed to update video snippet title:', error)
+      toast.error('Failed to save title changes', 'Please try again')
+      setDraftTitle(currentValue)
+      setIsEditingTitle(false)
+    } finally {
+      setIsSavingTitle(false)
+      clearSnippetSaving(snippet.id)
+    }
+  }, [draftTitle, snippet.id, snippet.title, onUpdateContent, toast, markSnippetSaving, clearSnippetSaving, clearSnippetDirty])
+
+  const handleTitleBlur = useCallback(() => {
+    void commitTitle()
+  }, [commitTitle])
+
+  const handleTitleKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      setDraftTitle(snippet.title ?? '')
+      setIsEditingTitle(false)
+      clearSnippetDirty(snippet.id)
+      return
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      void commitTitle()
+    }
+  }, [commitTitle, snippet.title, snippet.id, clearSnippetDirty])
+
+  const handleTitleChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    setDraftTitle(event.target.value)
+  }, [])
 
   // Get connected images (up to 3)
   const connectedImages = (snippet.connectedContent ?? [])
@@ -179,11 +293,32 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
         data-testid="video-snippet-node"
         data-snippet-id={snippet.id}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between text-3xl font-bold text-gray-900 uppercase mb-5">
-          <span className="tracking-wide">
-            VIDEO SNIPPET
-          </span>
+        {/* Header with Editable Title */}
+        <div className="flex items-center justify-between mb-5">
+          {isEditingTitle ? (
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={draftTitle}
+              onChange={handleTitleChange}
+              onBlur={handleTitleBlur}
+              onKeyDown={handleTitleKeyDown}
+              className="text-3xl font-bold text-gray-900 uppercase tracking-wide bg-white border-2 border-blue-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="Untitled Video Snippet"
+              disabled={isSavingTitle}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={handleTitleActivate}
+              className="text-3xl font-bold text-gray-900 uppercase tracking-wide hover:text-blue-600 transition-colors cursor-pointer bg-transparent border-none p-0 text-left"
+              title="Click to edit title"
+            >
+              {snippet.title && snippet.title.trim() !== '' ? snippet.title : 'Untitled Video Snippet'}
+            </button>
+          )}
           <button
             type="button"
             onClick={handleIdClick}
@@ -206,7 +341,7 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
               {imageSlots.map((image, index) => (
                 <div
                   key={index}
-                  className="aspect-square border-2 border-dashed border-gray-300 rounded-sm flex items-center justify-center bg-gray-50"
+                  className="aspect-video border-2 border-dashed border-gray-300 rounded-sm flex items-center justify-center bg-gray-50"
                 >
                   {image ? (
                     <img
@@ -356,6 +491,89 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
               />
             </div>
           </Accordion>
+        </div>
+
+        {/* Video Generation Section */}
+        <div className="mt-4 pt-4 border-t border-purple-300">
+          <div className="text-base font-semibold text-gray-800 mb-3">
+            Generate Video
+          </div>
+          <div className="flex gap-2">
+            <select
+              value={selectedVideoModel}
+              onChange={(e) => {
+                e.stopPropagation()
+                setSelectedVideoModel(e.target.value)
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="flex-1 text-sm px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+              disabled={isLoadingVideoModels}
+              style={POINTER_EVENTS_STYLES.interactive}
+            >
+              <option value="" disabled>
+                {isLoadingVideoModels ? 'Loading video models...' : 'Select video model...'}
+              </option>
+              {videoModels.map((model) => (
+                <option key={model.id} value={model.id} title={model.description ?? undefined}>
+                  {model.displayName}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
+              onClick={(event) => {
+                event.stopPropagation()
+                // Don't open prompt designer if Cmd/Ctrl is held (user is multi-selecting)
+                if (event.metaKey || event.ctrlKey) {
+                  event.preventDefault()
+                  return
+                }
+
+                // Build video prompt from all form fields
+                const promptParts: string[] = []
+
+                if (formData.subject) promptParts.push(`Subject: ${formData.subject}`)
+                if (formData.action) promptParts.push(`Action: ${formData.action}`)
+                if (formData.cameraMotion) promptParts.push(`Camera & Motion: ${formData.cameraMotion}`)
+                if (formData.composition) promptParts.push(`Composition: ${formData.composition}`)
+                if (formData.focusLens) promptParts.push(`Focus & Lens: ${formData.focusLens}`)
+                if (formData.style) promptParts.push(`Style: ${formData.style}`)
+                if (formData.ambiance) promptParts.push(`Ambiance: ${formData.ambiance}`)
+                if (formData.dialogue) promptParts.push(`Dialogue: ${formData.dialogue}`)
+                if (formData.soundEffects) promptParts.push(`Sound Effects: ${formData.soundEffects}`)
+                if (formData.ambientNoise) promptParts.push(`Ambient Noise: ${formData.ambientNoise}`)
+
+                const combinedPrompt = promptParts.join('\n')
+
+                openPromptDesigner({
+                  snippetId: snippet.id,
+                  snippetTitle: snippet.title && snippet.title.trim() !== '' ? snippet.title : 'Untitled Video Snippet',
+                  mode: 'video',
+                  initialPrompt: combinedPrompt,
+                  connectedContent: snippet.connectedContent ?? [],
+                  onGenerate: () => {
+                    toast.info('Video generation coming soon!')
+                  }
+                })
+              }}
+              disabled={isLoadingVideoModels || (!selectedVideoModel && videoModels.length > 0)}
+              style={POINTER_EVENTS_STYLES.interactive}
+              aria-label="Generate video content"
+              title={
+                isLoadingVideoModels
+                  ? 'Loading models...'
+                  : !selectedVideoModel
+                    ? 'Please select a video model first'
+                    : 'Generate video for this snippet'
+              }
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              Generate Video
+            </button>
+          </div>
         </div>
       </div>
     </>
