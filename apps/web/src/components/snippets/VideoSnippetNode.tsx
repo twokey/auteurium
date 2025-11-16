@@ -4,7 +4,9 @@ import { Accordion } from '../../shared/components/ui/Accordion'
 import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisticUpdatesStore'
 import { useToast } from '../../shared/store/toastStore'
 import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
+import { useVideoPromptStore } from '../../features/snippets/store/videoPromptStore'
 import { VIDEO_GENERATION } from '../../shared/constants'
+import { StarMenu } from '../../features/snippets/components/StarMenu'
 
 import type { AvailableModel, ConnectedContentItem, VideoGenerationInput, VideoMetadata, VideoGenerationStatus } from '../../types'
 
@@ -45,64 +47,12 @@ interface VideoFormData {
   ambientNoise: string
 }
 
-interface StarDropdownProps {
-  fieldName: string
-}
-
-const StarDropdown = ({ fieldName }: StarDropdownProps) => {
-  const [isOpen, setIsOpen] = useState(false)
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation()
-          setIsOpen(!isOpen)
-        }}
-        className="text-gray-600 hover:text-gray-800 transition-colors p-1 text-xl"
-            title={`Options for ${fieldName}`}
-      >
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
-          />
-        </svg>
-      </button>
-
-      {isOpen && (
-        <>
-          {/* Backdrop to close dropdown */}
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setIsOpen(false)}
-          />
-
-          {/* Dropdown menu */}
-          <div className="absolute top-full mt-1 right-0 bg-white border border-gray-200 rounded shadow-lg p-4 z-20 min-w-[200px]">
-            <div className="text-lg text-gray-500">
-              Menu (coming soon)
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
 interface TextareaFieldProps {
   label: string
   placeholder: string
   value: string
   onChange: (value: string) => void
+  onBlur?: () => void
   maxLength: number
   rows?: number
 }
@@ -112,9 +62,18 @@ const TextareaField = ({
   placeholder,
   value,
   onChange,
+  onBlur,
   maxLength,
   rows = 3
 }: TextareaFieldProps) => {
+  const handleSnippetSelect = (content: string) => {
+    // Append content to the current value
+    const separator = value.trim() ? ' ' : ''
+    const newValue = value + separator + content
+    // Truncate if exceeds maxLength
+    onChange(newValue.slice(0, maxLength))
+  }
+
   return (
     <div className="space-y-1">
       {/* Field Label - Increased font size by 2 steps (sm -> base -> lg) */}
@@ -127,6 +86,7 @@ const TextareaField = ({
           <textarea
             value={value}
             onChange={(e) => onChange(e.target.value)}
+            onBlur={onBlur}
             className="w-full text-2xl font-medium text-gray-900 bg-white border border-gray-200 rounded-sm p-4 focus:outline-none focus:ring-2 focus:ring-blue-300 hover:border-blue-400 resize-none leading-relaxed transition-colors"
             placeholder={placeholder}
             rows={rows}
@@ -135,7 +95,7 @@ const TextareaField = ({
             onMouseDown={(e) => e.stopPropagation()}
           />
         </div>
-        <StarDropdown fieldName={label} />
+        <StarMenu fieldType={label} onSelect={handleSnippetSelect} />
       </div>
       <div className="text-xl text-gray-500 text-right">
         {value.length}/{maxLength}
@@ -175,6 +135,12 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
   const toast = useToast()
   const { markSnippetDirty, clearSnippetDirty, markSnippetSaving, clearSnippetSaving } = useOptimisticUpdatesStore()
   const openPromptDesigner = usePromptDesignerStore((state) => state.open)
+  const {
+    setActiveSnippet,
+    updateCombinedPrompt,
+    updateReferenceImages,
+    activeSnippetId
+  } = useVideoPromptStore()
 
   // Local state for all form fields (ephemeral - not persisted)
   const [formData, setFormData] = useState<VideoFormData>({
@@ -257,6 +223,49 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
     onFocusSnippet(snippet.id)
   }
 
+  // Combine all form fields into a single prompt
+  const combineFormFieldsToPrompt = useCallback(() => {
+    const promptParts: string[] = []
+
+    if (formData.subject) promptParts.push(`Subject: ${formData.subject}`)
+    if (formData.action) promptParts.push(`Action: ${formData.action}`)
+    if (formData.cameraMotion) promptParts.push(`Camera & Motion: ${formData.cameraMotion}`)
+    if (formData.composition) promptParts.push(`Composition: ${formData.composition}`)
+    if (formData.focusLens) promptParts.push(`Focus & Lens: ${formData.focusLens}`)
+    if (formData.style) promptParts.push(`Style: ${formData.style}`)
+    if (formData.ambiance) promptParts.push(`Ambiance: ${formData.ambiance}`)
+    if (formData.dialogue) promptParts.push(`Dialogue: ${formData.dialogue}`)
+    if (formData.soundEffects) promptParts.push(`Sound Effects: ${formData.soundEffects}`)
+    if (formData.ambientNoise) promptParts.push(`Ambient Noise: ${formData.ambientNoise}`)
+
+    return promptParts.join('\n')
+  }, [formData])
+
+  // Update preview when form data changes
+  const handleFieldBlur = useCallback(() => {
+    if (activeSnippetId === snippet.id) {
+      const combinedPrompt = combineFormFieldsToPrompt()
+      updateCombinedPrompt(combinedPrompt)
+    }
+  }, [activeSnippetId, snippet.id, combineFormFieldsToPrompt, updateCombinedPrompt])
+
+  // Handle snippet click to mark as active
+  const handleSnippetClick = useCallback(() => {
+    setActiveSnippet(snippet.id)
+
+    // Update prompt and reference images
+    const combinedPrompt = combineFormFieldsToPrompt()
+    updateCombinedPrompt(combinedPrompt)
+
+    // Update reference images
+    const imageRefs = referenceImages.map((img) => ({
+      url: img.value,
+      snippetId: img.snippetId,
+      snippetTitle: img.snippetTitle || undefined
+    }))
+    updateReferenceImages(imageRefs)
+  }, [snippet.id, setActiveSnippet, combineFormFieldsToPrompt, updateCombinedPrompt, referenceImages, updateReferenceImages])
+
   const handleTitleActivate = useCallback((event?: React.MouseEvent) => {
     // Don't activate if Cmd/Ctrl is held (user is multi-selecting)
     if (event && (event.metaKey || event.ctrlKey)) {
@@ -332,6 +341,7 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
         className="p-6 w-[900px] bg-purple-100 border border-purple-200 rounded-2xl shadow-sm"
         data-testid="video-snippet-node"
         data-snippet-id={snippet.id}
+        onClick={handleSnippetClick}
       >
         {/* Header with Editable Title */}
         <div className="flex items-center justify-between mb-5">
@@ -424,6 +434,7 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
               placeholder="e.g., A cute creature with snow leopard-like fur and large expressive eyes."
               value={formData.subject}
               onChange={handleFieldChange('subject')}
+              onBlur={handleFieldBlur}
               maxLength={280}
             />
             <TextareaField
@@ -431,6 +442,7 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
               placeholder="e.g., happily prances through a whimsical winter forest."
               value={formData.action}
               onChange={handleFieldChange('action')}
+              onBlur={handleFieldBlur}
               maxLength={280}
             />
           </div>
@@ -450,6 +462,7 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
                 placeholder="e.g., Aerial view, dolly shot"
                 value={formData.cameraMotion}
                 onChange={handleFieldChange('cameraMotion')}
+                onBlur={handleFieldBlur}
                 maxLength={140}
                 rows={2}
               />
@@ -458,6 +471,7 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
                 placeholder="e.g., Wide shot, close-up"
                 value={formData.composition}
                 onChange={handleFieldChange('composition')}
+                onBlur={handleFieldBlur}
                 maxLength={140}
                 rows={2}
               />
@@ -466,6 +480,7 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
                 placeholder="e.g., Shallow focus, wide-angle"
                 value={formData.focusLens}
                 onChange={handleFieldChange('focusLens')}
+                onBlur={handleFieldBlur}
                 maxLength={140}
                 rows={2}
               />
@@ -486,6 +501,7 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
                 placeholder="e.g., 3D animated scene, joyful cartoon style, bright cheerful colors."
                 value={formData.style}
                 onChange={handleFieldChange('style')}
+                onBlur={handleFieldBlur}
                 maxLength={280}
               />
               <TextareaField
@@ -493,6 +509,7 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
                 placeholder="e.g., Warm sunlight filtering through branches, eerie glow of a neon sign."
                 value={formData.ambiance}
                 onChange={handleFieldChange('ambiance')}
+                onBlur={handleFieldBlur}
                 maxLength={280}
               />
             </div>
@@ -513,6 +530,7 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
                 placeholder='e.g., "This must be the key," he murmured.'
                 value={formData.dialogue}
                 onChange={handleFieldChange('dialogue')}
+                onBlur={handleFieldBlur}
                 maxLength={280}
               />
               <TextareaField
@@ -520,6 +538,7 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
                 placeholder="e.g., Tires screeching loudly, engine roaring."
                 value={formData.soundEffects}
                 onChange={handleFieldChange('soundEffects')}
+                onBlur={handleFieldBlur}
                 maxLength={280}
               />
               <TextareaField
@@ -527,6 +546,7 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
                 placeholder="e.g., A faint, eerie hum resonates."
                 value={formData.ambientNoise}
                 onChange={handleFieldChange('ambientNoise')}
+                onBlur={handleFieldBlur}
                 maxLength={280}
               />
             </div>

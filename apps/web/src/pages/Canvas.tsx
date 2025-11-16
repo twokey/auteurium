@@ -28,6 +28,8 @@ import { useCanvasStore } from '../features/canvas/store/canvasStore'
 import { useContextMenuStore } from '../features/canvas/store/contextMenuStore'
 import { ModelsProvider, useModels } from '../contexts/ModelsContext'
 import { PromptDesignerPanel } from '../components/canvas/PromptDesignerPanel'
+import { VideoPromptPreviewPanel } from '../components/snippets/VideoPromptPreviewPanel'
+import { useVideoPromptStore } from '../features/snippets/store/videoPromptStore'
 
 const NODE_TYPES: NodeTypes = {
   snippet: SnippetNode
@@ -43,6 +45,7 @@ const CanvasContent = () => {
   const navigate = useNavigate()
   const { generatingImageSnippetIds, generatingVideoSnippetIds, setSelectedSnippetIds } = useCanvasStore()
   const { openContextMenu, closeContextMenu } = useContextMenuStore()
+  const { activeSnippetId, clearActive } = useVideoPromptStore()
 
   // Track viewport for column guides
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 })
@@ -224,8 +227,9 @@ const CanvasContent = () => {
 
   const handlePaneClick = useCallback(() => {
     closeContextMenu()
+    clearActive() // Clear active video snippet when clicking on canvas pane
     // Note: ReactFlow will automatically deselect nodes and trigger onSelectionChange
-  }, [closeContextMenu])
+  }, [closeContextMenu, clearActive])
 
   // React Flow now handles all selection logic natively via multiSelectionKeyCode="Meta"
   // No custom node click handler needed
@@ -480,6 +484,19 @@ const CanvasContent = () => {
           )}
           <PromptDesignerPanel />
         </div>
+
+        {/* Video Prompt Preview Panel - positioned relative to active video snippet */}
+        {activeSnippetId && (
+          <VideoPromptPreviewPanel
+            snippets={snippets}
+            viewport={viewport}
+            videoModels={videoModels}
+            isLoadingVideoModels={isLoadingVideoModels}
+            isGeneratingVideo={!!generatingVideoSnippetIds[activeSnippetId]}
+            onGenerateVideo={handlers.handleGenerateVideo}
+            onUpdateContent={handlers.handleUpdateSnippetContent}
+          />
+        )}
       </div>
 
       {/* All Modals - Now managed centrally */}
