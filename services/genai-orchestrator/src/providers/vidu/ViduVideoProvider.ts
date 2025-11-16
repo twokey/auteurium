@@ -1,15 +1,17 @@
 import { Logger } from '@aws-lambda-powertools/logger'
-import type { ModelConfig, VideoGenerationRequest, VideoGenerationResponse, VideoMetadata } from '@auteurium/shared-types'
+import type { ModelConfig, VideoGenerationRequest, VideoGenerationResponse } from '@auteurium/shared-types'
 import type { IVideoProvider } from '../base/IVideoProvider'
-import { getModelsByProvider } from '../../config/models'
+import { getModelConfig, getModelsByProvider } from '../../config/models'
 import { ModelProvider, GenerationModality } from '@auteurium/shared-types'
 
 const logger = new Logger({ serviceName: 'vidu-video-provider' })
 
+type ViduTaskState = 'created' | 'queueing' | 'waiting' | 'processing' | 'succeed' | 'success' | 'failed'
+
 interface ViduTaskResponse {
-  taskId: string
-  status: 'waiting' | 'processing' | 'succeed' | 'failed'
-  videoUrl?: string
+  task_id: string
+  state: ViduTaskState
+  err_code?: string
   error?: string
 }
 
@@ -17,12 +19,19 @@ interface ViduTaskResponse {
  * Vidu video generation provider implementation
  * Supports text-to-video and image-to-video generation
  */
+interface ViduVideoProviderOptions {
+  webhookUrl?: string
+}
+
 export class ViduVideoProvider implements IVideoProvider {
   readonly name = 'vidu-video'
   private apiKey: string | null = null
   private baseUrl = 'https://api.vidu.com/ent/v2'
-  private maxPollingAttempts = 60 // 5 minutes with 5 second intervals
-  private pollingInterval = 5000 // 5 seconds
+  private webhookUrl?: string
+
+  constructor(options?: ViduVideoProviderOptions) {
+    this.webhookUrl = options?.webhookUrl
+  }
 
   async initialize(apiKey: string): Promise<void> {
     this.apiKey = apiKey
@@ -41,6 +50,11 @@ export class ViduVideoProvider implements IVideoProvider {
     const startTime = Date.now()
 
     try {
+      const modelConfig = getModelConfig(request.modelId)
+      if (!modelConfig) {
+        throw new Error(`Model configuration not found for ${request.modelId}`)
+      }
+
       // Validate prompt
       await this.validatePrompt(request.prompt)
 
@@ -50,7 +64,7 @@ export class ViduVideoProvider implements IVideoProvider {
         : 'text2video'
 
       logger.info('Generating video with Vidu', {
-        modelId: request.modelId,
+        modelId: modelConfig.modelId,
         endpoint,
         promptLength: request.prompt.length,
         imageCount: request.inputImages?.length || 0,
@@ -59,52 +73,25 @@ export class ViduVideoProvider implements IVideoProvider {
       })
 
       // Submit video generation task
-      const taskResponse = await this.submitVideoTask(endpoint, request)
-
-      // Poll for completion
-      const finalResponse = await this.pollTaskStatus(taskResponse.taskId)
-
-      if (finalResponse.status === 'failed') {
-        throw new Error(`Video generation failed: ${finalResponse.error || 'Unknown error'}`)
-      }
-
-      if (!finalResponse.videoUrl) {
-        throw new Error('No video URL returned from Vidu')
-      }
-
-      // Download video from Vidu URL
-      const videoBuffer = await this.downloadVideo(finalResponse.videoUrl)
+      const taskResponse = await this.submitVideoTask(endpoint, request, modelConfig.modelId)
 
       const generationTimeMs = Date.now() - startTime
       const cost = this.calculateCost(1, request.modelId)
 
-      const metadata: VideoMetadata = {
-        duration: request.duration || 4,
-        resolution: request.resolution || '720p',
-        aspectRatio: request.aspectRatio || '16:9',
-        style: request.style,
-        seed: request.seed,
-        format: 'mp4',
-        fileSize: videoBuffer.length,
-        movementAmplitude: request.movementAmplitude
-      }
-
-      logger.info('Video generation completed', {
-        modelId: request.modelId,
+      logger.info('Video generation task submitted', {
+        modelId: modelConfig.modelId,
         cost,
         generationTimeMs,
-        videoSizeBytes: videoBuffer.length
+        taskId: taskResponse.task_id,
+        webhookConfigured: Boolean(this.webhookUrl)
       })
 
       return {
-        videoUrl: finalResponse.videoUrl,
-        videoBuffer,
-        metadata,
-        tokensUsed: 1, // Vidu charges per video, not tokens
         cost,
-        modelUsed: request.modelId,
+        modelUsed: modelConfig.modelId,
         generationTimeMs,
-        taskId: taskResponse.taskId
+        taskId: taskResponse.task_id,
+        status: 'PENDING'
       }
     } catch (error) {
       logger.error('Video generation failed', {
@@ -115,11 +102,11 @@ export class ViduVideoProvider implements IVideoProvider {
     }
   }
 
-  private async submitVideoTask(endpoint: string, request: VideoGenerationRequest): Promise<ViduTaskResponse> {
+  private async submitVideoTask(endpoint: string, request: VideoGenerationRequest, resolvedModelId: string): Promise<ViduTaskResponse> {
     const url = `${this.baseUrl}/${endpoint}`
 
     const body: Record<string, unknown> = {
-      model: request.modelId,
+      model: resolvedModelId,
       prompt: request.prompt
     }
 
@@ -146,7 +133,17 @@ export class ViduVideoProvider implements IVideoProvider {
       body.movement_amplitude = request.movementAmplitude
     }
 
-    logger.info('Submitting Vidu task', { url, model: request.modelId })
+    if (this.webhookUrl) {
+      body.callback_url = this.webhookUrl
+      logger.info('Including callback URL for Vidu task', {
+        callbackUrl: this.webhookUrl,
+        endpoint: url
+      })
+    } else {
+      logger.warn('No webhook URL configured for Vidu provider; callbacks will not be received')
+    }
+
+    logger.info('Submitting Vidu task', { url, model: request.modelId, requestBody: body })
 
     const response = await fetch(url, {
       method: 'POST',
@@ -159,77 +156,25 @@ export class ViduVideoProvider implements IVideoProvider {
 
     if (!response.ok) {
       const errorText = await response.text()
+      logger.error('Vidu API request failed', {
+        status: response.status,
+        statusText: response.statusText,
+        errorBody: errorText,
+        requestUrl: url,
+        requestBody: body
+      })
       throw new Error(`Vidu API error (${response.status}): ${errorText}`)
     }
 
     const data = await response.json() as ViduTaskResponse
 
-    logger.info('Vidu task submitted', { taskId: data.taskId, status: data.status })
-
-    return data
-  }
-
-  private async pollTaskStatus(taskId: string): Promise<ViduTaskResponse> {
-    let attempts = 0
-
-    while (attempts < this.maxPollingAttempts) {
-      attempts++
-
-      // Wait before polling (except first attempt)
-      if (attempts > 1) {
-        await this.sleep(this.pollingInterval)
-      }
-
-      const status = await this.checkTaskStatus(taskId)
-
-      logger.info('Polling Vidu task', {
-        taskId,
-        status: status.status,
-        attempt: attempts,
-        maxAttempts: this.maxPollingAttempts
-      })
-
-      if (status.status === 'succeed' || status.status === 'failed') {
-        return status
-      }
-    }
-
-    throw new Error(`Video generation timed out after ${this.maxPollingAttempts} attempts`)
-  }
-
-  private async checkTaskStatus(taskId: string): Promise<ViduTaskResponse> {
-    const url = `${this.baseUrl}/generation/${taskId}`
-
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Token ${this.apiKey}`
-      }
+    logger.info('Vidu task submitted successfully', {
+      taskId: data.task_id,
+      state: data.state,
+      fullResponse: data
     })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`Vidu status check error (${response.status}): ${errorText}`)
-    }
-
-    return await response.json() as ViduTaskResponse
-  }
-
-  private async downloadVideo(videoUrl: string): Promise<Buffer> {
-    logger.info('Downloading video from Vidu', { videoUrl })
-
-    const response = await fetch(videoUrl)
-
-    if (!response.ok) {
-      throw new Error(`Failed to download video: ${response.status} ${response.statusText}`)
-    }
-
-    const arrayBuffer = await response.arrayBuffer()
-    return Buffer.from(arrayBuffer)
-  }
-
-  private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms))
+    return data
   }
 
   async getAvailableModels(): Promise<ModelConfig[]> {
@@ -243,8 +188,7 @@ export class ViduVideoProvider implements IVideoProvider {
   }
 
   calculateCost(videosGenerated: number, modelId: string): number {
-    const models = getModelsByProvider(ModelProvider.VIDU)
-    const model = models.find(m => m.modelId === modelId)
+    const model = getModelConfig(modelId)
 
     if (!model || !model.costPerToken) {
       logger.warn('Cost per video not configured for model', { modelId })
@@ -277,7 +221,7 @@ export class ViduVideoProvider implements IVideoProvider {
   }
 
   getSupportedResolutions(): string[] {
-    return ['512', '720p', '1080p']
+    return ['540p', '720p', '1080p']
   }
 
   getSupportedStyles(): string[] {

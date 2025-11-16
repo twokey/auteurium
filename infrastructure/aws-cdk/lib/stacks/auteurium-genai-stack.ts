@@ -2,6 +2,7 @@ import * as path from 'path'
 
 import * as cdk from 'aws-cdk-lib'
 import * as appsync from 'aws-cdk-lib/aws-appsync'
+import * as apigateway from 'aws-cdk-lib/aws-apigateway'
 import * as cognito from 'aws-cdk-lib/aws-cognito'
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb'
 import * as iam from 'aws-cdk-lib/aws-iam'
@@ -89,6 +90,15 @@ export class AuteuriumGenAIStack extends cdk.Stack {
         name: 'modelProvider',
         type: dynamodb.AttributeType.STRING
       }
+    })
+
+    this.generationsTable.addGlobalSecondaryIndex({
+      indexName: 'taskId-index',
+      partitionKey: {
+        name: 'taskId',
+        type: dynamodb.AttributeType.STRING
+      },
+      projectionType: dynamodb.ProjectionType.ALL
     })
 
     // Lambda function for generateContent mutation
@@ -256,6 +266,29 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       }
     })
 
+    const viduWebhookFunction = new lambdaNodejs.NodejsFunction(this, `ViduWebhookFunction-${stage}`, {
+      functionName: `auteurium-genai-vidu-webhook-${stage}`,
+      runtime: lambda.Runtime.NODEJS_22_X,
+      entry: path.join(__dirname, '../../../../services/api/src/webhooks/viduCallback.ts'),
+      handler: 'handler',
+      timeout: cdk.Duration.seconds(60),
+      memorySize: 1024,
+      bundling: {
+        format: lambdaNodejs.OutputFormat.CJS,
+        target: 'node22',
+        sourceMap: true,
+        tsconfig: path.join(__dirname, '../../../../services/api/tsconfig.json')
+      },
+      depsLockFilePath: path.join(__dirname, '../../../../package-lock.json'),
+      environment: {
+        SNIPPETS_TABLE: snippetsTable.tableName,
+        GENERATIONS_TABLE: this.generationsTable.tableName,
+        MEDIA_BUCKET_NAME: mediaBucket.bucketName,
+        LLM_API_KEYS_SECRET_ARN: llmApiKeysSecret.secretArn,
+        STAGE: stage
+      }
+    })
+
     // Lambda function for createScenes mutation
     const createScenesFunction = new lambdaNodejs.NodejsFunction(this, `CreateScenesFunction-${stage}`, {
       functionName: `auteurium-genai-create-scenes-${stage}`,
@@ -284,12 +317,38 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       }
     })
 
+    const webhookApi = new apigateway.RestApi(this, `GenAIWebhookApi-${stage}`, {
+      restApiName: `auteurium-genai-webhooks-${stage}`,
+      deployOptions: {
+        stageName: stage,
+        throttlingBurstLimit: 100,
+        throttlingRateLimit: 100
+      },
+      defaultCorsPreflightOptions: {
+        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowMethods: ['POST', 'OPTIONS']
+      }
+    })
+
+    const webhookPath = webhookApi.root.addResource('api')
+      .addResource('webhooks')
+      .addResource('vidu')
+      .addResource('callback')
+
+    webhookPath.addMethod('POST', new apigateway.LambdaIntegration(viduWebhookFunction), {
+      methodResponses: [{ statusCode: '200' }]
+    })
+
+    const viduWebhookUrl = webhookApi.urlForPath('/api/webhooks/vidu/callback')
+    generateVideoFunction.addEnvironment('VIDU_WEBHOOK_URL', viduWebhookUrl)
+
     // Grant permissions
     llmApiKeysSecret.grantRead(generateContentFunction)
     llmApiKeysSecret.grantRead(generateContentStreamFunction)
     llmApiKeysSecret.grantRead(generateImageFunction)
     llmApiKeysSecret.grantRead(generateVideoFunction)
     llmApiKeysSecret.grantRead(createScenesFunction)
+    llmApiKeysSecret.grantRead(viduWebhookFunction)
     usersTable.grantReadWriteData(generateContentFunction)
     usersTable.grantReadWriteData(generateContentStreamFunction)
     usersTable.grantReadWriteData(generationHistoryFunction)
@@ -302,17 +361,20 @@ export class AuteuriumGenAIStack extends cdk.Stack {
     this.generationsTable.grantReadWriteData(generateImageFunction)
     this.generationsTable.grantReadWriteData(generateVideoFunction)
     this.generationsTable.grantReadWriteData(createScenesFunction)
+    this.generationsTable.grantReadWriteData(viduWebhookFunction)
     snippetsTable.grantReadData(generateContentFunction)
     snippetsTable.grantReadData(generateContentStreamFunction)
     snippetsTable.grantReadWriteData(generateImageFunction)
     snippetsTable.grantReadWriteData(generateVideoFunction)
     snippetsTable.grantReadWriteData(createScenesFunction) // Need write access to create scene snippets
+    snippetsTable.grantReadWriteData(viduWebhookFunction)
     projectsTable.grantReadData(generateContentFunction)
     projectsTable.grantReadData(generateContentStreamFunction)
     connectionsTable.grantReadData(generateImageFunction) // Need to query connections for multimodal image generation
     connectionsTable.grantReadData(generateVideoFunction) // Need to query connections for multimodal video generation
     mediaBucket.grantReadWrite(generateImageFunction)
     mediaBucket.grantReadWrite(generateVideoFunction)
+    mediaBucket.grantReadWrite(viduWebhookFunction)
 
     // Grant versions table write access for createScenes
     const versionsTable = dynamodb.Table.fromTableName(this, 'VersionsTableForScenes', `auteurium-versions-${stage}`)
@@ -535,6 +597,11 @@ export class AuteuriumGenAIStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'LLMApiKeysSecretArn', {
       value: llmApiKeysSecret.secretArn,
       description: 'Secrets Manager ARN for LLM API keys'
+    })
+
+    new cdk.CfnOutput(this, 'ViduWebhookUrl', {
+      value: viduWebhookUrl,
+      description: 'Public URL for the Vidu webhook callback'
     })
   }
 }

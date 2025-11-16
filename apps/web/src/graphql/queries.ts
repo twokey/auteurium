@@ -54,6 +54,21 @@ export const GET_PROJECT = /* GraphQL */ `
           height
           aspectRatio
         }
+        videoUrl
+        videoS3Key
+        videoMetadata {
+          duration
+          resolution
+          aspectRatio
+          style
+          seed
+          format
+          fileSize
+          movementAmplitude
+        }
+        videoGenerationStatus
+        videoGenerationTaskId
+        videoGenerationError
       }
     }
   }
@@ -89,6 +104,21 @@ export const GET_PROJECT_WITH_SNIPPETS = /* GraphQL */ `
           height
           aspectRatio
         }
+        videoUrl
+        videoS3Key
+        videoMetadata {
+          duration
+          resolution
+          aspectRatio
+          style
+          seed
+          format
+          fileSize
+          movementAmplitude
+        }
+        videoGenerationStatus
+        videoGenerationTaskId
+        videoGenerationError
         snippetType
       }
     }
@@ -133,6 +163,21 @@ export const GET_SNIPPET = /* GraphQL */ `
         height
         aspectRatio
       }
+      videoUrl
+      videoS3Key
+      videoMetadata {
+        duration
+        resolution
+        aspectRatio
+        style
+        seed
+        format
+        fileSize
+        movementAmplitude
+      }
+      videoGenerationStatus
+      videoGenerationTaskId
+      videoGenerationError
       versions {
         id
         version

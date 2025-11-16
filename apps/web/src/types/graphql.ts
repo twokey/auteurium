@@ -111,6 +111,7 @@ export interface CreateSnippetInput {
   position?: Position
   tags?: string[]
   categories?: string[]
+  snippetType?: 'text' | 'video'
 }
 
 export interface CreateSnippetVariables {
@@ -197,6 +198,22 @@ export interface GenerateContentVariables {
   projectId: string
   snippetId: string
   input: GenerateContentInput
+}
+
+export interface GenerateSnippetVideoVariables {
+  projectId: string
+  snippetId: string
+  modelId: string
+  duration?: number
+  aspectRatio?: string
+  resolution?: string
+  style?: string
+  seed?: number
+  movementAmplitude?: string
+}
+
+export interface GenerateSnippetVideoMutationData {
+  generateSnippetVideo: Snippet
 }
 
 // Mutation Response Types

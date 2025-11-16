@@ -1,7 +1,7 @@
 import { GenerationOrchestrator } from '@auteurium/genai-orchestrator'
 import { Logger } from '@aws-lambda-powertools/logger'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { GetSecretValueCommand, SecretsManagerClient } from '@aws-sdk/client-secrets-manager'
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 
@@ -10,9 +10,10 @@ import { handleError } from '../../utils/errors'
 import { queryConnections } from '../../database/connections'
 import { batchGetSnippets } from '../../database/snippets'
 
-import type { VideoMetadata, Snippet, ImageMetadata } from '@auteurium/shared-types'
+import type { Snippet, ImageMetadata, VideoMetadata, VideoGenerationStatus } from '@auteurium/shared-types'
 import type { AppSyncResolverHandler } from 'aws-lambda'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { generateVideoInputSchema } from '@auteurium/validation'
 
 const logger = new Logger({ serviceName: 'snippet-generate-video' })
 
@@ -53,6 +54,9 @@ interface SnippetRecord {
   imageMetadata?: ImageMetadata | null
   videoS3Key?: string | null
   videoMetadata?: VideoMetadata | null
+  videoGenerationStatus?: VideoGenerationStatus | null
+  videoGenerationTaskId?: string | null
+  videoGenerationError?: string | null
 }
 
 /**
@@ -61,6 +65,14 @@ interface SnippetRecord {
 const extractTimestampFromS3Key = (s3Key: string): number => {
   const match = s3Key.match(/(?:image|video)-(\d+)\.\w+$/)
   return match ? parseInt(match[1], 10) : 0
+}
+
+const getReferenceImageLimit = (modelId: string): number => {
+  const normalized = modelId.toLowerCase()
+  if (normalized.includes('q1') || normalized.includes('q2')) {
+    return 7
+  }
+  return 3
 }
 
 /**
@@ -78,6 +90,11 @@ export const handler: AppSyncResolverHandler<GenerateVideoArgs, Snippet> = async
     }
 
     const userId = context.user.id
+
+    logger.info('Validating video generation input', {
+      arguments: event.arguments
+    })
+
     const {
       projectId,
       snippetId,
@@ -88,7 +105,7 @@ export const handler: AppSyncResolverHandler<GenerateVideoArgs, Snippet> = async
       style,
       seed,
       movementAmplitude
-    } = event.arguments
+    } = generateVideoInputSchema.parse(event.arguments)
 
     logger.info('Starting video generation for snippet', {
       userId,
@@ -154,8 +171,7 @@ export const handler: AppSyncResolverHandler<GenerateVideoArgs, Snippet> = async
         snippetsWithImages: snippetsWithImages.length
       })
 
-      // Validate image count (Vidu Q1 supports up to 7, Vidu 2.0/1.5 support up to 3)
-      const maxImages = modelId.includes('q1') ? 7 : 3
+      const maxImages = getReferenceImageLimit(modelId)
       if (snippetsWithImages.length > maxImages) {
         throw new Error(
           `Too many connected images (${snippetsWithImages.length}). Maximum ${maxImages} images supported for ${modelId}. ` +
@@ -229,12 +245,12 @@ export const handler: AppSyncResolverHandler<GenerateVideoArgs, Snippet> = async
       {
         modelId,
         prompt: snippet.textField1,
-        duration,
-        aspectRatio,
-        resolution,
-        style,
-        seed,
-        movementAmplitude,
+        duration: duration ?? undefined,
+        aspectRatio: aspectRatio ?? undefined,
+        resolution: resolution ?? undefined,
+        style: style ?? undefined,
+        seed: seed ?? undefined,
+        movementAmplitude: movementAmplitude ?? undefined,
         inputImages: inputImageUrls.length > 0 ? inputImageUrls : undefined
       },
       {
@@ -243,62 +259,21 @@ export const handler: AppSyncResolverHandler<GenerateVideoArgs, Snippet> = async
         projectId
       }
     )
-
-    // Extract video buffer
-    if (!videoResponse.videoBuffer) {
-      throw new Error('No video data returned from Vidu')
+    if (!videoResponse.taskId) {
+      throw new Error('Vidu did not return a task ID for tracking')
     }
 
-    const videoBuffer = Buffer.from(videoResponse.videoBuffer)
-
-    // Upload to S3
-    const timestamp = Date.now()
-    const s3Key = `snippets/${projectId}/${snippetId}/video-${timestamp}.mp4`
-
-    logger.info('Uploading video to S3', {
-      snippetId,
-      s3Key,
-      videoSize: videoBuffer.length
-    })
-
-    await s3Client.send(new PutObjectCommand({
-      Bucket: MEDIA_BUCKET_NAME,
-      Key: s3Key,
-      Body: videoBuffer,
-      ContentType: 'video/mp4',
-      Metadata: {
-        projectId,
-        snippetId,
-        userId,
-        generatedAt: new Date().toISOString(),
-        modelId,
-        duration: String(videoResponse.metadata.duration),
-        resolution: videoResponse.metadata.resolution
-      }
-    }))
-
-    // Note: We don't store a public URL here. The S3 bucket is private.
-    // Presigned URLs are generated at query time.
-
-    // Extract video metadata
-    const videoMetadata: VideoMetadata = {
-      duration: videoResponse.metadata.duration,
-      resolution: videoResponse.metadata.resolution,
-      aspectRatio: videoResponse.metadata.aspectRatio,
-      style: videoResponse.metadata.style,
-      seed: videoResponse.metadata.seed,
-      format: videoResponse.metadata.format,
-      fileSize: videoResponse.metadata.fileSize,
-      movementAmplitude: videoResponse.metadata.movementAmplitude
-    }
-
-    // Update snippet in DynamoDB with video info
+    const pendingStatus: VideoGenerationStatus = 'PENDING'
     const updatedAt = new Date().toISOString()
-
-    logger.info('Updating snippet with video metadata', {
-      snippetId,
-      s3Key
-    })
+    const requestMetadata = {
+      ...(duration !== undefined && { duration }),
+      ...(aspectRatio !== undefined && { aspectRatio }),
+      ...(resolution !== undefined && { resolution }),
+      ...(style !== undefined && { style }),
+      ...(seed !== undefined && { seed }),
+      ...(movementAmplitude !== undefined && { movementAmplitude }),
+      inputImagesCount: inputImageUrls.length
+    }
 
     await dynamoClient.send(new UpdateCommand({
       TableName: SNIPPETS_TABLE,
@@ -306,15 +281,15 @@ export const handler: AppSyncResolverHandler<GenerateVideoArgs, Snippet> = async
         projectId,
         id: snippetId
       },
-      UpdateExpression: 'SET videoS3Key = :videoS3Key, videoMetadata = :videoMetadata, updatedAt = :updatedAt',
+      UpdateExpression: 'SET videoGenerationStatus = :videoGenerationStatus, videoGenerationTaskId = :videoGenerationTaskId, videoGenerationError = :videoGenerationError, updatedAt = :updatedAt',
       ExpressionAttributeValues: {
-        ':videoS3Key': s3Key,
-        ':videoMetadata': videoMetadata,
+        ':videoGenerationStatus': pendingStatus,
+        ':videoGenerationTaskId': videoResponse.taskId,
+        ':videoGenerationError': null,
         ':updatedAt': updatedAt
       }
     }))
 
-    // Save generation record to DynamoDB
     const generationId = `${Date.now()}-${Math.random().toString(36).substring(7)}`
     const createdAt = new Date().toISOString()
 
@@ -324,9 +299,10 @@ export const handler: AppSyncResolverHandler<GenerateVideoArgs, Snippet> = async
         PK: `USER#${userId}`,
         SK: `GENERATION#${createdAt}#${generationId}`
       },
-      UpdateExpression: 'SET id = :id, userId = :userId, snippetId = :snippetId, projectId = :projectId, modelProvider = :modelProvider, modelId = :modelId, prompt = :prompt, #result = :result, tokensUsed = :tokensUsed, cost = :cost, generationTimeMs = :generationTimeMs, createdAt = :createdAt',
+      UpdateExpression: 'SET id = :id, userId = :userId, snippetId = :snippetId, projectId = :projectId, modelProvider = :modelProvider, modelId = :modelId, prompt = :prompt, #result = :result, tokensUsed = :tokensUsed, cost = :cost, generationTimeMs = :generationTimeMs, createdAt = :createdAt, taskId = :taskId, #status = :status, videoRequest = :videoRequest',
       ExpressionAttributeNames: {
-        '#result': 'result' // 'result' is a reserved keyword in DynamoDB
+        '#result': 'result',
+        '#status': 'status'
       },
       ExpressionAttributeValues: {
         ':id': generationId,
@@ -336,45 +312,65 @@ export const handler: AppSyncResolverHandler<GenerateVideoArgs, Snippet> = async
         ':modelProvider': 'vidu',
         ':modelId': modelId,
         ':prompt': snippet.textField1,
-        ':result': s3Key, // Store S3 key
+        ':result': snippet.videoS3Key ?? 'pending',
         ':tokensUsed': videoResponse.tokensUsed || 0,
         ':cost': videoResponse.cost,
         ':generationTimeMs': videoResponse.generationTimeMs,
-        ':createdAt': createdAt
+        ':createdAt': createdAt,
+        ':taskId': videoResponse.taskId,
+        ':status': pendingStatus,
+        ':videoRequest': requestMetadata
       }
     }))
 
-    logger.info('Video generation completed successfully', {
+    logger.info('Video generation task queued', {
       userId,
       snippetId,
       generationId,
       cost: videoResponse.cost,
-      s3Key
+      taskId: videoResponse.taskId
     })
 
-    // Generate presigned URL for immediate preview (valid for 1 hour)
-    const videoUrl = await getSignedUrl(
-      s3Client,
-      new GetObjectCommand({
-        Bucket: MEDIA_BUCKET_NAME,
-        Key: s3Key
-      }),
-      { expiresIn: 3600 }
-    )
+    let videoUrl: string | undefined
+    if (snippet.videoS3Key) {
+      try {
+        videoUrl = await getSignedUrl(
+          s3Client,
+          new GetObjectCommand({
+            Bucket: MEDIA_BUCKET_NAME,
+            Key: snippet.videoS3Key
+          }),
+          { expiresIn: 3600 }
+        )
+      } catch (signError) {
+        logger.warn('Failed to generate signed URL for existing video', {
+          snippetId,
+          videoKey: snippet.videoS3Key,
+          error: signError instanceof Error ? signError.message : String(signError)
+        })
+      }
+    }
 
-    // Return updated snippet with signed URL for immediate preview
-    return {
+    const responseSnippet = {
       ...snippet,
-      videoUrl,
-      videoS3Key: s3Key,
-      videoMetadata,
-      updatedAt
+      updatedAt,
+      videoGenerationStatus: pendingStatus,
+      videoGenerationTaskId: videoResponse.taskId,
+      videoGenerationError: undefined
     } as Snippet
+
+    if (videoUrl) {
+      responseSnippet.videoUrl = videoUrl
+    }
+
+    return responseSnippet
   } catch (error) {
     logger.error('Video generation failed', {
       error: error instanceof Error ? error.message : String(error),
+      errorDetails: error,
       projectId: event.arguments.projectId,
-      snippetId: event.arguments.snippetId
+      snippetId: event.arguments.snippetId,
+      arguments: event.arguments
     })
 
     handleError(error, logger, {

@@ -43,12 +43,12 @@ export const generateVideoInputSchema = z.object({
   projectId: z.string().min(1, 'Project ID is required'),
   snippetId: z.string().min(1, 'Snippet ID is required'),
   modelId: z.string().min(1, 'Model ID is required'),
-  duration: z.number().int().min(4).max(8).optional(),
-  aspectRatio: z.enum(['default', '16:9', '9:16', '1:1']).optional(),
-  resolution: z.enum(['512', '720p', '1080p']).optional(),
-  style: z.enum(['general', 'anime']).optional(),
-  seed: z.number().int().min(0).max(999999).optional(),
-  movementAmplitude: z.enum(['auto', 'small', 'medium', 'large']).optional()
+  duration: z.number().int().min(4).max(8).nullish(),
+  aspectRatio: z.enum(['default', '16:9', '9:16', '1:1']).nullish(),
+  resolution: z.enum(['540p', '720p', '1080p']).nullish(),
+  style: z.enum(['general', 'anime']).nullish(),
+  seed: z.number().int().min(0).max(999999).nullish(),
+  movementAmplitude: z.enum(['auto', 'small', 'medium', 'large']).nullish()
 })
 
 export const MAX_REFERENCE_IMAGES = 7 // Vidu Q1 supports up to 7 images

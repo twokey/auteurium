@@ -78,7 +78,20 @@ export const useGraphQLMutation = <TData = unknown, TVariables = Record<string, 
         } else if (err && typeof err === 'object') {
           // Check for GraphQL errors property
           if ('errors' in err && Array.isArray((err as any).errors)) {
-            errorMessage = (err as any).errors.map((e: any) => e.message || String(e)).join(', ')
+            const errors = (err as any).errors
+            // Check if any error has validation details
+            const validationDetails = errors
+              .filter((e: any) => e.extensions?.details)
+              .flatMap((e: any) => e.extensions.details)
+
+            if (validationDetails.length > 0) {
+              // Format validation errors nicely
+              errorMessage = validationDetails
+                .map((detail: any) => `${detail.field}: ${detail.message}`)
+                .join(', ')
+            } else {
+              errorMessage = errors.map((e: any) => e.message || String(e)).join(', ')
+            }
           } else if ('message' in err) {
             errorMessage = String((err as any).message)
           } else {
@@ -94,7 +107,8 @@ export const useGraphQLMutation = <TData = unknown, TVariables = Record<string, 
           operation: operationName,
           message: errorMessage,
           originalError: err,
-          errorType: err?.constructor?.name || typeof err
+          errorType: err?.constructor?.name || typeof err,
+          fullError: JSON.stringify(err, null, 2)
         })
 
         if (onError) {

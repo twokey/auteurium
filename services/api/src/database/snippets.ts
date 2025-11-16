@@ -67,34 +67,45 @@ const runQuery = async (
 const isMediaBucketConfigured = (): boolean => MEDIA_BUCKET_NAME.trim().length > 0
 
 const deleteSnippetMedia = async (snippet: Snippet | undefined): Promise<void> => {
-  if (!snippet || !snippet.imageS3Key) {
+  if (!snippet) {
     return
   }
 
   if (!isMediaBucketConfigured()) {
-    logger.info('Media bucket not configured, skipping snippet image deletion', {
+    logger.info('Media bucket not configured, skipping snippet media deletion', {
       snippetId: snippet.id
     })
     return
   }
 
-  try {
-    await s3Client.send(new DeleteObjectCommand({
-      Bucket: MEDIA_BUCKET_NAME,
-      Key: snippet.imageS3Key
-    }))
+  const deleteKey = async (key: string | undefined, assetType: 'image' | 'video'): Promise<void> => {
+    if (!key) {
+      return
+    }
 
-    logger.info('Snippet image deleted from S3', {
-      snippetId: snippet.id,
-      imageS3Key: snippet.imageS3Key
-    })
-  } catch (error) {
-    logger.warn('Failed to delete snippet image from S3', {
-      snippetId: snippet.id,
-      imageS3Key: snippet.imageS3Key,
-      error: error instanceof Error ? error.message : String(error)
-    })
+    try {
+      await s3Client.send(new DeleteObjectCommand({
+        Bucket: MEDIA_BUCKET_NAME,
+        Key: key
+      }))
+
+      logger.info(`Snippet ${assetType} deleted from S3`, {
+        snippetId: snippet.id,
+        key
+      })
+    } catch (error) {
+      logger.warn(`Failed to delete snippet ${assetType} from S3`, {
+        snippetId: snippet.id,
+        key,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    }
   }
+
+  await Promise.all([
+    deleteKey(snippet.imageS3Key, 'image'),
+    deleteKey(snippet.videoS3Key, 'video')
+  ])
 }
 
 const buildSnippet = (input: SnippetInput, userId: string, now: string): Snippet => ({

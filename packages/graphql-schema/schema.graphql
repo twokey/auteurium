@@ -40,6 +40,13 @@ type VideoMetadata {
   movementAmplitude: String
 }
 
+enum VideoGenerationStatus {
+  PENDING
+  PROCESSING
+  COMPLETE
+  FAILED
+}
+
 type Snippet {
   id: ID!
   projectId: ID!
@@ -58,6 +65,9 @@ type Snippet {
   videoUrl: String
   videoS3Key: String
   videoMetadata: VideoMetadata
+  videoGenerationStatus: VideoGenerationStatus
+  videoGenerationTaskId: String
+  videoGenerationError: String
   versions: [SnippetVersion!]!
   createdFrom: ID
   snippetType: String
@@ -322,6 +332,11 @@ type GenerationRecord {
   cost: Float!
   generationTimeMs: Int!
   createdAt: String!
+  taskId: String
+  status: VideoGenerationStatus
+  errorMessage: String
+  videoS3Key: String
+  videoMetadata: VideoMetadata
 }
 
 input GenerateContentInput {

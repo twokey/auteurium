@@ -21,7 +21,9 @@ import type {
   SnippetNodeData,
   Connection,
   ConnectedContentItem,
-  AvailableModel
+  AvailableModel,
+  VideoGenerationInput,
+  VideoMetadata
 } from '../../../types'
 import type { Node, Edge } from 'reactflow'
 
@@ -276,8 +278,14 @@ const areSnippetsEqual = (a: Snippet[], b: Snippet[]): boolean => {
       snippetA.snippetType !== snippetB.snippetType ||
       snippetA.imageUrl !== snippetB.imageUrl ||
       snippetA.imageS3Key !== snippetB.imageS3Key ||
+      snippetA.videoUrl !== snippetB.videoUrl ||
+      snippetA.videoS3Key !== snippetB.videoS3Key ||
       snippetA.position?.x !== snippetB.position?.x ||
       snippetA.position?.y !== snippetB.position?.y ||
+      snippetA.videoGenerationStatus !== snippetB.videoGenerationStatus ||
+      (snippetA.videoGenerationTaskId ?? null) !== (snippetB.videoGenerationTaskId ?? null) ||
+      (snippetA.videoGenerationError ?? '') !== (snippetB.videoGenerationError ?? '') ||
+      !areVideoMetadataEqual(snippetA.videoMetadata, snippetB.videoMetadata) ||
       !areConnectionsEqual(snippetA.connections, snippetB.connections)
     ) {
       return false
@@ -314,6 +322,27 @@ const areConnectionsEqual = (aConnections?: Connection[], bConnections?: Connect
   }
 
   return true
+}
+
+const areVideoMetadataEqual = (left?: VideoMetadata | null, right?: VideoMetadata | null): boolean => {
+  if (!left && !right) {
+    return true
+  }
+
+  if (!left || !right) {
+    return false
+  }
+
+  return (
+    left.duration === right.duration &&
+    left.resolution === right.resolution &&
+    left.aspectRatio === right.aspectRatio &&
+    (left.style ?? null) === (right.style ?? null) &&
+    (left.seed ?? null) === (right.seed ?? null) &&
+    (left.format ?? null) === (right.format ?? null) &&
+    (left.fileSize ?? null) === (right.fileSize ?? null) &&
+    (left.movementAmplitude ?? null) === (right.movementAmplitude ?? null)
+  )
 }
 
 export interface UseCanvasDataResult {
@@ -539,10 +568,12 @@ export function useFlowNodes(
     onCombine: (snippetId: string) => Promise<void>
     onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
     onGenerateText: (snippetId: string, content: string) => Promise<void>
+    onGenerateVideo: (snippetId: string, options: VideoGenerationInput) => Promise<void>
     onFocusSnippet: (snippetId: string) => void
     onCreateUpstreamSnippet: (snippetId: string) => Promise<void> | void
   },
   generatingImageSnippetIds: Record<string, boolean>,
+  generatingVideoSnippetIds: Record<string, boolean>,
   textModels?: AvailableModel[],
   isLoadingTextModels?: boolean,
   imageModels?: AvailableModel[],
@@ -648,10 +679,18 @@ export function useFlowNodes(
             imageMetadata: snippet.imageMetadata,
             connectedContent,
             downstreamConnections,
-            snippetType: snippet.snippetType
+            snippetType: snippet.snippetType,
+            videoUrl: snippet.videoUrl,
+            videoS3Key: snippet.videoS3Key,
+            videoMetadata: snippet.videoMetadata,
+            videoGenerationStatus: snippet.videoGenerationStatus,
+            videoGenerationTaskId: snippet.videoGenerationTaskId,
+            videoGenerationError: snippet.videoGenerationError
           },
           ...handlers,
+          onGenerateVideo: handlers.onGenerateVideo,
           isGeneratingImage: Boolean(generatingImageSnippetIds[snippet.id]),
+          isGeneratingVideo: Boolean(generatingVideoSnippetIds[snippet.id]),
           connectedSnippets,
           textModels,
           isLoadingTextModels,
@@ -673,6 +712,7 @@ export function useFlowNodes(
     snippets,
     handlers,
     generatingImageSnippetIds,
+    generatingVideoSnippetIds,
     textModels,
     isLoadingTextModels,
     imageModels,

@@ -65,6 +65,12 @@ export interface GenerationRecord {
   cost: number
   generationTimeMs: number
   createdAt: string
+  taskId?: string
+  status?: VideoGenerationStatus
+  videoS3Key?: string
+  videoMetadata?: VideoMetadata
+  errorMessage?: string
+  videoRequest?: VideoGenerationRequestDetails
 }
 
 export interface StreamingChunk {
@@ -85,6 +91,18 @@ export interface VideoMetadata {
   movementAmplitude?: string // e.g., "auto", "small", "medium", "large"
 }
 
+export type VideoGenerationStatus = 'PENDING' | 'PROCESSING' | 'COMPLETE' | 'FAILED'
+
+export interface VideoGenerationRequestDetails {
+  duration?: number
+  aspectRatio?: string
+  resolution?: string
+  style?: string
+  seed?: number
+  movementAmplitude?: string
+  inputImagesCount?: number
+}
+
 export interface VideoGenerationRequest {
   modelId: string
   prompt: string
@@ -98,12 +116,13 @@ export interface VideoGenerationRequest {
 }
 
 export interface VideoGenerationResponse {
-  videoUrl: string
+  videoUrl?: string
   videoBuffer?: Buffer
-  metadata: VideoMetadata
+  metadata?: VideoMetadata
   tokensUsed?: number
   cost: number
   modelUsed: string
   generationTimeMs: number
   taskId?: string // For async tracking
+  status?: VideoGenerationStatus
 }

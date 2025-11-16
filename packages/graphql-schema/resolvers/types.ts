@@ -119,6 +119,7 @@ export type GenerationRecord = {
   __typename?: 'GenerationRecord';
   cost: Scalars['Float']['output'];
   createdAt: Scalars['String']['output'];
+  errorMessage?: Maybe<Scalars['String']['output']>;
   generationTimeMs: Scalars['Int']['output'];
   id: Scalars['ID']['output'];
   modelId: Scalars['String']['output'];
@@ -127,9 +128,13 @@ export type GenerationRecord = {
   prompt: Scalars['String']['output'];
   result: Scalars['String']['output'];
   snippetId: Scalars['ID']['output'];
+  status?: Maybe<VideoGenerationStatus>;
   systemPrompt?: Maybe<Scalars['String']['output']>;
+  taskId?: Maybe<Scalars['String']['output']>;
   tokensUsed: Scalars['Int']['output'];
   userId: Scalars['ID']['output'];
+  videoMetadata?: Maybe<VideoMetadata>;
+  videoS3Key?: Maybe<Scalars['String']['output']>;
 };
 
 export type GenerationResult = {
@@ -475,6 +480,9 @@ export type Snippet = {
   userId: Scalars['ID']['output'];
   version: Scalars['Int']['output'];
   versions: Array<SnippetVersion>;
+  videoGenerationError?: Maybe<Scalars['String']['output']>;
+  videoGenerationStatus?: Maybe<VideoGenerationStatus>;
+  videoGenerationTaskId?: Maybe<Scalars['String']['output']>;
   videoMetadata?: Maybe<VideoMetadata>;
   videoS3Key?: Maybe<Scalars['String']['output']>;
   videoUrl?: Maybe<Scalars['String']['output']>;
@@ -549,6 +557,13 @@ export type User = {
 export enum UserRole {
   Admin = 'ADMIN',
   Standard = 'STANDARD'
+}
+
+export enum VideoGenerationStatus {
+  Complete = 'COMPLETE',
+  Failed = 'FAILED',
+  Pending = 'PENDING',
+  Processing = 'PROCESSING'
 }
 
 export type VideoMetadata = {
@@ -679,6 +694,7 @@ export type ResolversTypes = ResolversObject<{
   UpdateSnippetPositionInput: UpdateSnippetPositionInput;
   User: ResolverTypeWrapper<User>;
   UserRole: UserRole;
+  VideoGenerationStatus: VideoGenerationStatus;
   VideoMetadata: ResolverTypeWrapper<VideoMetadata>;
 }>;
 
@@ -757,6 +773,7 @@ export type CreateScenesResultResolvers<ContextType = GraphQLContext, ParentType
 export type GenerationRecordResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['GenerationRecord'] = ResolversParentTypes['GenerationRecord']> = ResolversObject<{
   cost?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  errorMessage?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   generationTimeMs?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   modelId?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
@@ -765,9 +782,13 @@ export type GenerationRecordResolvers<ContextType = GraphQLContext, ParentType e
   prompt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   result?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   snippetId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  status?: Resolver<Maybe<ResolversTypes['VideoGenerationStatus']>, ParentType, ContextType>;
   systemPrompt?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  taskId?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   tokensUsed?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   userId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  videoMetadata?: Resolver<Maybe<ResolversTypes['VideoMetadata']>, ParentType, ContextType>;
+  videoS3Key?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
 }>;
 
 export type GenerationResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['GenerationResult'] = ResolversParentTypes['GenerationResult']> = ResolversObject<{
@@ -891,6 +912,9 @@ export type SnippetResolvers<ContextType = GraphQLContext, ParentType extends Re
   userId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   version?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   versions?: Resolver<Array<ResolversTypes['SnippetVersion']>, ParentType, ContextType>;
+  videoGenerationError?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  videoGenerationStatus?: Resolver<Maybe<ResolversTypes['VideoGenerationStatus']>, ParentType, ContextType>;
+  videoGenerationTaskId?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   videoMetadata?: Resolver<Maybe<ResolversTypes['VideoMetadata']>, ParentType, ContextType>;
   videoS3Key?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   videoUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;

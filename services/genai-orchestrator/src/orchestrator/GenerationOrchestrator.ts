@@ -337,7 +337,9 @@ export class GenerationOrchestrator {
       // Select provider based on provider type
       let provider
       if (modelConfig.provider === ModelProvider.VIDU) {
-        provider = new ViduVideoProvider()
+        provider = new ViduVideoProvider({
+          webhookUrl: process.env.VIDU_WEBHOOK_URL
+        })
       } else {
         throw new Error(`Video generation not supported for provider: ${modelConfig.provider}`)
       }
@@ -347,13 +349,14 @@ export class GenerationOrchestrator {
       const response = await provider.generateVideo(request)
 
       const totalTime = Date.now() - startTime
-      logger.info('Video generation completed', {
+      logger.info('Video generation request submitted', {
         userId: context.userId,
         snippetId: context.snippetId,
         modelId: request.modelId,
         cost: response.cost,
         totalTimeMs: totalTime,
-        videoSizeBytes: response.metadata.fileSize
+        taskId: response.taskId,
+        status: response.status ?? 'PENDING'
       })
 
       return response

@@ -5,12 +5,12 @@ import { Handle, Position } from 'reactflow'
 import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
 import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisticUpdatesStore'
 import { useGenAI } from '../../hooks/useGenAI'
-import { CANVAS_CONSTANTS } from '../../shared/constants'
+import { CANVAS_CONSTANTS, VIDEO_GENERATION } from '../../shared/constants'
 import { useToast } from '../../shared/store/toastStore'
 import { countWords, truncateToWords } from '../../shared/utils/textUtils'
 import { VideoSnippetNode } from './VideoSnippetNode'
 
-import type { AvailableModel, ConnectedContentItem } from '../../types'
+import type { AvailableModel, ConnectedContentItem, VideoGenerationInput } from '../../types'
 
 interface SnippetNodeProps {
   id: string
@@ -41,9 +41,11 @@ interface SnippetNodeProps {
     onCombine: (snippetId: string) => Promise<void>
     onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
     onGenerateText: (snippetId: string, content: string) => Promise<void>
+    onGenerateVideo: (snippetId: string, options: VideoGenerationInput) => Promise<void> | void
     onFocusSnippet: (snippetId: string) => void
     onCreateUpstreamSnippet: (snippetId: string) => Promise<void> | void
     isGeneratingImage: boolean
+    isGeneratingVideo: boolean
     connectedSnippets?: { id: string; imageS3Key?: string | null }[]
     textModels?: AvailableModel[]
     isLoadingTextModels?: boolean
@@ -61,6 +63,19 @@ type EditableField = 'textField1' | 'title'
 const POINTER_EVENTS_STYLES = {
   interactive: { pointerEvents: 'auto' as const }
 } as const
+
+const getVideoReferenceLimit = (modelId: string): number => {
+  if (!modelId) {
+    return VIDEO_GENERATION.MAX_REFERENCE_IMAGES
+  }
+
+  const normalized = modelId.toLowerCase()
+  if (normalized.includes('q1') || normalized.includes('q2')) {
+    return 7
+  }
+
+  return 3
+}
 
 export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
   // Route to VideoSnippetNode if this is a video snippet
@@ -81,9 +96,11 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
     onUpdateContent,
     onGenerateImage,
     onGenerateText,
+    onGenerateVideo,
     onFocusSnippet,
     onCreateUpstreamSnippet,
     isGeneratingImage,
+    isGeneratingVideo = false,
     connectedSnippets = [],
     textModels = [],
     isLoadingTextModels = false,
@@ -118,6 +135,10 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
   const [isGeneratingText, setIsGeneratingText] = useState(false)
   const [isGeneratingScenes, setIsGeneratingScenes] = useState(false)
   const [isGenerateExpanded, setIsGenerateExpanded] = useState(false)
+
+  const connectedImageReferences = connectedContent.filter((item) => item.type === 'image')
+  const videoReferenceLimit = getVideoReferenceLimit(selectedVideoModel || videoModels[0]?.id || '')
+  const hasTooManyVideoReferences = connectedImageReferences.length > videoReferenceLimit
 
   useEffect(() => {
     if (activeField === 'textField1') return
@@ -1126,25 +1147,61 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
                       event.preventDefault()
                       return
                     }
+                    const targetModel = selectedVideoModel || videoModels[0]?.id || VIDEO_GENERATION.DEFAULT_MODEL
+
                     openPromptDesigner({
                       snippetId: snippet.id,
                       snippetTitle: displayTitle,
                       mode: 'video',
                       initialPrompt: snippet.textField1,
                       connectedContent: connectedContent,
-                      onGenerate: () => {
-                        toast.info('Video generation coming soon!')
+                      onGenerate: async (finalPrompt) => {
+                        await onUpdateContent(snippet.id, { textField1: finalPrompt })
+                        await onGenerateVideo(snippet.id, {
+                          modelId: targetModel,
+                          duration: VIDEO_GENERATION.DEFAULT_DURATION,
+                          aspectRatio: VIDEO_GENERATION.DEFAULT_ASPECT_RATIO,
+                          resolution: VIDEO_GENERATION.DEFAULT_RESOLUTION,
+                          style: VIDEO_GENERATION.DEFAULT_STYLE,
+                          movementAmplitude: VIDEO_GENERATION.DEFAULT_MOVEMENT_AMPLITUDE
+                        })
                       }
                     })
                   }}
-                  disabled={false}
+                  disabled={
+                    isGeneratingVideo ||
+                    isLoadingVideoModels ||
+                    (!selectedVideoModel && videoModels.length > 0) ||
+                    hasTooManyVideoReferences
+                  }
                   style={POINTER_EVENTS_STYLES.interactive}
                   aria-label="Generate video content"
-                  title="Generate video content for this snippet"
+                  title={
+                    isGeneratingVideo
+                      ? 'Video generation in progress...'
+                      : isLoadingVideoModels
+                        ? 'Loading video models...'
+                        : !selectedVideoModel
+                          ? 'Please select a video model first'
+                          : hasTooManyVideoReferences
+                            ? `Too many reference images (${connectedImageReferences.length}/${videoReferenceLimit}). Remove connections before generating.`
+                            : 'Generate video content for this snippet'
+                  }
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
+                  {isGeneratingVideo ? (
+                    <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  )}
                 </button>
               </div>
 
@@ -1155,6 +1212,17 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
                     <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
                   <span>Too many images ({connectedImagesCount}). Remove connections to use ≤3.</span>
+                </div>
+              )}
+
+              {hasTooManyVideoReferences && (
+                <div className="text-[10px] text-red-600 flex items-start gap-1" style={POINTER_EVENTS_STYLES.interactive}>
+                  <svg className="w-3 h-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <span>
+                    Too many reference images for this model ({connectedImageReferences.length}/{videoReferenceLimit}). Remove connections before generating.
+                  </span>
                 </div>
               )}
 

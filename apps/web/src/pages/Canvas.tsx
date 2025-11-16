@@ -41,7 +41,7 @@ const NODE_TYPES: NodeTypes = {
 const CanvasContent = () => {
   const { id: projectId } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { generatingImageSnippetIds, setSelectedSnippetIds } = useCanvasStore()
+  const { generatingImageSnippetIds, generatingVideoSnippetIds, setSelectedSnippetIds } = useCanvasStore()
   const { openContextMenu, closeContextMenu } = useContextMenuStore()
 
   // Track viewport for column guides
@@ -85,6 +85,7 @@ const CanvasContent = () => {
     onCombine: handlers.handleCombineSnippetContent,
     onGenerateImage: handlers.handleGenerateImage,
     onGenerateText: handlers.handleGenerateTextSnippet,
+    onGenerateVideo: handlers.handleGenerateVideo,
     onFocusSnippet: handlers.handleFocusSnippet,
     onCreateUpstreamSnippet: handlers.handleCreateUpstreamSnippet
   }), [
@@ -96,6 +97,7 @@ const CanvasContent = () => {
     handlers.handleCombineSnippetContent,
     handlers.handleGenerateImage,
     handlers.handleGenerateTextSnippet,
+    handlers.handleGenerateVideo,
     handlers.handleFocusSnippet,
     handlers.handleCreateUpstreamSnippet
   ])
@@ -105,6 +107,7 @@ const CanvasContent = () => {
     snippets,
     nodeHandlers,
     generatingImageSnippetIds,
+    generatingVideoSnippetIds,
     textModels,
     isLoadingTextModels,
     imageModels,

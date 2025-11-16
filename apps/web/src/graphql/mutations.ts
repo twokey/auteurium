@@ -49,6 +49,21 @@ export const CREATE_SNIPPET = /* GraphQL */ `
       createdAt
       updatedAt
       snippetType
+      videoUrl
+      videoS3Key
+      videoMetadata {
+        duration
+        resolution
+        aspectRatio
+        style
+        seed
+        format
+        fileSize
+        movementAmplitude
+      }
+      videoGenerationStatus
+      videoGenerationTaskId
+      videoGenerationError
     }
   }
 `
@@ -70,6 +85,21 @@ export const UPDATE_SNIPPET = /* GraphQL */ `
       createdAt
       updatedAt
       snippetType
+      videoUrl
+      videoS3Key
+      videoMetadata {
+        duration
+        resolution
+        aspectRatio
+        style
+        seed
+        format
+        fileSize
+        movementAmplitude
+      }
+      videoGenerationStatus
+      videoGenerationTaskId
+      videoGenerationError
     }
   }
 `
@@ -91,6 +121,21 @@ export const UPDATE_SNIPPET_POSITIONS = /* GraphQL */ `
       createdAt
       updatedAt
       snippetType
+      videoUrl
+      videoS3Key
+      videoMetadata {
+        duration
+        resolution
+        aspectRatio
+        style
+        seed
+        format
+        fileSize
+        movementAmplitude
+      }
+      videoGenerationStatus
+      videoGenerationTaskId
+      videoGenerationError
     }
   }
 `
@@ -118,6 +163,21 @@ export const REVERT_SNIPPET = /* GraphQL */ `
       createdAt
       updatedAt
       snippetType
+      videoUrl
+      videoS3Key
+      videoMetadata {
+        duration
+        resolution
+        aspectRatio
+        style
+        seed
+        format
+        fileSize
+        movementAmplitude
+      }
+      videoGenerationStatus
+      videoGenerationTaskId
+      videoGenerationError
     }
   }
 `
@@ -145,6 +205,21 @@ export const GENERATE_SNIPPET_IMAGE = /* GraphQL */ `
         height
         aspectRatio
       }
+      videoUrl
+      videoS3Key
+      videoMetadata {
+        duration
+        resolution
+        aspectRatio
+        style
+        seed
+        format
+        fileSize
+        movementAmplitude
+      }
+      videoGenerationStatus
+      videoGenerationTaskId
+      videoGenerationError
     }
   }
 `
@@ -197,6 +272,9 @@ export const GENERATE_SNIPPET_VIDEO = /* GraphQL */ `
         fileSize
         movementAmplitude
       }
+      videoGenerationStatus
+      videoGenerationTaskId
+      videoGenerationError
     }
   }
 `

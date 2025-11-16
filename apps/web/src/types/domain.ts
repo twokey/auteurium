@@ -28,6 +28,19 @@ export interface ImageMetadata {
   aspectRatio: string
 }
 
+export interface VideoMetadata {
+  duration: number
+  resolution: string
+  aspectRatio: string
+  style?: string
+  seed?: number
+  format?: string
+  fileSize?: number
+  movementAmplitude?: string
+}
+
+export type VideoGenerationStatus = 'PENDING' | 'PROCESSING' | 'COMPLETE' | 'FAILED'
+
 export interface Connection {
   id: string
   projectId: string
@@ -53,6 +66,12 @@ export interface Snippet {
   imageUrl?: string | null
   imageS3Key?: string | null
   imageMetadata?: ImageMetadata | null
+  videoUrl?: string | null
+  videoS3Key?: string | null
+  videoMetadata?: VideoMetadata | null
+  videoGenerationStatus?: VideoGenerationStatus | null
+  videoGenerationTaskId?: string | null
+  videoGenerationError?: string | null
   connections?: Connection[]
   snippetType?: 'text' | 'video'
 }

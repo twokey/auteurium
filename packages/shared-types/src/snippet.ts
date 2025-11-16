@@ -1,4 +1,4 @@
-import type { VideoMetadata } from './genai'
+import type { VideoMetadata, VideoGenerationStatus } from './genai'
 
 export interface Position {
   x: number
@@ -29,6 +29,9 @@ export interface Snippet {
   videoUrl?: string
   videoS3Key?: string
   videoMetadata?: VideoMetadata
+  videoGenerationStatus?: VideoGenerationStatus
+  videoGenerationTaskId?: string
+  videoGenerationError?: string
   createdFrom?: string
   snippetType?: 'text' | 'video'
 }

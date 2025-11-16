@@ -11,6 +11,7 @@ interface CanvasState {
   projectId: string | null
   isLoading: boolean
   generatingImageSnippetIds: Record<string, boolean>
+  generatingVideoSnippetIds: Record<string, boolean>
   viewport: Viewport | null
   selectedSnippetIds: Set<string>
 
@@ -18,6 +19,7 @@ interface CanvasState {
   setProjectId: (projectId: string | null) => void
   setLoading: (isLoading: boolean) => void
   setGeneratingImage: (snippetId: string, isGenerating: boolean) => void
+  setGeneratingVideo: (snippetId: string, isGenerating: boolean) => void
   setViewport: (viewport: Viewport) => void
   setSelectedSnippetIds: (ids: Set<string>) => void
   addToSelection: (id: string) => void
@@ -33,6 +35,7 @@ const INITIAL_STATE = {
   projectId: null,
   isLoading: false,
   generatingImageSnippetIds: {},
+  generatingVideoSnippetIds: {},
   viewport: null,
   selectedSnippetIds: new Set<string>(),
 }
@@ -55,6 +58,17 @@ export const useCanvasStore = create<CanvasState>((set) => ({
         delete newGeneratingIds[snippetId]
       }
       return { generatingImageSnippetIds: newGeneratingIds }
+    }),
+
+  setGeneratingVideo: (snippetId, isGenerating) =>
+    set((state) => {
+      const newGeneratingIds = { ...state.generatingVideoSnippetIds }
+      if (isGenerating) {
+        newGeneratingIds[snippetId] = true
+      } else {
+        delete newGeneratingIds[snippetId]
+      }
+      return { generatingVideoSnippetIds: newGeneratingIds }
     }),
     
   setViewport: (viewport) =>
@@ -130,4 +144,3 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   reset: () =>
     set(INITIAL_STATE),
 }))
-

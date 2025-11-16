@@ -12,7 +12,8 @@ import {
   CREATE_CONNECTION,
   DELETE_CONNECTION,
   COMBINE_SNIPPET_CONNECTIONS,
-  GENERATE_SNIPPET_IMAGE
+  GENERATE_SNIPPET_IMAGE,
+  GENERATE_SNIPPET_VIDEO
 } from '../../../graphql/mutations'
 import { useGraphQLMutation } from '../../../hooks/useGraphQLMutation'
 import { CANVAS_CONSTANTS } from '../../../shared/constants'
@@ -34,7 +35,10 @@ import type {
   CombineSnippetConnectionsVariables,
   GenerateSnippetImageVariables,
   CombineSnippetConnectionsMutationData,
-  GenerateSnippetImageMutationData
+  GenerateSnippetImageMutationData,
+  GenerateSnippetVideoVariables,
+  GenerateSnippetVideoMutationData,
+  VideoGenerationInput
 } from '../../../types'
 
 type SnippetContentChanges = Partial<Pick<Snippet, 'textField1' | 'title'>>
@@ -122,6 +126,7 @@ export interface UseCanvasHandlersResult {
   handleUpdateSnippetContent: (snippetId: string, changes: SnippetContentChanges) => Promise<void>
   handleCombineSnippetContent: (snippetId: string) => Promise<void>
   handleGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
+  handleGenerateVideo: (snippetId: string, options: VideoGenerationInput) => Promise<void>
   handleFocusSnippet: (snippetId: string) => void
   handleCreateUpstreamSnippet: (targetSnippetId: string) => Promise<void>
   handleNumberKeyNavigation: (key: string) => void
@@ -160,7 +165,7 @@ export function useCanvasHandlers({
   setGeneratedSnippetCreating
 } = useModalStore()
 
-  const { setLoading, setGeneratingImage } = useCanvasStore()
+  const { setLoading, setGeneratingImage, setGeneratingVideo } = useCanvasStore()
   const {
     addOptimisticSnippet,
     replaceOptimisticSnippet,
@@ -221,6 +226,12 @@ export function useCanvasHandlers({
   const { mutate: generateSnippetImageMutation } = useGraphQLMutation<GenerateSnippetImageMutationData, GenerateSnippetImageVariables>(GENERATE_SNIPPET_IMAGE, {
     onError: (error: Error) => {
       console.error('Error generating snippet image:', error)
+    }
+  })
+
+  const { mutate: generateSnippetVideoMutation } = useGraphQLMutation<GenerateSnippetVideoMutationData, GenerateSnippetVideoVariables>(GENERATE_SNIPPET_VIDEO, {
+    onError: (error: Error) => {
+      console.error('Error generating snippet video:', error)
     }
   })
 
@@ -790,6 +801,68 @@ export function useCanvasHandlers({
     replaceOptimisticConnection,
     removeOptimisticConnection
   ])
+
+  const handleGenerateVideo = useCallback(async (snippetId: string, options: VideoGenerationInput) => {
+    if (!projectId) {
+      toast.error('Cannot generate snippet video: no project ID')
+      const handledError = new Error('Missing project identifier')
+      Object.assign(handledError, { handled: true })
+      throw handledError
+    }
+
+    if (!options.modelId || options.modelId.trim() === '') {
+      toast.warning('Please select a video model')
+      const handledError = new Error('Missing video model selection')
+      Object.assign(handledError, { handled: true })
+      throw handledError
+    }
+
+    const isAlreadyGenerating = useCanvasStore.getState().generatingVideoSnippetIds[snippetId]
+    if (isAlreadyGenerating) {
+      toast.info('Video generation already in progress for this snippet')
+      const handledError = new Error('Video generation already running')
+      Object.assign(handledError, { handled: true })
+      throw handledError
+    }
+
+    setGeneratingVideo(snippetId, true)
+
+    try {
+      // Build variables object, omitting undefined values for GraphQL
+      const variables = {
+        projectId,
+        snippetId,
+        modelId: options.modelId,
+        ...(options.duration !== undefined && { duration: options.duration }),
+        ...(options.aspectRatio !== undefined && { aspectRatio: options.aspectRatio }),
+        ...(options.resolution !== undefined && { resolution: options.resolution }),
+        ...(options.style !== undefined && { style: options.style }),
+        ...(options.seed !== undefined && { seed: options.seed }),
+        ...(options.movementAmplitude !== undefined && { movementAmplitude: options.movementAmplitude })
+      }
+
+      console.log('generateSnippetVideo variables:', JSON.stringify(variables, null, 2))
+
+      await mutateWithInvalidate(
+        () => generateSnippetVideoMutation({ variables }),
+        ['ProjectWithSnippets']
+      )
+
+      toast.success('Video generation started', 'We will update this snippet once the video is ready.')
+    } catch (error) {
+      console.error('Failed to generate snippet video:', error)
+      const message = error instanceof Error ? error.message : 'Unknown error'
+
+      const isHandled = Boolean(error && typeof error === 'object' && 'handled' in (error as Record<string, unknown>))
+      if (!isHandled) {
+        toast.error('Failed to generate video', message)
+      }
+
+      throw error
+    } finally {
+      setGeneratingVideo(snippetId, false)
+    }
+  }, [generateSnippetVideoMutation, mutateWithInvalidate, projectId, setGeneratingVideo, toast])
 
   const handleCreateUpstreamSnippet = useCallback(async (targetSnippetId: string) => {
     if (!projectId) {
@@ -1461,6 +1534,7 @@ export function useCanvasHandlers({
     handleUpdateSnippetContent,
     handleCombineSnippetContent,
     handleGenerateImage,
+    handleGenerateVideo,
     handleCreateUpstreamSnippet,
     handleFocusSnippet,
     handleNumberKeyNavigation,
