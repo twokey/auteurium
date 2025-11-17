@@ -62,15 +62,15 @@ export const MODEL_REGISTRY: ModelConfig[] = [
     enabled: true
   },
 
-  // Vidu Models - Video Generation
+  // Vidu Models - Video Generation (Vidu Q2 family only)
   {
     id: 'vidu-q2-pro',
     provider: ModelProvider.VIDU,
     modelId: 'viduq2pro',
     modality: GenerationModality.TEXT_TO_VIDEO,
     displayName: 'Vidu Q2 Pro',
-    description: 'Premium video generation with highest quality (4-8s, up to 1080p)',
-    costPerToken: 0.15, // Estimated cost per video
+    description: 'Premium Q2 Image-to-Video & Start-End (1-10s, up to 1080p)',
+    costPerToken: 0.075, // Base cost for 1-second 720p generation
     enabled: true
   },
   {
@@ -79,8 +79,8 @@ export const MODEL_REGISTRY: ModelConfig[] = [
     modelId: 'viduq2turbo',
     modality: GenerationModality.TEXT_TO_VIDEO,
     displayName: 'Vidu Q2 Turbo',
-    description: 'Fast video generation with balanced quality (4-8s, up to 1080p)',
-    costPerToken: 0.10, // Estimated cost per video
+    description: 'Fast Q2 Image-to-Video & Start-End (1-10s, up to 1080p)',
+    costPerToken: 0.03, // Base cost for 1-second 540p generation
     enabled: true
   },
   {
@@ -88,49 +88,9 @@ export const MODEL_REGISTRY: ModelConfig[] = [
     provider: ModelProvider.VIDU,
     modelId: 'viduq2',
     modality: GenerationModality.TEXT_TO_VIDEO,
-    displayName: 'Vidu Q2',
-    description: 'Standard Q2 video generation (4-8s, up to 1080p)',
-    costPerToken: 0.08, // Estimated cost per video
-    enabled: true
-  },
-  {
-    id: 'vidu-q1',
-    provider: ModelProvider.VIDU,
-    modelId: 'viduq1',
-    modality: GenerationModality.TEXT_TO_VIDEO,
-    displayName: 'Vidu Q1',
-    description: 'Q1 generation with 1-7 reference image support (5s, 1080p)',
-    costPerToken: 0.12, // Estimated cost per video
-    enabled: true
-  },
-  {
-    id: 'vidu-q1-classic',
-    provider: ModelProvider.VIDU,
-    modelId: 'viduq1classic',
-    modality: GenerationModality.TEXT_TO_VIDEO,
-    displayName: 'Vidu Q1 Classic',
-    description: 'Classic Q1 model for stable video generation (5s, 1080p)',
-    costPerToken: 0.10, // Estimated cost per video
-    enabled: true
-  },
-  {
-    id: 'vidu-2.0',
-    provider: ModelProvider.VIDU,
-    modelId: 'vidu2.0',
-    modality: GenerationModality.TEXT_TO_VIDEO,
-    displayName: 'Vidu 2.0',
-    description: 'Version 2.0 with 1-3 reference image support (4-8s, multiple resolutions)',
-    costPerToken: 0.09, // Estimated cost per video
-    enabled: true
-  },
-  {
-    id: 'vidu-1.5',
-    provider: ModelProvider.VIDU,
-    modelId: 'vidu1.5',
-    modality: GenerationModality.TEXT_TO_VIDEO,
-    displayName: 'Vidu 1.5',
-    description: 'Version 1.5 with flexible parameters (4-8s, 512-1080p)',
-    costPerToken: 0.07, // Estimated cost per video
+    displayName: 'Vidu Q2 (Text & Reference)',
+    description: 'Text-to-Video and Reference-to-Video (1-10s, up to 1080p)',
+    costPerToken: 0.05, // Base cost for 1-second 540p text-to-video generation
     enabled: true
   },
 

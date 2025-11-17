@@ -10,6 +10,16 @@ const MODE_LABEL: Record<'text' | 'image' | 'video' | 'scenes', string> = {
   scenes: 'Scene generation'
 }
 
+const VIDEO_MODEL_LABELS: Record<string, string> = {
+  'vidu-q2-pro': 'Vidu Q2 Pro',
+  'vidu-q2-turbo': 'Vidu Q2 Turbo',
+  'vidu-q2': 'Vidu Q2',
+  // legacy identifiers kept for backwards compatibility with saved requests
+  'viduq2-pro': 'Vidu Q2 Pro',
+  'viduq2-turbo': 'Vidu Q2 Turbo',
+  'viduq2': 'Vidu Q2'
+}
+
 export const PromptDesignerPanel = () => {
   const toast = useToast()
   const isOpen = usePromptDesignerStore((state) => state.isOpen)
@@ -19,6 +29,7 @@ export const PromptDesignerPanel = () => {
   const mode = usePromptDesignerStore((state) => state.mode)
   const prompt = usePromptDesignerStore((state) => state.prompt)
   const connectedContent = usePromptDesignerStore((state) => state.connectedContent)
+  const generationSettings = usePromptDesignerStore((state) => state.generationSettings)
   const onGenerate = usePromptDesignerStore((state) => state.onGenerate)
   const close = usePromptDesignerStore((state) => state.close)
   const setPrompt = usePromptDesignerStore((state) => state.setPrompt)
@@ -51,6 +62,61 @@ export const PromptDesignerPanel = () => {
 
     return MODE_LABEL[mode]
   }, [mode])
+
+  const generationSettingsEntries = useMemo(() => {
+    if (generationSettings?.type !== 'video') {
+      return []
+    }
+
+    const { settings } = generationSettings
+    const entries: { label: string; value: string }[] = [
+      {
+        label: 'Model',
+        value: VIDEO_MODEL_LABELS[settings.model] ?? settings.model
+      },
+      {
+        label: 'Duration',
+        value: typeof settings.duration === 'number' ? `${settings.duration}s` : 'Default'
+      },
+      {
+        label: 'Resolution',
+        value: settings.resolution ?? 'Default'
+      },
+      {
+        label: 'Movement',
+        value: settings.movementAmplitude ?? 'auto'
+      },
+      {
+        label: 'Audio',
+        value: settings.audio ? 'Enabled' : 'Disabled'
+      },
+      {
+        label: 'Off-peak',
+        value: settings.offPeak ? 'Enabled' : 'Disabled'
+      }
+    ]
+
+    if (settings.audio && settings.voiceId) {
+      const offPeakIndex = entries.findIndex((entry) => entry.label === 'Off-peak')
+      const insertIndex = offPeakIndex >= 0 ? offPeakIndex : entries.length
+      entries.splice(insertIndex, 0, {
+        label: 'Voice',
+        value: settings.voiceId
+      })
+    }
+
+    if (typeof settings.seed === 'number') {
+      entries.push({
+        label: 'Seed',
+        value: settings.seed.toString()
+      })
+    }
+
+    return entries
+  }, [generationSettings])
+
+  const sanitizedSnippetTitle = snippetTitle?.trim() ?? ''
+  const shouldRenderSource = sanitizedSnippetTitle !== '' ? true : Boolean(snippetId)
 
   if (!isOpen) {
     return null
@@ -127,9 +193,10 @@ export const PromptDesignerPanel = () => {
               {headerSubtitle}
             </p>
           )}
-          {(snippetTitle || snippetId) && (
+          {shouldRenderSource && (
             <p className="text-xs text-gray-500 mt-1 truncate" title={snippetTitle ?? snippetId ?? ''}>
-              Source: {snippetTitle ?? 'Untitled'}{snippetId ? ` (${snippetId})` : ''}
+              Source: {sanitizedSnippetTitle !== '' ? sanitizedSnippetTitle : 'Untitled'}
+              {snippetId ? ` (${snippetId})` : ''}
             </p>
           )}
         </div>
@@ -156,41 +223,67 @@ export const PromptDesignerPanel = () => {
               Content
             </p>
             <div className="mt-1 space-y-2">
-              {connectedContent.map((item, index) => (
-                <div key={`connected-${item.snippetId}-${index}-${item.type}`}>
-                  <div className="flex items-center justify-between mb-0.5">
-                    <p className="text-[10px] text-gray-500 font-medium">
-                      {item.snippetTitle || 'Snippet'}
-                    </p>
-                    <p className="text-[10px] text-gray-400 font-mono">
-                      #{item.snippetId.slice(0, 8)}
-                    </p>
-                  </div>
-                  <div className="overflow-hidden rounded border border-gray-200 bg-gray-50">
-                    {item.type === 'text' ? (
-                      <p className="px-2 py-1 text-sm font-medium text-gray-900 whitespace-pre-wrap">
-                        {item.value}
+              {connectedContent.map((item, index) => {
+                const connectedTitle = item.snippetTitle?.trim() ?? ''
+                return (
+                  <div key={`connected-${item.snippetId}-${index}-${item.type}`}>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <p className="text-[10px] text-gray-500 font-medium">
+                        {connectedTitle !== '' ? connectedTitle : 'Snippet'}
                       </p>
-                    ) : (
-                      <img
-                        src={item.value}
-                        alt={`Connected from snippet ${item.snippetId}`}
-                        className="block w-full h-auto max-h-48 object-cover"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    )}
+                      <p className="text-[10px] text-gray-400 font-mono">
+                        #{item.snippetId.slice(0, 8)}
+                      </p>
+                    </div>
+                    <div className="overflow-hidden rounded border border-gray-200 bg-gray-50">
+                      {item.type === 'text' ? (
+                        <p className="px-2 py-1 text-sm font-medium text-gray-900 whitespace-pre-wrap">
+                          {item.value}
+                        </p>
+                      ) : (
+                        <img
+                          src={item.value}
+                          alt={`Connected from snippet ${item.snippetId}`}
+                          className="block w-full h-auto max-h-48 object-cover"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      )}
+                    </div>
                   </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {generationSettingsEntries.length > 0 && (
+          <div className="mb-3">
+            <p className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+              Generation settings
+            </p>
+            <dl className="divide-y divide-gray-100 rounded-md border border-gray-200 bg-gray-50">
+              {generationSettingsEntries.map((entry) => (
+                <div
+                  key={entry.label}
+                  className="flex items-center justify-between px-2.5 py-1.5"
+                >
+                  <dt className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                    {entry.label}
+                  </dt>
+                  <dd className="text-sm font-semibold text-gray-900">
+                    {entry.value}
+                  </dd>
                 </div>
               ))}
-            </div>
+            </dl>
           </div>
         )}
 
         <div className="mb-3">
           <div className="flex items-center justify-between mb-0.5">
             <p className="text-[10px] text-gray-500 font-medium">
-              {snippetTitle || 'Snippet'}
+              {sanitizedSnippetTitle !== '' ? sanitizedSnippetTitle : 'Snippet'}
             </p>
             <p className="text-[10px] text-gray-400 font-mono">
               #{snippetId?.slice(0, 8)}

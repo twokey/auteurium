@@ -213,7 +213,7 @@ export class ViduVideoProvider implements IVideoProvider {
   }
 
   getSupportedDurations(): number[] {
-    return [4, 8]
+    return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
   }
 
   getSupportedAspectRatios(): string[] {

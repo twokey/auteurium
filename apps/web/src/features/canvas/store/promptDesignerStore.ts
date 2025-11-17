@@ -1,8 +1,15 @@
 import { create } from 'zustand'
 
+import type { VideoModelSettings } from '../../snippets/store/videoPromptStore'
 import type { ConnectedContentItem } from '../../../types/components'
 
 type PromptDesignerMode = 'text' | 'image' | 'video' | 'scenes'
+
+export type PromptDesignerGenerationSettings =
+  | {
+      type: 'video'
+      settings: VideoModelSettings
+    }
 
 interface PromptDesignerOpenPayload {
   snippetId: string
@@ -11,6 +18,7 @@ interface PromptDesignerOpenPayload {
   initialPrompt: string
   connectedContent?: ConnectedContentItem[]
   onGenerate?: (prompt: string) => Promise<void> | void
+  generationSettings?: PromptDesignerGenerationSettings | null
 }
 
 interface PromptDesignerState {
@@ -21,6 +29,7 @@ interface PromptDesignerState {
   mode: PromptDesignerMode | null
   prompt: string
   connectedContent: ConnectedContentItem[]
+  generationSettings: PromptDesignerGenerationSettings | null
   onGenerate: ((prompt: string) => Promise<void> | void) | null
   open: (payload: PromptDesignerOpenPayload) => void
   close: () => void
@@ -39,12 +48,21 @@ const INITIAL_STATE: Omit<
   mode: null,
   prompt: '',
   connectedContent: [],
+  generationSettings: null,
   onGenerate: null
 }
 
 export const usePromptDesignerStore = create<PromptDesignerState>((set, get) => ({
   ...INITIAL_STATE,
-  open: ({ snippetId, snippetTitle = null, mode, initialPrompt, connectedContent = [], onGenerate }) => {
+  open: ({
+    snippetId,
+    snippetTitle = null,
+    mode,
+    initialPrompt,
+    connectedContent = [],
+    onGenerate,
+    generationSettings = null
+  }) => {
     set({
       isOpen: true,
       isGenerating: false,
@@ -53,6 +71,7 @@ export const usePromptDesignerStore = create<PromptDesignerState>((set, get) => 
       mode,
       prompt: initialPrompt,
       connectedContent,
+      generationSettings,
       onGenerate: onGenerate ?? null
     })
   },

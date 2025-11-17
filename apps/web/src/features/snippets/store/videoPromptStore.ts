@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-interface VideoModelSettings {
+export interface VideoModelSettings {
   model: string;
   duration: number;
   resolution: string;
@@ -33,8 +33,8 @@ interface VideoPromptState {
 }
 
 const DEFAULT_SETTINGS: VideoModelSettings = {
-  model: 'viduq2-turbo',
-  duration: 5,
+  model: 'vidu-q2-turbo',
+  duration: 4,
   resolution: '720p',
   audio: false,
   movementAmplitude: 'auto',

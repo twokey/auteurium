@@ -1,9 +1,236 @@
+import { useEffect, useMemo } from 'react';
+
+import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore';
 import { useVideoPromptStore } from '../../features/snippets/store/videoPromptStore';
 import { Accordion } from '../../shared/components/ui/Accordion';
-import type { Snippet, AvailableModel, VideoGenerationInput } from '../../types';
-import type { Viewport } from 'reactflow';
 import { VIDEO_GENERATION } from '../../shared/constants';
-import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore';
+
+import type { AvailableModel, Snippet, VideoGenerationInput } from '../../types';
+import type { Viewport } from 'reactflow';
+
+type ViduCapability = 'IMAGE_TO_VIDEO' | 'TEXT_TO_VIDEO' | 'REFERENCE_TO_VIDEO';
+type ResolutionOption = (typeof VIDEO_GENERATION.RESOLUTIONS)[number];
+
+interface ResolutionPricingDefinition {
+  baseCredits: number;
+  perSecondCredits: number;
+  baseUsd: number;
+  perSecondUsd: number;
+  secondSecondCredits?: number;
+  secondSecondUsd?: number;
+}
+
+interface ViduModelConfig {
+  id: string;
+  label: string;
+  description: string;
+  capability: ViduCapability | 'HYBRID';
+  durations: readonly number[];
+  defaultDuration: number;
+  resolutions: readonly ResolutionOption[];
+  defaultResolution: ResolutionOption;
+  maxReferenceImages: number;
+  pricing: Partial<Record<ViduCapability, Record<ResolutionOption, ResolutionPricingDefinition>>>;
+}
+
+const CAPABILITY_LABELS: Record<ViduCapability, string> = {
+  IMAGE_TO_VIDEO: 'Image-to-Video & Start-End',
+  TEXT_TO_VIDEO: 'Text-to-Video',
+  REFERENCE_TO_VIDEO: 'Reference-to-Video'
+};
+
+const COMMON_DURATIONS = [...VIDEO_GENERATION.DURATIONS] as const;
+const COMMON_RESOLUTIONS = VIDEO_GENERATION.RESOLUTIONS;
+
+const isResolutionOption = (value: string): value is ResolutionOption =>
+  (COMMON_RESOLUTIONS as readonly string[]).includes(value);
+
+const VIDU_Q2_MODEL_CONFIG: Record<string, ViduModelConfig> = {
+  'vidu-q2-turbo': {
+    id: 'vidu-q2-turbo',
+    label: 'Vidu Q2 Turbo',
+    description: 'Fastest Q2 image-to-video (best for storyboard start/end workflows).',
+    capability: 'IMAGE_TO_VIDEO',
+    durations: COMMON_DURATIONS,
+    defaultDuration: 4,
+    resolutions: COMMON_RESOLUTIONS,
+    defaultResolution: '720p',
+    maxReferenceImages: 7,
+    pricing: {
+      IMAGE_TO_VIDEO: {
+        '540p': {
+          baseCredits: 6,
+          perSecondCredits: 2,
+          baseUsd: 0.03,
+          perSecondUsd: 0.01
+        },
+        '720p': {
+          baseCredits: 8,
+          secondSecondCredits: 10,
+          perSecondCredits: 10,
+          baseUsd: 0.04,
+          secondSecondUsd: 0.01,
+          perSecondUsd: 0.05
+        },
+        '1080p': {
+          baseCredits: 35,
+          perSecondCredits: 10,
+          baseUsd: 0.175,
+          perSecondUsd: 0.05
+        }
+      }
+    }
+  },
+  'vidu-q2-pro': {
+    id: 'vidu-q2-pro',
+    label: 'Vidu Q2 Pro',
+    description: 'Premium Q2 image-to-video output with more headroom for upscale.',
+    capability: 'IMAGE_TO_VIDEO',
+    durations: COMMON_DURATIONS,
+    defaultDuration: 4,
+    resolutions: COMMON_RESOLUTIONS,
+    defaultResolution: '720p',
+    maxReferenceImages: 7,
+    pricing: {
+      IMAGE_TO_VIDEO: {
+        '540p': {
+          baseCredits: 8,
+          secondSecondCredits: 10,
+          perSecondCredits: 5,
+          baseUsd: 0.04,
+          secondSecondUsd: 0.01,
+          perSecondUsd: 0.025
+        },
+        '720p': {
+          baseCredits: 15,
+          perSecondCredits: 10,
+          baseUsd: 0.075,
+          perSecondUsd: 0.05
+        },
+        '1080p': {
+          baseCredits: 55,
+          perSecondCredits: 15,
+          baseUsd: 0.275,
+          perSecondUsd: 0.075
+        }
+      }
+    }
+  },
+  'vidu-q2': {
+    id: 'vidu-q2',
+    label: 'Vidu Q2',
+    description: 'Core Q2 model for pure text prompts or reference-to-video runs.',
+    capability: 'HYBRID',
+    durations: COMMON_DURATIONS,
+    defaultDuration: 4,
+    resolutions: COMMON_RESOLUTIONS,
+    defaultResolution: '540p',
+    maxReferenceImages: 7,
+    pricing: {
+      TEXT_TO_VIDEO: {
+        '540p': {
+          baseCredits: 10,
+          perSecondCredits: 2,
+          baseUsd: 0.05,
+          perSecondUsd: 0.01
+        },
+        '720p': {
+          baseCredits: 15,
+          perSecondCredits: 5,
+          baseUsd: 0.075,
+          perSecondUsd: 0.025
+        },
+        '1080p': {
+          baseCredits: 20,
+          perSecondCredits: 10,
+          baseUsd: 0.1,
+          perSecondUsd: 0.05
+        }
+      },
+      REFERENCE_TO_VIDEO: {
+        '540p': {
+          baseCredits: 15,
+          perSecondCredits: 5,
+          baseUsd: 0.075,
+          perSecondUsd: 0.025
+        },
+        '720p': {
+          baseCredits: 25,
+          perSecondCredits: 5,
+          baseUsd: 0.125,
+          perSecondUsd: 0.025
+        },
+        '1080p': {
+          baseCredits: 75,
+          perSecondCredits: 10,
+          baseUsd: 0.375,
+          perSecondUsd: 0.05
+        }
+      }
+    }
+  }
+};
+
+const DEFAULT_MODEL_ID = VIDEO_GENERATION.DEFAULT_MODEL;
+const MODEL_OPTIONS = Object.values(VIDU_Q2_MODEL_CONFIG);
+
+const determineCapability = (config: ViduModelConfig, hasReferenceImages: boolean): ViduCapability => {
+  if (config.capability === 'HYBRID') {
+    return hasReferenceImages ? 'REFERENCE_TO_VIDEO' : 'TEXT_TO_VIDEO';
+  }
+  return config.capability;
+};
+
+const getPricingDefinition = (
+  config: ViduModelConfig,
+  requestedCapability: ViduCapability,
+  resolution: ResolutionOption
+): ResolutionPricingDefinition | undefined => {
+  const mapping = config.pricing[requestedCapability];
+  if (!mapping) {
+    return undefined;
+  }
+  return mapping[resolution];
+};
+
+const accumulateTotals = (duration: number, definition: ResolutionPricingDefinition, valueKey: 'credit' | 'usd'): number => {
+  const base = valueKey === 'credit' ? definition.baseCredits : definition.baseUsd;
+  const perSecond = valueKey === 'credit' ? definition.perSecondCredits : definition.perSecondUsd;
+  const secondSecond = valueKey === 'credit' ? definition.secondSecondCredits : definition.secondSecondUsd;
+
+  if (duration <= 1) {
+    return base;
+  }
+
+  let total = base;
+  if (secondSecond !== undefined) {
+    total += secondSecond;
+    if (duration > 2) {
+      total += perSecond * (duration - 2);
+    }
+  } else {
+    total += perSecond * (duration - 1);
+  }
+  return total;
+};
+
+const calculatePricing = (duration: number, definition: ResolutionPricingDefinition) => {
+  const totalCredits = accumulateTotals(duration, definition, 'credit');
+  const totalUsd = accumulateTotals(duration, definition, 'usd');
+  const standardCredits = Math.ceil(totalCredits);
+  const standardUsd = Number(totalUsd.toFixed(2));
+  const offPeakCredits = Math.ceil(totalCredits / 2);
+  const offPeakUsd = Number((totalUsd / 2).toFixed(2));
+
+  return {
+    standardCredits,
+    standardUsd,
+    offPeakCredits,
+    offPeakUsd
+  };
+};
+
+const formatUsd = (value: number) => `$${value.toFixed(2)}`;
 
 interface VideoPromptPreviewPanelProps {
   snippets: Snippet[];
@@ -33,60 +260,70 @@ export const VideoPromptPreviewPanel = ({
   } = useVideoPromptStore();
   const openPromptDesigner = usePromptDesignerStore((state) => state.open);
 
-  // Don't render if no active snippet
-  if (!activeSnippetId) return null;
+  useEffect(() => {
+    if (!VIDU_Q2_MODEL_CONFIG[modelSettings.model]) {
+      updateModelSettings({ model: DEFAULT_MODEL_ID });
+    }
+  }, [modelSettings.model, updateModelSettings]);
 
-  // Find the active snippet to get its position
+  const selectedModelId = VIDU_Q2_MODEL_CONFIG[modelSettings.model] ? modelSettings.model : DEFAULT_MODEL_ID;
+  const modelConfig = useMemo(() => VIDU_Q2_MODEL_CONFIG[selectedModelId], [selectedModelId]);
+
+  useEffect(() => {
+    if (!modelConfig.durations.includes(modelSettings.duration)) {
+      updateModelSettings({ duration: modelConfig.defaultDuration });
+    }
+  }, [modelConfig, modelSettings.duration, updateModelSettings]);
+
+  useEffect(() => {
+    const currentResolution = modelSettings.resolution;
+    const isValidResolution =
+      isResolutionOption(currentResolution) && modelConfig.resolutions.includes(currentResolution);
+    if (!isValidResolution) {
+      updateModelSettings({ resolution: modelConfig.defaultResolution });
+    }
+  }, [modelConfig, modelSettings.resolution, updateModelSettings]);
+
+  const activeDuration = modelConfig.durations.includes(modelSettings.duration)
+    ? modelSettings.duration
+    : modelConfig.defaultDuration;
+  const sanitizedResolution = isResolutionOption(modelSettings.resolution)
+    ? modelSettings.resolution
+    : modelConfig.defaultResolution;
+  const activeResolution = modelConfig.resolutions.includes(sanitizedResolution)
+    ? sanitizedResolution
+    : modelConfig.defaultResolution;
+
+  const hasReferenceImages = referenceImages.length > 0;
+  const capability = determineCapability(modelConfig, hasReferenceImages);
+  const pricingDefinition = getPricingDefinition(modelConfig, capability, activeResolution);
+  const pricingSummary = useMemo<ReturnType<typeof calculatePricing> | null>(() => {
+    if (!pricingDefinition) {
+      return null;
+    }
+    return calculatePricing(activeDuration, pricingDefinition);
+  }, [pricingDefinition, activeDuration]);
+  const appliedCredits = pricingSummary
+    ? (modelSettings.offPeak ? pricingSummary.offPeakCredits : pricingSummary.standardCredits)
+    : null;
+  const appliedUsd = pricingSummary
+    ? (modelSettings.offPeak ? pricingSummary.offPeakUsd : pricingSummary.standardUsd)
+    : null;
+  const capabilityLabel = CAPABILITY_LABELS[capability];
+
+  if (!activeSnippetId) {
+    return null;
+  }
+
   const activeSnippet = snippets.find(s => s.id === activeSnippetId);
-  if (!activeSnippet || !activeSnippet.position) return null;
+  if (!activeSnippet?.position) {
+    return null;
+  }
 
   // Calculate screen position from canvas coordinates
   // Canvas coordinates are transformed by viewport (zoom and pan)
   const screenX = activeSnippet.position.x * viewport.zoom + viewport.x;
   const screenY = activeSnippet.position.y * viewport.zoom + viewport.y;
-
-  // Model-specific constraints
-  const getModelConstraints = (model: string) => {
-    switch (model) {
-      case 'viduq2-pro':
-      case 'viduq2-turbo':
-        return {
-          durations: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-          resolutions: ['540p', '720p', '1080p'],
-          defaultDuration: 5,
-          defaultResolution: '720p',
-          maxReferenceImages: 7,
-        };
-      case 'viduq1':
-      case 'viduq1-classic':
-        return {
-          durations: [5],
-          resolutions: ['1080p'],
-          defaultDuration: 5,
-          defaultResolution: '1080p',
-          maxReferenceImages: 7,
-        };
-      case 'vidu2.0':
-      case 'vidu1.5':
-        return {
-          durations: [4, 8],
-          resolutions: modelSettings.duration === 8 ? ['720p'] : ['360p', '720p', '1080p'],
-          defaultDuration: 4,
-          defaultResolution: modelSettings.duration === 8 ? '720p' : '720p',
-          maxReferenceImages: 3,
-        };
-      default:
-        return {
-          durations: [4, 8],
-          resolutions: ['540p', '720p', '1080p'],
-          defaultDuration: 4,
-          defaultResolution: '720p',
-          maxReferenceImages: 7,
-        };
-    }
-  };
-
-  const constraints = getModelConstraints(modelSettings.model);
   const characterCount = combinedPrompt.length;
   const maxCharacters = 2000;
 
@@ -96,6 +333,13 @@ export const VideoPromptPreviewPanel = ({
     { id: 'voice_2', name: 'Voice 2 - Energetic' },
     { id: 'voice_3', name: 'Voice 3 - Calm' },
   ];
+
+  const MODEL_SELECT_ID = 'video-model-select';
+  const DURATION_SELECT_ID = 'video-duration-select';
+  const RESOLUTION_SELECT_ID = 'video-resolution-select';
+  const MOVEMENT_SELECT_ID = 'video-movement-amplitude';
+  const VOICE_SELECT_ID = 'video-voice-select';
+  const SEED_INPUT_ID = 'video-seed-input';
 
   return (
     <div
@@ -118,51 +362,49 @@ export const VideoPromptPreviewPanel = ({
           <div className="space-y-3">
             {/* Model Selection */}
             <div>
-              <label className="block text-xs font-medium text-gray-800 mb-1">
+              <label htmlFor={MODEL_SELECT_ID} className="block text-xs font-medium text-gray-800 mb-1">
                 Model
               </label>
               <select
-                value={modelSettings.model}
+                id={MODEL_SELECT_ID}
+                value={selectedModelId}
                 onChange={(e) => {
                   const newModel = e.target.value;
-                  const constraints = getModelConstraints(newModel);
+                  const nextConfig = VIDU_Q2_MODEL_CONFIG[newModel] ?? modelConfig;
                   updateModelSettings({
                     model: newModel,
-                    duration: constraints.defaultDuration,
-                    resolution: constraints.defaultResolution,
+                    duration: nextConfig.defaultDuration,
+                    resolution: nextConfig.defaultResolution,
                   });
                 }}
                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
-                <option value="viduq2-pro">Vidu Q2 Pro</option>
-                <option value="viduq2-turbo">Vidu Q2 Turbo</option>
-                <option value="viduq1">Vidu Q1</option>
-                <option value="viduq1-classic">Vidu Q1 Classic</option>
-                <option value="vidu2.0">Vidu 2.0</option>
-                <option value="vidu1.5">Vidu 1.5</option>
+                {MODEL_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
+              <p className="mt-1 text-xs text-gray-600">
+                {modelConfig.description}
+              </p>
             </div>
 
             {/* Duration */}
             <div>
-              <label className="block text-xs font-medium text-gray-800 mb-1">
+              <label htmlFor={DURATION_SELECT_ID} className="block text-xs font-medium text-gray-800 mb-1">
                 Duration
               </label>
               <select
-                value={modelSettings.duration}
+                id={DURATION_SELECT_ID}
+                value={activeDuration}
                 onChange={(e) => {
                   const newDuration = Number(e.target.value);
-                  updateModelSettings({
-                    duration: newDuration,
-                    // Update resolution if needed for vidu2.0/1.5
-                    resolution: modelSettings.model.includes('vidu2.0') || modelSettings.model.includes('vidu1.5')
-                      ? newDuration === 8 ? '720p' : modelSettings.resolution
-                      : modelSettings.resolution,
-                  });
+                  updateModelSettings({ duration: newDuration });
                 }}
                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
-                {constraints.durations.map((duration) => (
+                {modelConfig.durations.map((duration) => (
                   <option key={duration} value={duration}>
                     {duration}s
                   </option>
@@ -172,15 +414,16 @@ export const VideoPromptPreviewPanel = ({
 
             {/* Resolution */}
             <div>
-              <label className="block text-xs font-medium text-gray-800 mb-1">
+              <label htmlFor={RESOLUTION_SELECT_ID} className="block text-xs font-medium text-gray-800 mb-1">
                 Resolution
               </label>
               <select
-                value={modelSettings.resolution}
-                onChange={(e) => updateModelSettings({ resolution: e.target.value })}
+                id={RESOLUTION_SELECT_ID}
+                value={activeResolution}
+                onChange={(e) => updateModelSettings({ resolution: e.target.value as ResolutionOption })}
                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
-                {constraints.resolutions.map((resolution) => (
+                {modelConfig.resolutions.map((resolution) => (
                   <option key={resolution} value={resolution}>
                     {resolution}
                   </option>
@@ -190,10 +433,11 @@ export const VideoPromptPreviewPanel = ({
 
             {/* Movement Amplitude */}
             <div>
-              <label className="block text-xs font-medium text-gray-800 mb-1">
+              <label htmlFor={MOVEMENT_SELECT_ID} className="block text-xs font-medium text-gray-800 mb-1">
                 Movement Amplitude
               </label>
               <select
+                id={MOVEMENT_SELECT_ID}
                 value={modelSettings.movementAmplitude}
                 onChange={(e) => updateModelSettings({ movementAmplitude: e.target.value })}
                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -207,7 +451,7 @@ export const VideoPromptPreviewPanel = ({
 
             {/* Audio Toggle */}
             <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-gray-800">Audio</label>
+              <span className="text-xs font-medium text-gray-800">Audio</span>
               <button
                 onClick={() => updateModelSettings({ audio: !modelSettings.audio })}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
@@ -225,11 +469,12 @@ export const VideoPromptPreviewPanel = ({
             {/* Voice ID (only when audio is enabled) */}
             {modelSettings.audio && (
               <div>
-                <label className="block text-xs font-medium text-gray-800 mb-1">
+                <label htmlFor={VOICE_SELECT_ID} className="block text-xs font-medium text-gray-800 mb-1">
                   Voice
                 </label>
                 <select
-                  value={modelSettings.voiceId || ''}
+                  id={VOICE_SELECT_ID}
+                  value={modelSettings.voiceId ?? ''}
                   onChange={(e) => updateModelSettings({ voiceId: e.target.value })}
                   className="w-full px-3 py-2 bg-white border border-gray-300 rounded text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
@@ -245,12 +490,13 @@ export const VideoPromptPreviewPanel = ({
 
             {/* Seed (optional) */}
             <div>
-              <label className="block text-xs font-medium text-gray-800 mb-1">
+              <label htmlFor={SEED_INPUT_ID} className="block text-xs font-medium text-gray-800 mb-1">
                 Seed (optional)
               </label>
               <input
+                id={SEED_INPUT_ID}
                 type="number"
-                value={modelSettings.seed || ''}
+                value={modelSettings.seed ?? ''}
                 onChange={(e) => updateModelSettings({ seed: e.target.value ? Number(e.target.value) : undefined })}
                 placeholder="Random"
                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -259,7 +505,7 @@ export const VideoPromptPreviewPanel = ({
 
             {/* Off-peak Mode */}
             <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-gray-800">Off-peak Mode</label>
+              <span className="text-xs font-medium text-gray-800">Off-peak Mode</span>
               <button
                 onClick={() => updateModelSettings({ offPeak: !modelSettings.offPeak })}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
@@ -273,6 +519,41 @@ export const VideoPromptPreviewPanel = ({
                 />
               </button>
             </div>
+
+            {pricingSummary && (
+              <div className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-sm text-purple-900">
+                <div className="flex items-center justify-between font-semibold">
+                  <span>{modelConfig.label}</span>
+                  <span>{activeResolution.toUpperCase()} • {activeDuration}s</span>
+                </div>
+                <div className="mt-1 text-[11px] uppercase tracking-wide text-purple-700">
+                  {capabilityLabel}
+                </div>
+                <dl className="mt-2 space-y-1 text-gray-900">
+                  <div className="flex items-center justify-between">
+                    <dt>{modelSettings.offPeak ? 'Applied (off-peak)' : 'Applied (standard)'}</dt>
+                    <dd>
+                      {appliedCredits} credits · {appliedUsd !== null ? formatUsd(appliedUsd) : '—'}
+                    </dd>
+                  </div>
+                  <div className="flex items-center justify-between text-gray-700">
+                    <dt>Standard</dt>
+                    <dd>
+                      {pricingSummary.standardCredits} credits · {formatUsd(pricingSummary.standardUsd)}
+                    </dd>
+                  </div>
+                  <div className="flex items-center justify-between text-gray-700">
+                    <dt>Off-peak</dt>
+                    <dd>
+                      {pricingSummary.offPeakCredits} credits · {formatUsd(pricingSummary.offPeakUsd)}
+                    </dd>
+                  </div>
+                </dl>
+                <p className="mt-2 text-[11px] text-gray-600">
+                  Estimates follow Vidu Q2 pricing. Off-peak halves the total credits (rounded up).
+                </p>
+              </div>
+            )}
 
             {/* Generate Video Button */}
             <button
@@ -296,16 +577,30 @@ export const VideoPromptPreviewPanel = ({
                     snippetTitle: img.snippetTitle,
                     value: img.url
                   })),
+                  generationSettings: {
+                    type: 'video',
+                    settings: {
+                      ...modelSettings,
+                      model: selectedModelId,
+                      duration: activeDuration,
+                      resolution: activeResolution
+                    }
+                  },
                   onGenerate: async (finalPrompt) => {
+                    const latestSettings = useVideoPromptStore.getState().modelSettings;
                     await onUpdateContent(activeSnippetId, { textField1: finalPrompt });
-                    const targetModel = modelSettings.model || videoModels[0]?.id || VIDEO_GENERATION.DEFAULT_MODEL;
+                    const fallbackModel = videoModels[0]?.id ?? VIDEO_GENERATION.DEFAULT_MODEL;
+                    const targetModel = latestSettings.model && VIDU_Q2_MODEL_CONFIG[latestSettings.model]
+                      ? latestSettings.model
+                      : fallbackModel;
                     const designerRequest: VideoGenerationInput = {
                       modelId: targetModel,
-                      duration: modelSettings.duration || VIDEO_GENERATION.DEFAULT_DURATION,
+                      duration: latestSettings.duration ?? VIDEO_GENERATION.DEFAULT_DURATION,
                       aspectRatio: VIDEO_GENERATION.DEFAULT_ASPECT_RATIO,
-                      resolution: modelSettings.resolution || VIDEO_GENERATION.DEFAULT_RESOLUTION,
+                      resolution: latestSettings.resolution ?? VIDEO_GENERATION.DEFAULT_RESOLUTION,
                       style: VIDEO_GENERATION.DEFAULT_STYLE,
-                      movementAmplitude: modelSettings.movementAmplitude || VIDEO_GENERATION.DEFAULT_MOVEMENT_AMPLITUDE
+                      seed: latestSettings.seed,
+                      movementAmplitude: latestSettings.movementAmplitude ?? VIDEO_GENERATION.DEFAULT_MOVEMENT_AMPLITUDE
                     };
                     await onGenerateVideo(activeSnippetId, designerRequest);
                   }
@@ -313,7 +608,7 @@ export const VideoPromptPreviewPanel = ({
               }}
               disabled={
                 isLoadingVideoModels ||
-                (!modelSettings.model && videoModels.length > 0) ||
+                (!selectedModelId && videoModels.length > 0) ||
                 isGeneratingVideo ||
                 !combinedPrompt
               }
@@ -323,7 +618,7 @@ export const VideoPromptPreviewPanel = ({
                   ? 'Video generation in progress...'
                   : isLoadingVideoModels
                     ? 'Loading models...'
-                    : !modelSettings.model
+                    : !selectedModelId
                       ? 'Please select a video model first'
                       : !combinedPrompt
                         ? 'No prompt available. Fill in the form fields first.'
@@ -361,22 +656,24 @@ export const VideoPromptPreviewPanel = ({
           ) : (
             <div>
               <p className="text-xs text-gray-600 mb-2">
-                {referenceImages.length} / {constraints.maxReferenceImages} images
+                {referenceImages.length} / {modelConfig.maxReferenceImages} images
               </p>
               <div className="grid grid-cols-3 gap-2">
-                {referenceImages.slice(0, constraints.maxReferenceImages).map((image, index) => (
+                {referenceImages.slice(0, modelConfig.maxReferenceImages).map((image, index) => (
                   <div key={index} className="relative aspect-square">
                     <img
                       src={image.url}
-                      alt={image.snippetTitle || `Reference ${index + 1}`}
+                      alt={image.snippetTitle && image.snippetTitle.trim() !== ''
+                        ? image.snippetTitle
+                        : `Reference ${index + 1}`}
                       className="w-full h-full object-cover rounded border border-gray-300"
                     />
                   </div>
                 ))}
               </div>
-              {referenceImages.length > constraints.maxReferenceImages && (
+              {referenceImages.length > modelConfig.maxReferenceImages && (
                 <p className="text-xs text-red-600 mt-2">
-                  Warning: Only first {constraints.maxReferenceImages} images will be used
+                  Warning: Only first {modelConfig.maxReferenceImages} images will be used
                 </p>
               )}
             </div>

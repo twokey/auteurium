@@ -43,7 +43,7 @@ export const generateVideoInputSchema = z.object({
   projectId: z.string().min(1, 'Project ID is required'),
   snippetId: z.string().min(1, 'Snippet ID is required'),
   modelId: z.string().min(1, 'Model ID is required'),
-  duration: z.number().int().min(4).max(8).nullish(),
+  duration: z.number().int().min(1).max(10).nullish(),
   aspectRatio: z.enum(['default', '16:9', '9:16', '1:1']).nullish(),
   resolution: z.enum(['540p', '720p', '1080p']).nullish(),
   style: z.enum(['general', 'anime']).nullish(),
