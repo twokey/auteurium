@@ -1077,7 +1077,7 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
                       mode: 'image',
                       initialPrompt: snippet.textField1,
                       connectedContent: connectedContent,
-                      onGenerate: async (nextPrompt) => {
+                      onGenerate: (nextPrompt) => {
                         const trimmedPrompt = nextPrompt.trim()
                         if (trimmedPrompt === '') {
                           toast.warning('Please provide prompt content for image generation')

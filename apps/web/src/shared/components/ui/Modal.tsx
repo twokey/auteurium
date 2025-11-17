@@ -77,7 +77,7 @@ export const Modal = ({ isOpen, onClose, children, size = 'md' }: ModalProps) =>
   )
 }
 
-Modal.Header = function ModalHeader({ children }: ModalHeaderProps) {
+Modal.Header = ({ children }: ModalHeaderProps) => {
   return (
     <div className="px-6 py-4 border-b border-gray-200">
       {children}
@@ -85,7 +85,7 @@ Modal.Header = function ModalHeader({ children }: ModalHeaderProps) {
   )
 }
 
-Modal.Body = function ModalBody({ children }: ModalBodyProps) {
+Modal.Body = ({ children }: ModalBodyProps) => {
   return (
     <div className="px-6 py-4 overflow-y-auto flex-1">
       {children}
@@ -93,7 +93,7 @@ Modal.Body = function ModalBody({ children }: ModalBodyProps) {
   )
 }
 
-Modal.Footer = function ModalFooter({ children }: ModalFooterProps) {
+Modal.Footer = ({ children }: ModalFooterProps) => {
   return (
     <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3">
       {children}

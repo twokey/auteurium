@@ -36,7 +36,7 @@ export const useSnippetVersions = (snippetId: string): UseSnippetVersionsReturn 
 
   // Handle version revert
   const revertVersion = useCallback(
-    async (_projectId: string, _snippetId: string, _version: number) => {
+    (_projectId: string, _snippetId: string, _version: number) => {
       setIsReverting(true)
       try {
         // Note: You'll need to implement REVERT_SNIPPET_VERSION mutation in graphql/mutations.ts
