@@ -136,7 +136,7 @@ const analyzeSnippetConnections = (
 
   const rawIncomingMap = new Map<
     string,
-    Array<{ sourceId: string; createdAt?: string | null; order: number }>
+    { sourceId: string; createdAt?: string | null; order: number }[]
   >()
 
   snippets.forEach((snippet) => {
@@ -646,7 +646,7 @@ export function useFlowNodes(
 
       // Note: The pending positions will be flushed by the existing debounced mechanism
       // in useReactFlowSetup, so no need to trigger flush here
-      console.log(`Migrated ${snippetsNeedingMigration.length} snippets to column layout`)
+      console.warn(`Migrated ${snippetsNeedingMigration.length} snippets to column layout`)
     }
   }, [snippets, addPendingPosition])
 
@@ -686,7 +686,7 @@ export function useFlowNodes(
           const targetSnippet = snippetMap.get(conn.targetSnippetId)
           return targetSnippet ? { id: targetSnippet.id, title: targetSnippet.title } : null
         })
-        .filter(conn => conn !== null) as Array<{ id: string; title?: string }>
+        .filter(conn => conn !== null) as { id: string; title?: string }[]
 
       const isVideoSnippet = snippet.snippetType === 'video'
       const nodeBackground = isVideoSnippet ? '#ede9fe' : '#dbeafe' // purple-100 vs blue-100

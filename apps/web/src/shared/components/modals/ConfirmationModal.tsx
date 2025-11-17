@@ -1,6 +1,7 @@
-import { ReactNode } from 'react'
-import { Modal } from '../ui/Modal'
+import { type ReactNode } from 'react'
+
 import { Button } from '../ui/Button'
+import { Modal } from '../ui/Modal'
 
 interface ConfirmationModalProps {
   isOpen: boolean

@@ -3,8 +3,8 @@
  * Centralizes all modal rendering for the canvas
  */
 
-import { DeleteSnippetConfirmation } from '../../../components/modals/DeleteSnippetConfirmation'
 import { DeleteMultipleSnippetsConfirmation } from '../../../components/modals/DeleteMultipleSnippetsConfirmation'
+import { DeleteSnippetConfirmation } from '../../../components/modals/DeleteSnippetConfirmation'
 import { EditSnippetModal } from '../../../components/modals/EditSnippetModal'
 import { GeneratedSnippetPreviewModal } from '../../../components/modals/GeneratedSnippetPreviewModal'
 import { ManageConnectionsModal } from '../../../components/modals/ManageConnectionsModal'

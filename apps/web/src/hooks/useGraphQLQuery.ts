@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getClient } from '../services/graphql'
 
 const getOperationName = (graphQLDocument: string): string => {
-  const match = graphQLDocument.match(/\b(query|mutation|subscription)\s+([A-Za-z_][A-Za-z0-9_]*)/)
+  const match = /\b(query|mutation|subscription)\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(graphQLDocument)
   return match?.[2] ?? 'anonymous'
 }
 
@@ -39,7 +39,7 @@ export const useGraphQLQuery = <TData = unknown, TVariables = Record<string, unk
       const errorObject = unknownError as {
         message?: unknown
         code?: unknown
-        errors?: Array<{ message?: unknown }>
+        errors?: { message?: unknown }[]
         recoverySuggestion?: unknown
       }
 

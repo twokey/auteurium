@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo, type ReactNode } from 
 
 import { GET_AVAILABLE_MODELS } from '../graphql/genai'
 import { useGraphQLQueryWithCache } from '../shared/hooks/useGraphQLQueryWithCache'
+
 import type { AvailableModel } from '../types'
 
 interface AvailableModelsData {
@@ -40,7 +41,7 @@ export const ModelsProvider = ({ children }: ModelsProviderProps) => {
   const allModels = data?.availableModels ?? []
 
   const filterByModalities = useCallback(
-    (models: AvailableModel[], modalities: Array<AvailableModel['modality']>) =>
+    (models: AvailableModel[], modalities: AvailableModel['modality'][]) =>
       models.filter(model => modalities.includes(model.modality)),
     []
   )

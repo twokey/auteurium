@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { Modal } from '../../../shared/components/ui/Modal'
+
 import { Button } from '../../../shared/components/ui/Button'
-import { useConnectionManagement, useConnectionListing } from '../hooks'
+import { Modal } from '../../../shared/components/ui/Modal'
 import { ConnectionForm, ConnectionsList } from '../components'
+import { useConnectionManagement, useConnectionListing } from '../hooks'
+
 import type { Snippet } from '../../../types'
 
 interface ManageConnectionsModalProps {

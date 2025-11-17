@@ -1,7 +1,9 @@
 import { useCallback, useState } from 'react'
+
 import { CREATE_CONNECTION, DELETE_CONNECTION } from '../../../graphql/mutations'
 import { useGraphQLMutation } from '../../../hooks/useGraphQLMutation'
 import { useToast } from '../../../shared/store/toastStore'
+
 import type { Connection } from '../../../types'
 
 interface CreateConnectionInput {

@@ -1,6 +1,7 @@
-import { ReactNode, FormEvent } from 'react'
-import { Modal } from '../ui/Modal'
+import { type ReactNode, type FormEvent } from 'react'
+
 import { Button } from '../ui/Button'
+import { Modal } from '../ui/Modal'
 
 export interface FormModalConfig {
   title: string

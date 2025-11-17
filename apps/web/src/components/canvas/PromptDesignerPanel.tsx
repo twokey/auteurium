@@ -165,14 +165,6 @@ export const PromptDesignerPanel = () => {
         finalPrompt = connectedText || currentText || ''
       }
 
-      // Log the complete prompt being sent to generation
-      // eslint-disable-next-line no-console
-      console.log('=== PromptDesigner: Sending Prompt to LLM ===')
-      // eslint-disable-next-line no-console
-      console.log('Complete Prompt:', finalPrompt)
-      // eslint-disable-next-line no-console
-      console.log('Prompt Length:', finalPrompt.length, 'characters')
-
       await Promise.resolve(onGenerate(finalPrompt))
       close()
     } catch (error) {

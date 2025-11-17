@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react'
 import { getClient } from '../services/graphql'
 
 const getOperationName = (graphQLDocument: string): string => {
-  const match = graphQLDocument.match(/\b(mutation|query|subscription)\s+([A-Za-z_][A-Za-z0-9_]*)/)
+  const match = /\b(mutation|query|subscription)\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(graphQLDocument)
   return match?.[2] ?? 'anonymous'
 }
 

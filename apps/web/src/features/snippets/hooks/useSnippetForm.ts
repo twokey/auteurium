@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+
 import type { Snippet } from '../../../types'
 
 type EditableField = 'textField1'

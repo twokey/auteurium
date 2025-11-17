@@ -4,11 +4,12 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+
 import { getClient } from '../../services/graphql'
 import { GRAPHQL } from '../constants'
 
 const getOperationName = (graphQLDocument: string): string => {
-  const match = graphQLDocument.match(/\b(query|mutation|subscription)\s+([A-Za-z_][A-Za-z0-9_]*)/)
+  const match = /\b(query|mutation|subscription)\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(graphQLDocument)
   return match?.[2] ?? 'anonymous'
 }
 
@@ -92,7 +93,7 @@ export const useGraphQLQueryWithCache = <TData = unknown, TVariables = Record<st
       const errorObject = unknownError as {
         message?: unknown
         code?: unknown
-        errors?: Array<{ message?: unknown }>
+        errors?: { message?: unknown }[]
         recoverySuggestion?: unknown
       }
 

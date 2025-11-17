@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react'
+
 import { useGraphQLQuery } from '../../../hooks/useGraphQLQuery'
 import { useToast } from '../../../shared/store/toastStore'
+
 import type { SnippetVersion } from '../../../types'
 
 export interface UseSnippetVersionsReturn {
@@ -61,7 +63,7 @@ export const useSnippetVersions = (snippetId: string): UseSnippetVersionsReturn 
   return {
     versions: data?.snippetVersions ?? [],
     isLoading: loading,
-    error: error as Error | null,
+    error: error,
     revertVersion,
     isReverting
   }

@@ -8,12 +8,12 @@ import { useToast } from '../../shared/store/toastStore'
 interface DeleteMultipleSnippetsConfirmationProps {
   isOpen: boolean
   onClose: () => void
-  snippets: Array<{
+  snippets: {
     id: string
     projectId: string
     title?: string
     textField1?: string
-  }>
+  }[]
   projectId: string
   onDeleted?: () => void
 }

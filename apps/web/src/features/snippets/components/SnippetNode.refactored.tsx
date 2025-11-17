@@ -1,11 +1,13 @@
 import { memo, useCallback } from 'react'
 import { Handle, Position } from 'reactflow'
-import { useSnippetNodeEditing, useSnippetNodeActions } from '../hooks'
+
 import {
   SnippetNodeContent,
   SnippetNodeToolbar,
   SnippetNodeImage
 } from '.'
+import { useSnippetNodeEditing, useSnippetNodeActions } from '../hooks'
+
 import type { EditableField, SnippetNodeProps } from '../../../types'
 
 /**

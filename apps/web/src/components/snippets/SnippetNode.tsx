@@ -2,13 +2,13 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Handle, Position } from 'reactflow'
 
-import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
+import { VideoSnippetNode } from './VideoSnippetNode'
 import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisticUpdatesStore'
+import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
 import { useGenAI } from '../../hooks/useGenAI'
 import { CANVAS_CONSTANTS, VIDEO_GENERATION } from '../../shared/constants'
 import { useToast } from '../../shared/store/toastStore'
 import { countWords, truncateToWords } from '../../shared/utils/textUtils'
-import { VideoSnippetNode } from './VideoSnippetNode'
 
 import type { AvailableModel, ConnectedContentItem, VideoGenerationInput } from '../../types'
 
@@ -42,7 +42,7 @@ interface SnippetNodeProps {
         movementAmplitude?: string
       } | null
       connectedContent?: ConnectedContentItem[]
-      downstreamConnections?: Array<{ id: string; title?: string }>
+      downstreamConnections?: { id: string; title?: string }[]
       snippetType?: 'text' | 'video'
     }
     onEdit: (snippetId: string) => void
@@ -90,12 +90,7 @@ const getVideoReferenceLimit = (modelId: string): number => {
 }
 
 export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
-  // Route to VideoSnippetNode if this is a video snippet
-  if (data.snippet.snippetType === 'video') {
-    return <VideoSnippetNode id={id} data={data} />
-  }
-
-  // Otherwise, render regular snippet UI
+  // Call all hooks before any conditional returns (Rules of Hooks)
   const toast = useToast()
   const { id: projectId } = useParams<{ id: string }>()
   const { generateStream, createScenes } = useGenAI({ enabled: true })
@@ -227,16 +222,7 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
       const newValue = draftValues.textField1
       const currentValue = snippet.textField1
 
-      console.log('[SnippetNode] commitField called:', {
-        field,
-        snippetId: snippet.id,
-        newValue,
-        currentValue,
-        areEqual: newValue === currentValue
-      })
-
       if (newValue === currentValue) {
-        console.log('[SnippetNode] No change detected, skipping update')
         clearSnippetDirty(snippet.id)
         setActiveField(null)
         return
@@ -246,9 +232,7 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
       markSnippetSaving(snippet.id)
 
       try {
-        console.log('[SnippetNode] Calling onUpdateContent with:', { snippetId: snippet.id, textField1: newValue })
         await onUpdateContent(snippet.id, { textField1: newValue })
-        console.log('[SnippetNode] onUpdateContent completed successfully')
         clearSnippetDirty(snippet.id)
         setActiveField(null)
       } catch (error) {
@@ -267,16 +251,7 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
       const newValue = draftValues.title
       const currentValue = snippet.title ?? ''
 
-      console.log('[SnippetNode] commitField called:', {
-        field,
-        snippetId: snippet.id,
-        newValue,
-        currentValue,
-        areEqual: newValue === currentValue
-      })
-
       if (newValue === currentValue) {
-        console.log('[SnippetNode] No change detected, skipping update')
         clearSnippetDirty(snippet.id)
         setActiveField(null)
         return
@@ -286,9 +261,7 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
       markSnippetSaving(snippet.id)
 
       try {
-        console.log('[SnippetNode] Calling onUpdateContent with:', { snippetId: snippet.id, title: newValue })
         await onUpdateContent(snippet.id, { title: newValue })
-        console.log('[SnippetNode] onUpdateContent completed successfully')
         clearSnippetDirty(snippet.id)
         setActiveField(null)
       } catch (error) {
@@ -514,18 +487,6 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
     setIsGeneratingText(true)
 
     try {
-      // Log the generation call
-      // eslint-disable-next-line no-console
-      console.log('=== Text Generation Request ===')
-      // eslint-disable-next-line no-console
-      console.log('Model ID:', selectedTextModel)
-      // eslint-disable-next-line no-console
-      console.log('Prompt:', trimmedPrompt)
-      // eslint-disable-next-line no-console
-      console.log('Snippet ID:', snippet.id)
-      // eslint-disable-next-line no-console
-      console.log('Project ID:', projectId)
-
       // Call generation API
       const { result, fallbackReason } = await generateStream(
         projectId,
@@ -533,14 +494,6 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
         selectedTextModel,
         trimmedPrompt
       )
-
-      // Log the result
-      // eslint-disable-next-line no-console
-      console.log('=== Text Generation Response ===')
-      // eslint-disable-next-line no-console
-      console.log('Result:', result)
-      // eslint-disable-next-line no-console
-      console.log('Fallback Reason:', fallbackReason)
 
       if (!result?.content || result.content.trim() === '') {
         toast.warning(
@@ -601,18 +554,6 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
     setIsGeneratingScenes(true)
 
     try {
-      // Log the generation call
-      // eslint-disable-next-line no-console
-      console.log('=== Scene Generation Request ===')
-      // eslint-disable-next-line no-console
-      console.log('Model ID:', selectedSceneModel)
-      // eslint-disable-next-line no-console
-      console.log('Prompt:', trimmedPrompt)
-      // eslint-disable-next-line no-console
-      console.log('Snippet ID:', snippet.id)
-      // eslint-disable-next-line no-console
-      console.log('Project ID:', projectId)
-
       // Call scene generation API (creates scenes in backend)
       const result = await createScenes(
         projectId,
@@ -620,12 +561,6 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
         selectedSceneModel,
         trimmedPrompt
       )
-
-      // Log the result
-      // eslint-disable-next-line no-console
-      console.log('=== Scene Generation Response ===')
-      // eslint-disable-next-line no-console
-      console.log('Scenes created:', result?.scenes?.length ?? 0)
 
       if (!result?.scenes || result.scenes.length === 0) {
         toast.warning(
@@ -654,6 +589,11 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
       setIsGeneratingScenes(false)
     }
   }, [selectedSceneModel, projectId, createScenes, snippet.id, toast])
+
+  // Route to VideoSnippetNode if this is a video snippet
+  if (data.snippet.snippetType === 'video') {
+    return <VideoSnippetNode id={id} data={data} />
+  }
 
   return (
     <>

@@ -1,4 +1,5 @@
 import { formatDistanceToNow } from 'date-fns'
+
 import type { SnippetVersion } from '../../../types'
 
 interface VersionTimelineProps {

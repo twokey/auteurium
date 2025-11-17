@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useRef, type MutableRefObject } from 'react'
-import type { ReactFlowInstance, Node } from 'reactflow'
+
 
 import {
   CREATE_SNIPPET,
@@ -17,10 +17,10 @@ import {
 } from '../../../graphql/mutations'
 import { useGraphQLMutation } from '../../../hooks/useGraphQLMutation'
 import { CANVAS_CONSTANTS } from '../../../shared/constants'
-import { mutateWithInvalidate, mutateOptimisticOnly } from '../../../shared/utils/cacheHelpers'
-import { snapToColumn, getColumnIndex, getRelativeColumnX } from '../../../shared/utils/columnLayout'
 import { useModalStore } from '../../../shared/store/modalStore'
 import { useToast } from '../../../shared/store/toastStore'
+import { mutateWithInvalidate, mutateOptimisticOnly } from '../../../shared/utils/cacheHelpers'
+import { snapToColumn, getColumnIndex, getRelativeColumnX } from '../../../shared/utils/columnLayout'
 import { useCanvasStore } from '../store/canvasStore'
 import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
 
@@ -40,6 +40,7 @@ import type {
   GenerateSnippetVideoMutationData,
   VideoGenerationInput
 } from '../../../types'
+import type { ReactFlowInstance, Node } from 'reactflow'
 
 type SnippetContentChanges = Partial<Pick<Snippet, 'textField1' | 'title'>>
 
@@ -426,12 +427,6 @@ export function useCanvasHandlers({
     snippetId: string,
     changes: SnippetContentChanges
   ) => {
-    console.log('[useCanvasHandlers] handleUpdateSnippetContent called:', {
-      snippetId,
-      changes,
-      projectId
-    })
-
     if (!projectId) {
       console.error('Cannot update snippet content: no project ID')
       return
@@ -443,38 +438,22 @@ export function useCanvasHandlers({
       return
     }
 
-    console.log('[useCanvasHandlers] Current snippet state:', {
-      id: snippetBeforeUpdate.id,
-      textField1: snippetBeforeUpdate.textField1
-    })
-
     const updateInput: SnippetContentChanges = {}
     const previousValues: SnippetContentChanges = {}
 
     if (Object.prototype.hasOwnProperty.call(changes, 'textField1')) {
       updateInput.textField1 = changes.textField1 ?? ''
       previousValues.textField1 = snippetBeforeUpdate.textField1
-      console.log('[useCanvasHandlers] textField1 update prepared:', {
-        newValue: updateInput.textField1,
-        oldValue: previousValues.textField1
-      })
     }
 
     if (Object.prototype.hasOwnProperty.call(changes, 'title')) {
       updateInput.title = changes.title ?? ''
       previousValues.title = snippetBeforeUpdate.title
-      console.log('[useCanvasHandlers] title update prepared:', {
-        newValue: updateInput.title,
-        oldValue: previousValues.title
-      })
     }
 
     if (Object.keys(updateInput).length === 0) {
-      console.log('[useCanvasHandlers] No fields to update, returning early')
       return
     }
-
-    console.log('[useCanvasHandlers] Applying optimistic update and calling mutation')
 
     const previousSnippetSnapshot: Snippet = { ...snippetBeforeUpdate }
     const updatedSnippet: Snippet = {
@@ -508,8 +487,6 @@ export function useCanvasHandlers({
         input: updateInput
       } as Record<string, unknown> & UpdateSnippetVariables
 
-      console.log('[useCanvasHandlers] Calling updateSnippetMutation with variables:', mutationVariables)
-
       // Use optimistic-only pattern: mutation already shows changes via optimistic update
       // No cache invalidation needed - we only changed existing fields
       // The stale-while-revalidate cache will refresh in background if needed
@@ -518,8 +495,6 @@ export function useCanvasHandlers({
           variables: mutationVariables
         })
       )
-
-      console.log('[useCanvasHandlers] Mutation completed, result:', result)
     } catch (error) {
       console.error('Failed to update snippet content:', error)
       updateRealSnippet(previousSnippetSnapshot)
@@ -840,8 +815,6 @@ export function useCanvasHandlers({
         ...(options.seed !== undefined && { seed: options.seed }),
         ...(options.movementAmplitude !== undefined && { movementAmplitude: options.movementAmplitude })
       }
-
-      console.log('generateSnippetVideo variables:', JSON.stringify(variables, null, 2))
 
       await mutateWithInvalidate(
         () => generateSnippetVideoMutation({ variables }),

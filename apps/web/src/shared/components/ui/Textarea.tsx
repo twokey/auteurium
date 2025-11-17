@@ -14,7 +14,7 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   ref?: React.Ref<HTMLTextAreaElement>
 }
 
-export function Textarea({
+export const Textarea = ({
   label,
   error,
   helperText,
@@ -22,7 +22,7 @@ export function Textarea({
   className = '',
   ref,
   ...props
-}: TextareaProps) {
+}: TextareaProps) => {
   const widthClass = fullWidth ? 'w-full' : ''
   const errorClass = error ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
 

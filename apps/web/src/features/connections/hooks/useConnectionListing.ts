@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+
 import type { Snippet, Connection } from '../../../types'
 
 interface ConnectionWithSource extends Connection {

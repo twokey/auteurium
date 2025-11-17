@@ -67,7 +67,7 @@ export const configureAmplify = () => {
   Amplify.configure(config)
 
   // Success log
-  console.info('[Amplify] Configured successfully', {
+  console.warn('[Amplify] Configured successfully', {
     hasAuth: Boolean(config.Auth?.Cognito?.userPoolId),
     hasGraphQL: Boolean(config.API?.GraphQL?.endpoint),
     region: config.API?.GraphQL?.region

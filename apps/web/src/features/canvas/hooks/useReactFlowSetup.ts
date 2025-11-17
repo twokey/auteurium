@@ -6,16 +6,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { addEdge, useEdgesState, useNodesState } from 'reactflow'
 
+import { UPDATE_SNIPPET_POSITIONS } from '../../../graphql/mutations'
+import { getClient } from '../../../services/graphql'
+import { CANVAS_CONSTANTS } from '../../../shared/constants'
 import { useDebouncedCallback } from '../../../shared/hooks/useDebounce'
 import { mutateWithInvalidate } from '../../../shared/utils/cacheHelpers'
 import { snapPositionToColumn } from '../../../shared/utils/columnLayout'
-import { UPDATE_SNIPPET_POSITIONS } from '../../../graphql/mutations'
-import { CANVAS_CONSTANTS } from '../../../shared/constants'
-import { getClient } from '../../../services/graphql'
+import { useCanvasKeyboardShortcut } from '../context/canvasKeyboard'
 import { useCanvasStore } from '../store/canvasStore'
 import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
 import { usePendingPositionsStore } from '../store/pendingPositionsStore'
-import { useCanvasKeyboardShortcut } from '../context/canvasKeyboard'
 
 import type {
   Snippet,
@@ -36,13 +36,13 @@ const BULK_POSITION_CHUNK_SIZE = 20 // Conservative chunk size to stay well belo
 const BULK_POSITION_SUPPORT_STORAGE_KEY = 'canvas-bulk-position-mutation-supported-v2'
 const BULK_POSITION_SUPPORT_RETRY_MS = 30 * 60 * 1000 // Retry bulk detection every 30 minutes
 
-type GraphQLClient = {
+interface GraphQLClient {
   graphql: <TData = unknown, TVariables = Record<string, unknown>>(input: {
     query: string
     variables?: TVariables
   }) => Promise<{
     data?: TData | null
-    errors?: Array<{ message?: string }>
+    errors?: { message?: string }[]
   }>
 }
 
@@ -244,11 +244,11 @@ export function useReactFlowSetup({
       return
     }
 
-    const preparedUpdates = snippetIds.reduce<Array<{
+    const preparedUpdates = snippetIds.reduce<{
       snippetId: string
       position: { x: number; y: number }
       fallbackSnippet?: Snippet
-    }>>((acc, snippetId) => {
+    }[]>((acc, snippetId) => {
       const position = pendingPositions[snippetId]
       if (!position) {
         return acc
@@ -514,8 +514,8 @@ export function useReactFlowSetup({
     (params: Connection) => {
       if (!projectId || !params.source || !params.target) return
 
-      const sourceSnippetId = params.source!
-      const targetSnippetId = params.target!
+      const sourceSnippetId = params.source
+      const targetSnippetId = params.target
 
       // Generate temporary ID for optimistic connection
       const tempId = `temp-conn-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`

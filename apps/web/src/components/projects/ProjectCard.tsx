@@ -4,9 +4,9 @@ import { Link, useNavigate } from 'react-router-dom'
 import { EditProjectModal } from './EditProjectModal'
 import { DELETE_PROJECT } from '../../graphql/mutations'
 import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
+import { Modal } from '../../shared/components/ui/Modal'
 import { useToast } from '../../shared/store/toastStore'
 import { formatDate, getTimeSince } from '../../shared/utils/dateFormatters'
-import { Modal } from '../../shared/components/ui/Modal'
 
 interface Project {
   id: string
@@ -43,7 +43,7 @@ export const ProjectCard = ({ project, onDeleted, onUpdated }: ProjectCardProps)
   })
 
   const handleOpenProject = () => {
-    navigate(`/project/${project.id}`)
+    void navigate(`/project/${project.id}`)
   }
 
   const handleKeyDown: KeyboardEventHandler<HTMLDivElement> = (event) => {

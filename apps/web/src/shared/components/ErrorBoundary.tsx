@@ -4,6 +4,7 @@
  */
 
 import React, { Component, type ReactNode } from 'react'
+
 import { ErrorFallback } from './ErrorFallback'
 import { logComponentError } from '../utils/errorLogger'
 
