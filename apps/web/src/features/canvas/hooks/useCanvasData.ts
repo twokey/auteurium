@@ -44,6 +44,8 @@ interface ConnectedContentEntry {
     height: number
     aspectRatio: string
   } | null
+  videoUrl?: string | null
+  videoMetadata?: VideoMetadata | null
 }
 
 const mergeConnectedEntries = (
@@ -65,8 +67,9 @@ const mergeConnectedEntries = (
     const trimmedText = entry.text?.trim() ?? ''
     const hasText = trimmedText !== ''
     const hasImage = Boolean(entry.imageUrl)
+    const hasVideo = Boolean(entry.videoUrl)
 
-    if (!hasText && !hasImage) {
+    if (!hasText && !hasImage && !hasVideo) {
       continue
     }
 
@@ -80,6 +83,11 @@ const mergeConnectedEntries = (
       if (hasImage && !existing.imageUrl) {
         existing.imageUrl = entry.imageUrl
         existing.imageMetadata = entry.imageMetadata ?? existing.imageMetadata ?? null
+      }
+
+      if (hasVideo && !existing.videoUrl) {
+        existing.videoUrl = entry.videoUrl
+        existing.videoMetadata = entry.videoMetadata ?? existing.videoMetadata ?? null
       }
 
       continue
@@ -97,6 +105,11 @@ const mergeConnectedEntries = (
     if (hasImage) {
       newEntry.imageUrl = entry.imageUrl
       newEntry.imageMetadata = entry.imageMetadata ?? null
+    }
+
+    if (hasVideo) {
+      newEntry.videoUrl = entry.videoUrl
+      newEntry.videoMetadata = entry.videoMetadata ?? null
     }
 
     merged.push(newEntry)
@@ -191,10 +204,12 @@ const analyzeSnippetConnections = (
       const imageUrl = sourceSnippet?.imageUrl ?? null
       const hasText = trimmedText !== ''
       const hasImage = Boolean(imageUrl)
+      const videoUrl = sourceSnippet?.videoUrl ?? null
+      const hasVideo = Boolean(videoUrl)
 
       let branchContent: ConnectedContentEntry[] = [...sourceContent]
 
-      if (hasText || hasImage) {
+      if (hasText || hasImage || hasVideo) {
         branchContent = [
           ...sourceContent,
           {
@@ -205,6 +220,12 @@ const analyzeSnippetConnections = (
               ? {
                   imageUrl,
                   imageMetadata: sourceSnippet?.imageMetadata ?? null
+                }
+              : {}),
+            ...(hasVideo
+              ? {
+                  videoUrl,
+                  videoMetadata: sourceSnippet?.videoMetadata ?? null
                 }
               : {})
           }
@@ -248,6 +269,16 @@ const analyzeSnippetConnections = (
           type: 'image',
           value: entry.imageUrl,
           imageMetadata: entry.imageMetadata ?? null
+        })
+      }
+
+      if (entry.videoUrl) {
+        items.push({
+          snippetId: entry.snippetId,
+          snippetTitle: entry.snippetTitle ?? null,
+          type: 'video',
+          value: entry.videoUrl,
+          videoMetadata: entry.videoMetadata ?? null
         })
       }
     })

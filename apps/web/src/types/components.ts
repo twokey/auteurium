@@ -113,6 +113,22 @@ export type ConnectedContentItem =
         aspectRatio: string
       } | null
     }
+  | {
+      snippetId: string
+      snippetTitle?: string | null
+      type: 'video'
+      value: string
+      videoMetadata?: {
+        duration?: number
+        resolution?: string
+        aspectRatio?: string
+        format?: string
+        seed?: number
+        fileSize?: number
+        style?: string
+        movementAmplitude?: string
+      } | null
+    }
 
 export interface SnippetNodeData {
   snippet: {

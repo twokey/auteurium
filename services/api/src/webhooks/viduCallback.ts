@@ -2,13 +2,15 @@ import { Logger } from '@aws-lambda-powertools/logger'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'
-import { DynamoDBDocumentClient, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { z } from 'zod'
+import { randomUUID } from 'crypto'
 
 import { verifyViduSignature } from '../utils/viduSignature'
 
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda'
-import type { VideoGenerationStatus, VideoMetadata, GenerationRecord } from '@auteurium/shared-types'
+import type { VideoGenerationStatus, VideoMetadata, GenerationRecord, Snippet } from '@auteurium/shared-types'
+import { ConnectionType } from '@auteurium/shared-types'
 
 const logger = new Logger({ serviceName: 'vidu-webhook-handler' })
 
@@ -20,6 +22,8 @@ const SNIPPETS_TABLE = process.env.SNIPPETS_TABLE!
 const GENERATIONS_TABLE = process.env.GENERATIONS_TABLE!
 const MEDIA_BUCKET_NAME = process.env.MEDIA_BUCKET_NAME!
 const LLM_API_KEYS_SECRET_ARN = process.env.LLM_API_KEYS_SECRET_ARN!
+const CONNECTIONS_TABLE = process.env.CONNECTIONS_TABLE!
+const VERSIONS_TABLE = process.env.VERSIONS_TABLE!
 
 const SUCCESS_STATES = new Set(['succeed', 'success', 'completed'])
 const FAILURE_STATES = new Set(['failed', 'error'])
@@ -120,16 +124,154 @@ const buildQueryString = (
 const buildVideoMetadata = (record: GenerationTaskRecord, fileSize: number): VideoMetadata => {
   const request = (record.videoRequest ?? {}) as Record<string, unknown>
 
-  return {
+  const metadata: VideoMetadata = {
     duration: typeof request.duration === 'number' ? request.duration : 4,
     resolution: typeof request.resolution === 'string' ? request.resolution : '720p',
     aspectRatio: typeof request.aspectRatio === 'string' ? request.aspectRatio : '16:9',
-    style: typeof request.style === 'string' ? request.style : undefined,
-    seed: typeof request.seed === 'number' ? request.seed : undefined,
     format: 'mp4',
-    fileSize,
-    movementAmplitude: typeof request.movementAmplitude === 'string' ? request.movementAmplitude : undefined
+    fileSize
   }
+
+  const optionalFields: Array<[keyof VideoMetadata, unknown]> = [
+    ['style', typeof request.style === 'string' ? request.style : undefined],
+    ['seed', typeof request.seed === 'number' ? request.seed : undefined],
+    ['movementAmplitude', typeof request.movementAmplitude === 'string' ? request.movementAmplitude : undefined]
+  ]
+
+  for (const [key, value] of optionalFields) {
+    if (value !== undefined) {
+      Object.assign(metadata, { [key]: value })
+    }
+  }
+
+  return metadata
+}
+
+const VIDEO_SNIPPET_HORIZONTAL_OFFSET = 950
+
+const generateId = (): string => {
+  if (typeof randomUUID === 'function') {
+    return randomUUID()
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+}
+
+const normalizeStringArray = (value: unknown): string[] => {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  return value.filter((entry): entry is string => typeof entry === 'string')
+}
+
+const buildDerivedSnippetTitle = (sourceTitle?: string): string => {
+  if (sourceTitle && sourceTitle.trim() !== '') {
+    return `${sourceTitle.trim()} - Video`
+  }
+  return 'Generated Video'
+}
+
+const getSourceSnippet = async (projectId: string, snippetId: string): Promise<Snippet | null> => {
+  const snippetResult = await dynamoClient.send(new GetCommand({
+    TableName: SNIPPETS_TABLE,
+    Key: {
+      projectId,
+      id: snippetId
+    }
+  }))
+
+  return snippetResult.Item as Snippet | undefined ?? null
+}
+
+const saveSnippetVersion = async (snippet: Snippet): Promise<void> => {
+  await dynamoClient.send(new PutCommand({
+    TableName: VERSIONS_TABLE,
+    Item: {
+      id: generateId(),
+      snippetId: snippet.id,
+      projectId: snippet.projectId,
+      version: snippet.version,
+      title: snippet.title,
+      textField1: snippet.textField1,
+      userId: snippet.userId,
+      position: snippet.position,
+      tags: snippet.tags,
+      categories: snippet.categories,
+      createdAt: new Date().toISOString()
+    }
+  }))
+}
+
+const createDerivedVideoSnippet = async (
+  record: GenerationTaskRecord,
+  sourceSnippet: Snippet,
+  s3Key: string,
+  metadata: VideoMetadata
+): Promise<Snippet> => {
+  const timestamp = new Date().toISOString()
+  const position = sourceSnippet.position ?? { x: 0, y: 0 }
+
+  const derivedSnippet: Snippet = {
+    id: generateId(),
+    projectId: record.projectId,
+    userId: sourceSnippet.userId ?? record.userId,
+    title: buildDerivedSnippetTitle(sourceSnippet.title),
+    textField1: sourceSnippet.textField1 ?? '',
+    position: {
+      x: position.x + VIDEO_SNIPPET_HORIZONTAL_OFFSET,
+      y: position.y
+    },
+    tags: normalizeStringArray(sourceSnippet.tags),
+    categories: normalizeStringArray(sourceSnippet.categories),
+    version: 1,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    snippetType: 'text',
+    createdFrom: sourceSnippet.id,
+    videoS3Key: s3Key,
+    videoMetadata: metadata,
+    videoGenerationStatus: 'COMPLETE'
+  }
+
+  await dynamoClient.send(new PutCommand({
+    TableName: SNIPPETS_TABLE,
+    Item: derivedSnippet
+  }))
+
+  await saveSnippetVersion(derivedSnippet)
+
+  return derivedSnippet
+}
+
+const linkSnippets = async (
+  record: GenerationTaskRecord,
+  sourceSnippetId: string,
+  targetSnippetId: string
+): Promise<void> => {
+  const timestamp = new Date().toISOString()
+  const metadata: Record<string, unknown> = {
+    provider: 'vidu',
+    assetType: 'video'
+  }
+
+  if (record.taskId) {
+    metadata.taskId = record.taskId
+  }
+
+  await dynamoClient.send(new PutCommand({
+    TableName: CONNECTIONS_TABLE,
+    Item: {
+      id: generateId(),
+      projectId: record.projectId,
+      sourceSnippetId,
+      targetSnippetId,
+      connectionType: ConnectionType.REFERENCES,
+      label: 'Video Output',
+      metadata,
+      userId: record.userId,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    }
+  }))
 }
 
 const updateSnippetStatus = async (
@@ -381,11 +523,47 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       const s3Key = await uploadVideoToS3(videoBuffer, record.projectId, record.snippetId)
       const metadata = buildVideoMetadata(record, videoBuffer.length)
 
-      await updateSnippetStatus(record, 'COMPLETE', {
-        videoS3Key: s3Key,
-        videoMetadata: metadata,
-        videoGenerationError: null
-      })
+      let derivedSnippet: Snippet | null = null
+      try {
+        const sourceSnippet = await getSourceSnippet(record.projectId, record.snippetId)
+
+        if (sourceSnippet) {
+          derivedSnippet = await createDerivedVideoSnippet(record, sourceSnippet, s3Key, metadata)
+          try {
+            await linkSnippets(record, sourceSnippet.id, derivedSnippet.id)
+          } catch (linkError) {
+            logger.warn('Failed to link generated video snippet to source', {
+              taskId,
+              sourceSnippetId: sourceSnippet.id,
+              generatedSnippetId: derivedSnippet.id,
+              error: linkError instanceof Error ? linkError.message : String(linkError)
+            })
+          }
+        } else {
+          logger.warn('Source snippet not found for generated video', {
+            projectId: record.projectId,
+            snippetId: record.snippetId
+          })
+        }
+      } catch (creationError) {
+        logger.error('Failed to create derived video snippet', {
+          taskId,
+          snippetId: record.snippetId,
+          error: creationError instanceof Error ? creationError.message : String(creationError)
+        })
+      }
+
+      record.taskId = undefined
+
+      await updateSnippetStatus(record, 'COMPLETE', derivedSnippet
+        ? {
+            videoGenerationError: null
+          }
+        : {
+            videoS3Key: s3Key,
+            videoMetadata: metadata,
+            videoGenerationError: null
+          })
 
       await updateGenerationRecord(record, 'COMPLETE', {
         result: s3Key,
@@ -397,10 +575,13 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       logger.info('Processed successful Vidu callback', {
         taskId,
         snippetId: record.snippetId,
-        projectId: record.projectId
+        projectId: record.projectId,
+        generatedSnippetId: derivedSnippet?.id ?? null
       })
 
-      return respond(200, { message: 'Video stored successfully' })
+      return respond(200, {
+        message: derivedSnippet ? 'Video snippet created' : 'Video stored successfully'
+      })
     }
 
     if (FAILURE_STATES.has(payload.state)) {

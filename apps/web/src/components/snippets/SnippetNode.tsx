@@ -29,6 +29,18 @@ interface SnippetNodeProps {
         height: number
         aspectRatio: string
       } | null
+      videoUrl?: string | null
+      videoS3Key?: string | null
+      videoMetadata?: {
+        duration: number
+        resolution: string
+        aspectRatio: string
+        style?: string
+        seed?: number
+        format?: string
+        fileSize?: number
+        movementAmplitude?: string
+      } | null
       connectedContent?: ConnectedContentItem[]
       downstreamConnections?: Array<{ id: string; title?: string }>
       snippetType?: 'text' | 'video'
@@ -778,7 +790,7 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
                       <p className="px-2 pb-1.5 text-sm font-medium text-gray-900 whitespace-pre-wrap">
                         {item.value}
                       </p>
-                    ) : (
+                    ) : item.type === 'image' ? (
                       <img
                         src={item.value}
                         alt={`Connected from snippet ${item.snippetId}`}
@@ -786,6 +798,15 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
                         loading="lazy"
                         decoding="async"
                         draggable={false}
+                      />
+                    ) : (
+                      <video
+                        src={item.value}
+                        controls
+                        playsInline
+                        className="block w-full h-auto max-h-48 bg-black"
+                        aria-hidden="true"
+                        tabIndex={-1}
                       />
                     )}
                   </div>
@@ -836,6 +857,49 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
             </button>
           </div>
         )}
+
+        {/* Video Preview */}
+        {snippet.videoUrl ? (
+          <div className="mt-2">
+            <div className="text-xs font-semibold text-gray-600 mb-1">
+              Video Preview
+            </div>
+            <video
+              key={snippet.videoUrl}
+              className="w-full rounded-md border border-gray-200"
+              src={snippet.videoUrl}
+              controls
+              playsInline
+              aria-label="Snippet video preview"
+            />
+            {snippet.videoMetadata && (
+              <dl className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-gray-600">
+                <div>
+                  <dt className="font-semibold text-gray-800">Duration</dt>
+                  <dd>{snippet.videoMetadata.duration}s</dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-gray-800">Resolution</dt>
+                  <dd>{snippet.videoMetadata.resolution}</dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-gray-800">Aspect</dt>
+                  <dd>{snippet.videoMetadata.aspectRatio}</dd>
+                </div>
+                {snippet.videoMetadata.fileSize && (
+                  <div>
+                    <dt className="font-semibold text-gray-800">Size</dt>
+                    <dd>{(snippet.videoMetadata.fileSize / (1024 * 1024)).toFixed(2)} MB</dd>
+                  </div>
+                )}
+              </dl>
+            )}
+          </div>
+        ) : snippet.videoS3Key ? (
+          <p className="mt-2 text-xs text-gray-500">
+            Video available but preview expired. Generate again or request a new link to view it.
+          </p>
+        ) : null}
 
         {/* Downstream connections section */}
         {snippet.downstreamConnections && snippet.downstreamConnections.length > 0 && (

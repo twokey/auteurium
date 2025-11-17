@@ -266,6 +266,8 @@ export class AuteuriumGenAIStack extends cdk.Stack {
       }
     })
 
+    const versionsTableName = `auteurium-versions-${stage}`
+
     const viduWebhookFunction = new lambdaNodejs.NodejsFunction(this, `ViduWebhookFunction-${stage}`, {
       functionName: `auteurium-genai-vidu-webhook-${stage}`,
       runtime: lambda.Runtime.NODEJS_22_X,
@@ -285,7 +287,9 @@ export class AuteuriumGenAIStack extends cdk.Stack {
         GENERATIONS_TABLE: this.generationsTable.tableName,
         MEDIA_BUCKET_NAME: mediaBucket.bucketName,
         LLM_API_KEYS_SECRET_ARN: llmApiKeysSecret.secretArn,
-        STAGE: stage
+        STAGE: stage,
+        CONNECTIONS_TABLE: connectionsTable.tableName,
+        VERSIONS_TABLE: versionsTableName
       }
     })
 
@@ -309,7 +313,7 @@ export class AuteuriumGenAIStack extends cdk.Stack {
         STAGE: stage,
         USERS_TABLE: usersTable.tableName,
         SNIPPETS_TABLE: snippetsTable.tableName,
-        VERSIONS_TABLE: dynamodb.Table.fromTableName(this, 'VersionsTable', `auteurium-versions-${stage}`).tableName,
+        VERSIONS_TABLE: versionsTableName,
         GENERATIONS_TABLE: this.generationsTable.tableName,
         LLM_API_KEYS_SECRET_ARN: llmApiKeysSecret.secretArn,
         USER_POOL_ID: userPool.userPoolId,
@@ -374,11 +378,13 @@ export class AuteuriumGenAIStack extends cdk.Stack {
     connectionsTable.grantReadData(generateVideoFunction) // Need to query connections for multimodal video generation
     mediaBucket.grantReadWrite(generateImageFunction)
     mediaBucket.grantReadWrite(generateVideoFunction)
+    connectionsTable.grantReadWriteData(viduWebhookFunction)
     mediaBucket.grantReadWrite(viduWebhookFunction)
 
     // Grant versions table write access for createScenes
-    const versionsTable = dynamodb.Table.fromTableName(this, 'VersionsTableForScenes', `auteurium-versions-${stage}`)
+    const versionsTable = dynamodb.Table.fromTableName(this, 'VersionsTableForScenes', versionsTableName)
     versionsTable.grantWriteData(createScenesFunction)
+    versionsTable.grantWriteData(viduWebhookFunction)
 
     // Grant GSI query permissions
     generateContentFunction.addToRolePolicy(new iam.PolicyStatement({

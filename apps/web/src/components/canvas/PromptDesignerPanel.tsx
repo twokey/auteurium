@@ -142,7 +142,15 @@ export const PromptDesignerPanel = () => {
             return value
           }
 
-          return `Image: ${value}`
+          if (item.type === 'image') {
+            return `Image: ${value}`
+          }
+
+          if (item.type === 'video') {
+            return `Video: ${value}`
+          }
+
+          return null
         })
         .filter((line): line is string => Boolean(line))
 
@@ -240,13 +248,21 @@ export const PromptDesignerPanel = () => {
                         <p className="px-2 py-1 text-sm font-medium text-gray-900 whitespace-pre-wrap">
                           {item.value}
                         </p>
-                      ) : (
+                      ) : item.type === 'image' ? (
                         <img
                           src={item.value}
                           alt={`Connected from snippet ${item.snippetId}`}
                           className="block w-full h-auto max-h-48 object-cover"
                           loading="lazy"
                           decoding="async"
+                        />
+                      ) : (
+                        <video
+                          src={item.value}
+                          controls
+                          playsInline
+                          className="block w-full h-auto max-h-48 bg-black"
+                          aria-label="Connected video reference preview"
                         />
                       )}
                     </div>
