@@ -718,7 +718,7 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
                     type="button"
                     className="inline-flex items-center rounded border border-red-300 bg-white px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={isGeneratingVideo}
-                    onClick={async (event) => {
+                    onClick={(event) => {
                       event.stopPropagation()
                       const fallbackModel = selectedVideoModel || videoModels[0]?.id || VIDEO_GENERATION.DEFAULT_MODEL
                       const retryRequest = lastRequestRef.current ?? {
@@ -730,13 +730,15 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
                         movementAmplitude: VIDEO_GENERATION.DEFAULT_MOVEMENT_AMPLITUDE
                       }
                       lastRequestRef.current = retryRequest
-                      try {
-                        await onGenerateVideo(snippet.id, retryRequest)
-                        toast.success('Retry started', 'Video generation retry has been queued.')
-                      } catch (retryError) {
-                        console.error('Failed to retry video generation:', retryError)
-                        toast.error('Retry failed', retryError instanceof Error ? retryError.message : 'Unknown error')
-                      }
+                      void (async () => {
+                        try {
+                          await onGenerateVideo(snippet.id, retryRequest)
+                          toast.success('Retry started', 'Video generation retry has been queued.')
+                        } catch (retryError) {
+                          console.error('Failed to retry video generation:', retryError)
+                          toast.error('Retry failed', retryError instanceof Error ? retryError.message : 'Unknown error')
+                        }
+                      })()
                     }}
                   >
                     Retry

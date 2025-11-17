@@ -42,8 +42,8 @@ export const SnippetNodeContent = ({
             ref={textField1Ref}
             value={draftValues.textField1}
             onChange={(e) => onFieldChange('textField1', e.target.value)}
-            onBlur={async () => {
-              await onFieldBlur('textField1', draftValues.textField1, onFieldSave)
+            onBlur={() => {
+              void onFieldBlur('textField1', draftValues.textField1, onFieldSave)
             }}
             className="w-full px-2 py-1 text-sm bg-white border border-blue-500 rounded focus:outline-none resize-none"
             rows={3}

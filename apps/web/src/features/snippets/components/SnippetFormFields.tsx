@@ -53,7 +53,7 @@ export const SnippetFormFields = ({
             ref={textField1Ref}
             value={formState.textField1}
             onChange={(e) => onTextField1Change(e.target.value)}
-            onBlur={(e) => onFieldBlur('textField1', e.target.value)}
+            onBlur={(e) => void onFieldBlur('textField1', e.target.value)}
             className="w-full px-3 py-2 border border-blue-500 rounded-md focus:outline-none resize-none"
             rows={4}
             disabled={isDisabled || savingField === 'textField1'}

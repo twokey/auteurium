@@ -352,7 +352,7 @@ const CanvasContent = () => {
             <div className="text-red-500 text-lg font-medium mb-2">Error loading project</div>
             <p className="text-gray-600 mb-4">{error.message}</p>
             <button
-              onClick={() => navigate('/')}
+              onClick={() => void navigate('/')}
               className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
             >
               Back to Dashboard
@@ -372,7 +372,7 @@ const CanvasContent = () => {
           <div className="text-center">
             <div className="text-gray-500 text-lg font-medium mb-2">Project not found</div>
             <button
-              onClick={() => navigate('/')}
+              onClick={() => void navigate('/')}
               className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
             >
               Back to Dashboard

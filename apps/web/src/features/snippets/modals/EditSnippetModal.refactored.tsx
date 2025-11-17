@@ -90,7 +90,7 @@ export const EditSnippetModal = ({
         <Button variant="secondary" onClick={onClose}>
           Cancel
         </Button>
-        <Button variant="primary" onClick={handleSave}>
+        <Button variant="primary" onClick={() => void handleSave()}>
           Save Changes
         </Button>
       </Modal.Footer>

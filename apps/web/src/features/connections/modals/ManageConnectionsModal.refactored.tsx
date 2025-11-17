@@ -97,7 +97,7 @@ export const ManageConnectionsModal = ({
             isDisabled={isCreating}
           />
           <Button
-            onClick={handleCreate}
+            onClick={() => void handleCreate()}
             variant="primary"
             isLoading={isCreating}
             disabled={isCreating || !targetSnippetId.trim()}

@@ -76,7 +76,7 @@ export const CanvasModals = ({
           isOpen={true}
           onClose={closeDeleteSnippet}
           snippet={currentDeleteSnippet}
-          onDeleted={refetch}
+          onDeleted={() => void refetch()}
         />
       )}
 
@@ -87,7 +87,7 @@ export const CanvasModals = ({
           onClose={closeDeleteMultipleSnippets}
           snippets={deleteMultipleSnippets.snippets}
           projectId={deleteMultipleSnippets.projectId ?? ''}
-          onDeleted={refetch}
+          onDeleted={() => void refetch()}
         />
       )}
 
