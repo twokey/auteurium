@@ -59,12 +59,12 @@ export class ViduVideoProvider implements IVideoProvider {
       await this.validatePrompt(request.prompt)
 
       // Determine endpoint based on whether images are provided
-      const endpoint = request.inputImages && request.inputImages.length > 0
-        ? 'reference2video'
-        : 'text2video'
+      const endpoint = this.resolveEndpoint(request)
+      const apiModelId = this.formatModelIdForEndpoint(modelConfig.modelId, endpoint)
 
       logger.info('Generating video with Vidu', {
         modelId: modelConfig.modelId,
+        apiModelId,
         endpoint,
         promptLength: request.prompt.length,
         imageCount: request.inputImages?.length || 0,
@@ -73,7 +73,7 @@ export class ViduVideoProvider implements IVideoProvider {
       })
 
       // Submit video generation task
-      const taskResponse = await this.submitVideoTask(endpoint, request, modelConfig.modelId)
+      const taskResponse = await this.submitVideoTask(endpoint, request, apiModelId)
 
       const generationTimeMs = Date.now() - startTime
       const cost = this.calculateCost(1, request.modelId)
@@ -102,20 +102,38 @@ export class ViduVideoProvider implements IVideoProvider {
     }
   }
 
-  private async submitVideoTask(endpoint: string, request: VideoGenerationRequest, resolvedModelId: string): Promise<ViduTaskResponse> {
+  private resolveEndpoint(request: VideoGenerationRequest): 'text2video' | 'img2video' {
+    if (request.inputImages && request.inputImages.length > 0) {
+      return 'img2video'
+    }
+    return 'text2video'
+  }
+
+  private formatModelIdForEndpoint(modelId: string, endpoint: 'text2video' | 'img2video'): string {
+    if (endpoint === 'img2video') {
+      const match = modelId.match(/^(viduq\d)([a-z]+)$/i)
+      if (match) {
+        return `${match[1]}-${match[2]}`.toLowerCase()
+      }
+    }
+    return modelId
+  }
+
+  private async submitVideoTask(endpoint: string, request: VideoGenerationRequest, apiModelId: string): Promise<ViduTaskResponse> {
     const url = `${this.baseUrl}/${endpoint}`
 
     const body: Record<string, unknown> = {
-      model: resolvedModelId,
-      prompt: request.prompt
+      model: apiModelId,
+      prompt: request.prompt,
+      audio: false
     }
 
     // Add optional parameters
     if (request.inputImages && request.inputImages.length > 0) {
       body.images = request.inputImages
     }
-    if (request.duration) {
-      body.duration = String(request.duration)
+    if (request.duration !== undefined) {
+      body.duration = request.duration
     }
     if (request.aspectRatio) {
       body.aspect_ratio = request.aspectRatio
@@ -127,7 +145,7 @@ export class ViduVideoProvider implements IVideoProvider {
       body.style = request.style
     }
     if (request.seed !== undefined) {
-      body.seed = String(request.seed)
+      body.seed = request.seed
     }
     if (request.movementAmplitude) {
       body.movement_amplitude = request.movementAmplitude
