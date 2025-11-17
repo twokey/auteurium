@@ -699,7 +699,9 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
             className="mb-2"
             style={POINTER_EVENTS_STYLES.interactive}
             onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => event.stopPropagation()}
             onMouseDown={(event) => event.stopPropagation()}
+            role="presentation"
           >
             <div className="space-y-2">
               {connectedContent.map((item, index) => {
@@ -744,10 +746,13 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
                         src={item.value}
                         controls
                         playsInline
+                        muted
                         className="block w-full h-auto max-h-48 bg-black"
                         aria-hidden="true"
                         tabIndex={-1}
-                      />
+                      >
+                        <track kind="captions" />
+                      </video>
                     )}
                   </div>
                 )
@@ -810,8 +815,11 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
               src={snippet.videoUrl}
               controls
               playsInline
+              muted
               aria-label="Snippet video preview"
-            />
+            >
+              <track kind="captions" />
+            </video>
             {snippet.videoMetadata && (
               <dl className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-gray-600">
                 <div>

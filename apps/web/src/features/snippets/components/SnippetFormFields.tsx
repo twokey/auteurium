@@ -61,6 +61,12 @@ export const SnippetFormFields = ({
         ) : (
           <div
             onClick={() => onFieldActivate('textField1')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onFieldActivate('textField1')
+              }
+            }}
             role="button"
             tabIndex={0}
             className="w-full px-3 py-2 bg-gray-100 rounded-md cursor-pointer hover:bg-gray-200 min-h-[100px] text-sm text-gray-700"

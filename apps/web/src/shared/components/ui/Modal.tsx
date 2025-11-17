@@ -53,9 +53,17 @@ export const Modal = ({ isOpen, onClose, children, size = 'md' }: ModalProps) =>
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-      <div 
-        className="fixed inset-0" 
+      <div
+        className="fixed inset-0"
         onClick={onClose}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onClose()
+          }
+        }}
+        role="button"
+        tabIndex={0}
         aria-label="Close modal"
       />
       <div 

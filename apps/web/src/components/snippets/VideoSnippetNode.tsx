@@ -343,6 +343,14 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
         data-testid="video-snippet-node"
         data-snippet-id={snippet.id}
         onClick={handleSnippetClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            handleSnippetClick()
+          }
+        }}
+        role="button"
+        tabIndex={0}
       >
         {/* Header with Editable Title */}
         <div className="flex items-center justify-between mb-5">
@@ -752,7 +760,10 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
               src={snippet.videoUrl}
               controls
               playsInline
-            />
+              muted
+            >
+              <track kind="captions" />
+            </video>
             {snippet.videoMetadata && (
               <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-700">
                 <div>

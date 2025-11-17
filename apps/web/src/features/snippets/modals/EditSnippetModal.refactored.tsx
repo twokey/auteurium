@@ -58,8 +58,11 @@ export const EditSnippetModal = ({
       {/* Body */}
       <div className="max-h-[60vh] overflow-y-auto space-y-4 p-6">
         <div>
-          <label className="block text-sm text-gray-700 mb-2">Title</label>
+          <label htmlFor="snippet-title" className="block text-sm text-gray-700 mb-2">
+            Title
+          </label>
           <input
+            id="snippet-title"
             type="text"
             value={form.formState.title}
             onChange={(e) => form.setTitle(e.target.value)}
@@ -68,8 +71,11 @@ export const EditSnippetModal = ({
         </div>
 
         <div>
-          <label className="block text-sm text-gray-700 mb-2">Content</label>
+          <label htmlFor="snippet-content" className="block text-sm text-gray-700 mb-2">
+            Content
+          </label>
           <textarea
+            id="snippet-content"
             ref={form.textField1Ref}
             value={form.formState.textField1}
             onChange={(e) => form.setTextField1(e.target.value)}

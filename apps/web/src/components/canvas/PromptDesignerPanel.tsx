@@ -253,9 +253,12 @@ export const PromptDesignerPanel = () => {
                           src={item.value}
                           controls
                           playsInline
+                          muted
                           className="block w-full h-auto max-h-48 bg-black"
                           aria-label="Connected video reference preview"
-                        />
+                        >
+                          <track kind="captions" />
+                        </video>
                       )}
                     </div>
                   </div>
