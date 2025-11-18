@@ -3,8 +3,18 @@
  * Manages ReactFlow configuration, viewport, and node/edge updates
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { addEdge, useEdgesState, useNodesState } from 'reactflow'
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import {
+  addEdge,
+  useEdgesState,
+  useNodesState,
+  type OnNodesChange,
+  type OnEdgesChange,
+  type ReactFlowInstance,
+  type Connection,
+  type Node,
+  type Edge
+} from 'reactflow'
 
 import { UPDATE_SNIPPET_POSITIONS } from '../../../graphql/mutations'
 import { getClient } from '../../../services/graphql'
@@ -22,11 +32,14 @@ import type {
   SnippetNodeData,
   UseGraphQLMutationResult,
   CreateConnectionVariables,
+  CreateConnectionMutationData,
   DeleteConnectionVariables,
+  DeleteConnectionMutationData,
   UpdateSnippetPositionsMutationData,
-  UpdateSnippetPositionsVariables
+  UpdateSnippetPositionsVariables,
+  UpdateSnippetMutationData,
+  UpdateSnippetVariables
 } from '../../../types'
-import type { ReactFlowInstance, Connection, Node, Edge } from 'reactflow'
 
 interface ConnectionEdgeData {
   connectionId?: string
@@ -121,20 +134,20 @@ const haveEdgesChanged = (
 export interface UseReactFlowSetupProps {
   projectId: string | undefined
   flowNodes: Node<SnippetNodeData>[]
-  flowEdges: any[]
+  flowEdges: Edge<ConnectionEdgeData>[]
   snippets: Snippet[]
-  updateSnippetMutation: any
-  createConnectionMutation: UseGraphQLMutationResult<any, CreateConnectionVariables>['mutate']
-  deleteConnectionMutation: UseGraphQLMutationResult<any, DeleteConnectionVariables>['mutate']
+  updateSnippetMutation: UseGraphQLMutationResult<UpdateSnippetMutationData, UpdateSnippetVariables>['mutate']
+  createConnectionMutation: UseGraphQLMutationResult<CreateConnectionMutationData, CreateConnectionVariables>['mutate']
+  deleteConnectionMutation: UseGraphQLMutationResult<DeleteConnectionMutationData, DeleteConnectionVariables>['mutate']
 }
 
 export interface UseReactFlowSetupResult {
   nodes: Node<SnippetNodeData>[]
-  edges: any[]
-  setNodes: any
-  setEdges: any
-  onNodesChange: any
-  onEdgesChange: any
+  edges: Edge<ConnectionEdgeData>[]
+  setNodes: Dispatch<SetStateAction<Node<SnippetNodeData>[]>>
+  setEdges: Dispatch<SetStateAction<Edge<ConnectionEdgeData>[]>>
+  onNodesChange: OnNodesChange
+  onEdgesChange: OnEdgesChange
   onConnect: (params: Connection) => void
   onInit: (instance: ReactFlowInstance) => void
   onNodeDragStop: (_event: React.MouseEvent, node: Node) => void
@@ -193,7 +206,7 @@ export function useReactFlowSetup({
         }
       }
     } catch (error) {
-      console.debug('[useReactFlowSetup] Failed to read bulk position support flag from storage.', error)
+      console.warn('[useReactFlowSetup] Failed to read bulk position support flag from storage.', error)
     }
   }, [allowBulkPositionMutation])
 
@@ -336,7 +349,7 @@ export function useReactFlowSetup({
                 JSON.stringify({ status: 'unsupported', updatedAt: Date.now() })
               )
             } catch (error) {
-              console.debug('[useReactFlowSetup] Failed to persist bulk position support flag.', error)
+              console.warn('[useReactFlowSetup] Failed to persist bulk position support flag.', error)
             }
           }
         }
@@ -350,7 +363,7 @@ export function useReactFlowSetup({
               JSON.stringify({ status: 'supported', updatedAt: Date.now() })
             )
           } catch (error) {
-            console.debug('[useReactFlowSetup] Failed to persist bulk position support flag.', error)
+            console.warn('[useReactFlowSetup] Failed to persist bulk position support flag.', error)
           }
         }
 

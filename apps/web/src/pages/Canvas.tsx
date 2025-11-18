@@ -6,6 +6,7 @@ import {
   Controls,
   MiniMap,
   ReactFlow,
+  type Node,
   type NodeTypes,
   type ReactFlowInstance,
   type Viewport
@@ -20,7 +21,6 @@ import { SnippetNode } from '../components/snippets/SnippetNode'
 import { VideoPromptPreviewPanel } from '../components/snippets/VideoPromptPreviewPanel'
 import { Navigation } from '../components/ui/Navigation'
 import { ModelsProvider } from '../contexts/ModelsContext'
-import { useModels } from '../hooks/useModels'
 import { CanvasModals } from '../features/canvas/components/CanvasModals'
 import { ContextMenu } from '../features/canvas/components/ContextMenu'
 import { useCanvasKeyboardShortcut } from '../features/canvas/context/canvasKeyboard'
@@ -30,6 +30,7 @@ import { useReactFlowSetup } from '../features/canvas/hooks/useReactFlowSetup'
 import { useCanvasStore } from '../features/canvas/store/canvasStore'
 import { useContextMenuStore } from '../features/canvas/store/contextMenuStore'
 import { useVideoPromptStore } from '../features/snippets/store/videoPromptStore'
+import { useModels } from '../hooks/useModels'
 import { LoadingSpinner } from '../shared/components/ui/LoadingSpinner'
 
 const NODE_TYPES: NodeTypes = {
@@ -65,7 +66,8 @@ const CanvasContent = () => {
   } = useModels()
 
   // Create refs that will be populated after ReactFlow setup
-  const setNodesRef = useRef<any>(() => {})
+  // eslint-disable-next-line @typescript-eslint/no-empty-function -- Initial ref value, will be replaced in useEffect
+  const setNodesRef = useRef<(nodes: Node[] | ((nodes: Node[]) => Node[])) => void>(() => {})
   const externalReactFlowInstanceRef = useRef<ReactFlowInstance | null>(null)
   const reactFlowWrapperRef = useRef<HTMLDivElement>(null)
 
@@ -73,7 +75,7 @@ const CanvasContent = () => {
   const handlers = useCanvasHandlers({
     projectId,
     snippets,
-    setNodes: (updateFn: any) => setNodesRef.current(updateFn),
+    setNodes: (updateFn: Node[] | ((nodes: Node[]) => Node[])) => setNodesRef.current(updateFn),
     reactFlowInstance: externalReactFlowInstanceRef
   })
   const { handleNumberKeyNavigation } = handlers
@@ -152,12 +154,12 @@ const CanvasContent = () => {
     setupOnInit(instance)
   }, [setupOnInit])
 
-  const handleMove = useCallback((_event: any, viewport: Viewport) => {
+  const handleMove = useCallback((_event: React.MouseEvent | React.TouchEvent, viewport: Viewport) => {
     setViewport(viewport)
   }, [])
 
   // Wrap onMoveEnd to update viewport state for column guides
-  const handleMoveEnd = useCallback((_event: any, viewport: Viewport) => {
+  const handleMoveEnd = useCallback((_event: React.MouseEvent | React.TouchEvent, viewport: Viewport) => {
     setViewport(viewport)
     onMoveEnd()
   }, [onMoveEnd])
@@ -171,7 +173,7 @@ const CanvasContent = () => {
   }, [])
 
   // Context menu handlers with viewport-aware positioning
-  const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: any) => {
+  const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
     event.preventDefault()
     event.stopPropagation()
 
@@ -256,8 +258,8 @@ const CanvasContent = () => {
   const handleSelectAll = useCallback((event: KeyboardEvent) => {
     event.preventDefault()
     // Select all nodes in ReactFlow
-    setNodes((currentNodes: any) =>
-      currentNodes.map((node: any) => ({
+    setNodes((currentNodes: Node[]) =>
+      currentNodes.map((node: Node) => ({
         ...node,
         selected: true
       }))
@@ -274,8 +276,8 @@ const CanvasContent = () => {
 
   const handleDeselect = useCallback(() => {
     // Deselect all nodes in ReactFlow
-    setNodes((currentNodes: any) =>
-      currentNodes.map((node: any) => ({
+    setNodes((currentNodes: Node[]) =>
+      currentNodes.map((node: Node) => ({
         ...node,
         selected: false
       }))
@@ -303,7 +305,7 @@ const CanvasContent = () => {
   useCanvasKeyboardShortcut(deleteShortcut, handleDeleteSelected)
 
   // Sync ReactFlow selection with Zustand store
-  const handleSelectionChange = useCallback((params: { nodes: any[] }) => {
+  const handleSelectionChange = useCallback((params: { nodes: Node[] }) => {
     // Update Zustand store with all selected node IDs
     const selectedIds = new Set(params.nodes.map(node => node.id))
     setSelectedSnippetIds(selectedIds)
@@ -512,7 +514,7 @@ const CanvasContent = () => {
         onEdit={handlers.handleEditSnippet}
         onDelete={handlers.handleDeleteSnippet}
         onDeleteMultiple={handlers.handleDeleteMultiple}
-        onConnectMultiple={handlers.handleConnectMultiple}
+        onConnectMultiple={(snippetIds: string[]) => void handlers.handleConnectMultiple(snippetIds)}
         onManageConnections={handlers.handleManageConnections}
         onViewVersions={handlers.handleViewVersions}
       />
