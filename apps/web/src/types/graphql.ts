@@ -304,8 +304,8 @@ export interface GraphQLErrorExtensions {
 export interface GraphQLError {
   message: string
   extensions?: GraphQLErrorExtensions
-  locations?: Array<{ line: number; column: number }>
-  path?: Array<string | number>
+  locations?: { line: number; column: number }[]
+  path?: (string | number)[]
 }
 
 export interface GraphQLResponse<T> {

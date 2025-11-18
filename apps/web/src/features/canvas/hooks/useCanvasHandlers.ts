@@ -127,7 +127,7 @@ const getNodeMeasurements = (node: Node | undefined) => {
 export interface UseCanvasHandlersProps {
   projectId: string | undefined
   snippets: Snippet[]
-  setNodes: (nodes: any) => void
+  setNodes: (nodes: Node[] | ((nodes: Node[]) => Node[])) => void
   reactFlowInstance?: MutableRefObject<ReactFlowInstance | null>
 }
 
@@ -153,9 +153,9 @@ export interface UseCanvasHandlersResult {
   handleSaveCanvas: () => void
 
   // Mutations
-  updateSnippetMutation: (options: { variables: any }) => Promise<any>
-  createConnectionMutation: ReturnType<typeof useGraphQLMutation<any, CreateConnectionVariables>>['mutate']
-  deleteConnectionMutation: ReturnType<typeof useGraphQLMutation<any, DeleteConnectionVariables>>['mutate']
+  updateSnippetMutation: (options: { variables: UpdateSnippetVariables }) => Promise<UpdateSnippetMutationData | null>
+  createConnectionMutation: ReturnType<typeof useGraphQLMutation<CreateConnectionMutationData, CreateConnectionVariables>>['mutate']
+  deleteConnectionMutation: ReturnType<typeof useGraphQLMutation<DeleteConnectionMutationData, DeleteConnectionVariables>>['mutate']
 
   // Generated Snippet Handlers
   handleCreateGeneratedSnippet: () => Promise<void>
@@ -210,7 +210,7 @@ export function useCanvasHandlers({
     }
   })
 
-  const { mutate: createConnectionMutation } = useGraphQLMutation<any, CreateConnectionVariables>(CREATE_CONNECTION, {
+  const { mutate: createConnectionMutation } = useGraphQLMutation<CreateConnectionMutationData, CreateConnectionVariables>(CREATE_CONNECTION, {
     onCompleted: () => {
       toast.success('Connection created successfully!')
     },
@@ -220,7 +220,7 @@ export function useCanvasHandlers({
     }
   })
 
-  const { mutate: deleteConnectionMutation } = useGraphQLMutation<any, DeleteConnectionVariables>(DELETE_CONNECTION, {
+  const { mutate: deleteConnectionMutation } = useGraphQLMutation<DeleteConnectionMutationData, DeleteConnectionVariables>(DELETE_CONNECTION, {
     onCompleted: () => {
       toast.success('Connection deleted successfully!')
     },
@@ -478,15 +478,15 @@ export function useCanvasHandlers({
     updateRealSnippet(updatedSnippet)
 
     // Optimistic update
-    setNodes((currentNodes: any) =>
-      currentNodes.map((node: any) =>
+    setNodes((currentNodes: Node[]) =>
+      currentNodes.map((node: Node) =>
         node.id === snippetId
           ? {
               ...node,
               data: {
                 ...node.data,
                 snippet: {
-                  ...node.data.snippet,
+                  ...(node.data as SnippetNodeData).snippet,
                   ...updateInput
                 }
               }
@@ -514,15 +514,15 @@ export function useCanvasHandlers({
       console.error('Failed to update snippet content:', error)
       updateRealSnippet(previousSnippetSnapshot)
       // Rollback optimistic update
-      setNodes((currentNodes: any) =>
-        currentNodes.map((node: any) =>
+      setNodes((currentNodes: Node[]) =>
+        currentNodes.map((node: Node) =>
           node.id === snippetId
             ? {
                 ...node,
                 data: {
                   ...node.data,
                   snippet: {
-                    ...node.data.snippet,
+                    ...(node.data as SnippetNodeData).snippet,
                     ...previousValues
                   }
                 }
@@ -560,17 +560,17 @@ export function useCanvasHandlers({
       }
 
       // Update node with combined data
-      setNodes((currentNodes: any) =>
-        currentNodes.map((node: any) =>
+      setNodes((currentNodes: Node[]) =>
+        currentNodes.map((node: Node) =>
           node.id === snippetId
             ? {
                 ...node,
                 data: {
                   ...node.data,
                   snippet: {
-                    ...node.data.snippet,
+                    ...(node.data as SnippetNodeData).snippet,
                     textField1: updatedSnippet.textField1,
-                    connectionCount: node.data.snippet.connectionCount
+                    connectionCount: (node.data as SnippetNodeData).snippet.connectionCount
                   }
                 }
               }
@@ -1419,8 +1419,8 @@ export function useCanvasHandlers({
       }
 
       // Update ReactFlow selection so downstream subscribers stay in sync
-      setNodes((currentNodes: any[]) =>
-        currentNodes.map((currentNode: any) => {
+      setNodes((currentNodes: Node[]) =>
+        currentNodes.map((currentNode: Node) => {
           const shouldSelect = currentNode.id === snippetId
           if (currentNode.selected === shouldSelect) {
             return currentNode
