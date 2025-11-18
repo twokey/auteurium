@@ -3,59 +3,50 @@
  * Manages all event handlers, mutations, and canvas operations
  */
 
-import { useCallback, useRef, type MutableRefObject } from 'react'
-import type { Node, Edge, Connection as ReactFlowConnection, OnNodesChange, OnEdgesChange } from 'reactflow'
-
+import { useCallback, useRef } from 'react'
+import type { MutableRefObject } from 'react'
+import type { Edge, Node, ReactFlowInstance } from 'reactflow'
 
 import {
-  CREATE_SNIPPET,
-  UPDATE_SNIPPET,
-  CREATE_CONNECTION,
-  DELETE_CONNECTION,
   COMBINE_SNIPPET_CONNECTIONS,
+  CREATE_CONNECTION,
+  CREATE_SNIPPET,
+  DELETE_CONNECTION,
   GENERATE_SNIPPET_IMAGE,
-  GENERATE_SNIPPET_VIDEO
+  GENERATE_SNIPPET_VIDEO,
+  UPDATE_SNIPPET
 } from '../../../graphql/mutations'
 import { useGraphQLMutation } from '../../../hooks/useGraphQLMutation'
 import { CANVAS_CONSTANTS } from '../../../shared/constants'
 import { useModalStore } from '../../../shared/store/modalStore'
 import { useToast } from '../../../shared/store/toastStore'
 import { mutateWithInvalidate, mutateOptimisticOnly } from '../../../shared/utils/cacheHelpers'
-import { snapToColumn, getColumnIndex, getRelativeColumnX } from '../../../shared/utils/columnLayout'
+import { getColumnIndex, getRelativeColumnX, snapToColumn } from '../../../shared/utils/columnLayout'
 import { useCanvasStore } from '../store/canvasStore'
 import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
-
 import type {
-  Snippet,
-  Connection,
-  CreateSnippetVariables,
-  CreateSnippetMutationData,
-  UpdateSnippetVariables,
-  UpdateSnippetMutationData,
-  CreateConnectionVariables,
-  CreateConnectionMutationData,
-  DeleteConnectionVariables,
-  DeleteConnectionMutationData,
-  CombineSnippetConnectionsVariables,
-  GenerateSnippetImageVariables,
   CombineSnippetConnectionsMutationData,
+  CombineSnippetConnectionsVariables,
+  CreateConnectionMutationData,
+  CreateConnectionVariables,
+  CreateSnippetMutationData,
+  CreateSnippetVariables,
+  DeleteConnectionMutationData,
+  DeleteConnectionVariables,
   GenerateSnippetImageMutationData,
-  GenerateSnippetVideoVariables,
+  GenerateSnippetImageVariables,
   GenerateSnippetVideoMutationData,
+  GenerateSnippetVideoVariables,
+  Snippet,
+  UpdateSnippetMutationData,
+  UpdateSnippetVariables,
   VideoGenerationInput
 } from '../../../types'
-import type { ReactFlowInstance } from 'reactflow'
 
 // Custom ReactFlow node data type
 interface SnippetNodeData {
   snippet: Snippet
 }
-
-// Type alias for snippet nodes
-type SnippetNode = Node<SnippetNodeData>
-
-// Type alias for connection edges
-type ConnectionEdge = Edge<Connection>
 
 type SnippetContentChanges = Partial<Pick<Snippet, 'textField1' | 'title'>>
 
