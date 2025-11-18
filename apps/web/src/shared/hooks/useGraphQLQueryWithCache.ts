@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { getClient } from '../../services/graphql'
+import { isGraphQLError } from '../../types/graphql'
 import { GRAPHQL } from '../constants'
 
 const getOperationName = (graphQLDocument: string): string => {
@@ -89,37 +90,21 @@ export const useGraphQLQueryWithCache = <TData = unknown, TVariables = Record<st
       return unknownError.message
     }
 
+    if (isGraphQLError(unknownError)) {
+      const messages = unknownError.errors.map((err) => err.message).filter(Boolean)
+      if (messages.length > 0) {
+        return messages.join(', ')
+      }
+    }
+
     if (unknownError && typeof unknownError === 'object') {
-      const errorObject = unknownError as {
-        message?: unknown
-        code?: unknown
-        errors?: { message?: unknown }[]
-        recoverySuggestion?: unknown
+      if ('message' in unknownError && typeof unknownError.message === 'string' && unknownError.message.trim() !== '') {
+        const code = 'code' in unknownError && typeof unknownError.code === 'string' ? unknownError.code : null
+        return code ? `[${code}] ${unknownError.message}` : unknownError.message
       }
 
-      if (Array.isArray(errorObject.errors) && errorObject.errors.length > 0) {
-        const messages = errorObject.errors
-          .map((err) => {
-            if (err && typeof err === 'object' && 'message' in err && typeof err.message === 'string') {
-              return err.message
-            }
-            return null
-          })
-          .filter((msg): msg is string => Boolean(msg))
-
-        if (messages.length > 0) {
-          return messages.join(', ')
-        }
-      }
-
-      if (typeof errorObject.message === 'string' && errorObject.message.trim() !== '') {
-        return errorObject.code && typeof errorObject.code === 'string'
-          ? `[${errorObject.code}] ${errorObject.message}`
-          : errorObject.message
-      }
-
-      if (typeof errorObject.recoverySuggestion === 'string' && errorObject.recoverySuggestion.trim() !== '') {
-        return errorObject.recoverySuggestion
+      if ('recoverySuggestion' in unknownError && typeof unknownError.recoverySuggestion === 'string' && unknownError.recoverySuggestion.trim() !== '') {
+        return unknownError.recoverySuggestion
       }
     }
 

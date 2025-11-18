@@ -288,3 +288,58 @@ export interface GenerationStreamEvent {
 export interface GenerationStreamSubscriptionData {
   onGenerationStream: GenerationStreamEvent | null
 }
+
+// GraphQL Error Types
+export interface ValidationDetail {
+  field: string
+  message: string
+}
+
+export interface GraphQLErrorExtensions {
+  code?: string
+  details?: ValidationDetail[]
+  validationErrors?: Record<string, string>
+}
+
+export interface GraphQLError {
+  message: string
+  extensions?: GraphQLErrorExtensions
+  locations?: Array<{ line: number; column: number }>
+  path?: Array<string | number>
+}
+
+export interface GraphQLResponse<T> {
+  data?: T
+  errors?: GraphQLError[]
+}
+
+// Type guards for GraphQL errors
+export function isGraphQLError(error: unknown): error is { errors: GraphQLError[] } {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'errors' in error &&
+    Array.isArray((error as { errors: unknown }).errors)
+  )
+}
+
+export function hasValidationErrors(error: GraphQLError): boolean {
+  return !!(error.extensions?.validationErrors ?? error.extensions?.details)
+}
+
+export function extractValidationErrors(errors: GraphQLError[]): Record<string, string> {
+  const validationErrors: Record<string, string> = {}
+
+  for (const error of errors) {
+    if (error.extensions?.validationErrors) {
+      Object.assign(validationErrors, error.extensions.validationErrors)
+    }
+    if (error.extensions?.details) {
+      for (const detail of error.extensions.details) {
+        validationErrors[detail.field] = detail.message
+      }
+    }
+  }
+
+  return validationErrors
+}

@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react'
 
 import { getClient } from '../services/graphql'
+import type { GraphQLError, ValidationDetail } from '../types/graphql'
+import { extractValidationErrors, isGraphQLError } from '../types/graphql'
 
 const getOperationName = (graphQLDocument: string): string => {
   const match = /\b(mutation|query|subscription)\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(graphQLDocument)
@@ -69,34 +71,33 @@ export const useGraphQLMutation = <TData = unknown, TVariables = Record<string, 
         })
 
         return mutationData
-      } catch (err) {
+      } catch (err: unknown) {
         // Extract error message from various error formats
         let errorMessage = 'An unknown error occurred'
 
         if (err instanceof Error) {
           errorMessage = err.message
-        } else if (err && typeof err === 'object') {
-          // Check for GraphQL errors property
-          if ('errors' in err && Array.isArray((err as any).errors)) {
-            const errors = (err as any).errors
-            // Check if any error has validation details
-            const validationDetails = errors
-              .filter((e: any) => e.extensions?.details)
-              .flatMap((e: any) => e.extensions.details)
+        } else if (isGraphQLError(err)) {
+          // Use type guard for GraphQL errors
+          const errors: GraphQLError[] = err.errors
 
-            if (validationDetails.length > 0) {
-              // Format validation errors nicely
-              errorMessage = validationDetails
-                .map((detail: any) => `${detail.field}: ${detail.message}`)
-                .join(', ')
-            } else {
-              errorMessage = errors.map((e: any) => e.message || String(e)).join(', ')
-            }
-          } else if ('message' in err) {
-            errorMessage = String((err as any).message)
+          // Check if any error has validation details
+          const validationDetails: ValidationDetail[] = errors
+            .filter((e) => e.extensions?.details)
+            .flatMap((e) => e.extensions?.details ?? [])
+
+          if (validationDetails.length > 0) {
+            // Format validation errors nicely
+            errorMessage = validationDetails
+              .map((detail) => `${detail.field}: ${detail.message}`)
+              .join(', ')
           } else {
-            errorMessage = JSON.stringify(err)
+            errorMessage = errors.map((e) => e.message || String(e)).join(', ')
           }
+        } else if (err && typeof err === 'object' && 'message' in err) {
+          errorMessage = String(err.message)
+        } else if (err && typeof err === 'object') {
+          errorMessage = JSON.stringify(err)
         } else if (err) {
           errorMessage = String(err)
         }
@@ -107,7 +108,10 @@ export const useGraphQLMutation = <TData = unknown, TVariables = Record<string, 
           operation: operationName,
           message: errorMessage,
           originalError: err,
-          errorType: err?.constructor?.name || typeof err,
+          errorType:
+            err && typeof err === 'object' && 'constructor' in err && err.constructor
+              ? err.constructor.name
+              : typeof err,
           fullError: JSON.stringify(err, null, 2)
         })
 

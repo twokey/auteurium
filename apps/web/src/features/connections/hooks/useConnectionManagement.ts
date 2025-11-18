@@ -4,7 +4,11 @@ import { CREATE_CONNECTION, DELETE_CONNECTION } from '../../../graphql/mutations
 import { useGraphQLMutation } from '../../../hooks/useGraphQLMutation'
 import { useToast } from '../../../shared/store/toastStore'
 
-import type { Connection } from '../../../types'
+import type {
+  Connection,
+  CreateConnectionMutationData,
+  DeleteConnectionMutationData
+} from '../../../types'
 
 interface CreateConnectionInput {
   projectId: string
@@ -29,8 +33,8 @@ export const useConnectionManagement = (): UseConnectionManagementReturn => {
   const [isCreating, setIsCreating] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  const { mutate: createMutation } = useGraphQLMutation(CREATE_CONNECTION)
-  const { mutate: deleteMutation } = useGraphQLMutation(DELETE_CONNECTION)
+  const { mutate: createMutation } = useGraphQLMutation<CreateConnectionMutationData>(CREATE_CONNECTION)
+  const { mutate: deleteMutation } = useGraphQLMutation<DeleteConnectionMutationData>(DELETE_CONNECTION)
 
   const createConnection = useCallback(
     async (input: CreateConnectionInput) => {
@@ -59,7 +63,7 @@ export const useConnectionManagement = (): UseConnectionManagementReturn => {
         })
 
         toast.success('Connection created successfully')
-        return (result as any)?.createConnection || null
+        return result?.createConnection ?? null
       } catch (error) {
         console.error('Failed to create connection:', error)
         toast.error('Failed to create connection', error instanceof Error ? error.message : 'Unknown error')
@@ -86,7 +90,7 @@ export const useConnectionManagement = (): UseConnectionManagementReturn => {
         })
 
         toast.success('Connection deleted successfully')
-        return (result as any)?.deleteConnection || false
+        return result?.deleteConnection ?? false
       } catch (error) {
         console.error('Failed to delete connection:', error)
         toast.error('Failed to delete connection', error instanceof Error ? error.message : 'Unknown error')
