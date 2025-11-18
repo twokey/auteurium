@@ -4,6 +4,7 @@
  */
 
 import { useCallback, useRef, type MutableRefObject } from 'react'
+import type { Node, Edge, Connection as ReactFlowConnection, OnNodesChange, OnEdgesChange } from 'reactflow'
 
 
 import {
@@ -26,12 +27,15 @@ import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
 
 import type {
   Snippet,
+  Connection,
   CreateSnippetVariables,
   CreateSnippetMutationData,
   UpdateSnippetVariables,
   UpdateSnippetMutationData,
   CreateConnectionVariables,
+  CreateConnectionMutationData,
   DeleteConnectionVariables,
+  DeleteConnectionMutationData,
   CombineSnippetConnectionsVariables,
   GenerateSnippetImageVariables,
   CombineSnippetConnectionsMutationData,
@@ -40,7 +44,18 @@ import type {
   GenerateSnippetVideoMutationData,
   VideoGenerationInput
 } from '../../../types'
-import type { ReactFlowInstance, Node } from 'reactflow'
+import type { ReactFlowInstance } from 'reactflow'
+
+// Custom ReactFlow node data type
+interface SnippetNodeData {
+  snippet: Snippet
+}
+
+// Type alias for snippet nodes
+type SnippetNode = Node<SnippetNodeData>
+
+// Type alias for connection edges
+type ConnectionEdge = Edge<Connection>
 
 type SnippetContentChanges = Partial<Pick<Snippet, 'textField1' | 'title'>>
 
@@ -1021,7 +1036,7 @@ export function useCanvasHandlers({
     )
       .then((result) => {
         if (result) {
-          const createdSnippet = (result as any).createSnippet as Snippet
+          const createdSnippet = (result as CreateSnippetMutationData | null)?.createSnippet
           // Replace optimistic snippet with real one from server
           replaceOptimisticSnippet(tempId, createdSnippet)
         }
@@ -1084,7 +1099,7 @@ export function useCanvasHandlers({
     )
       .then((result) => {
         if (result) {
-          const createdSnippet = (result as any).createSnippet as Snippet
+          const createdSnippet = (result as CreateSnippetMutationData | null)?.createSnippet
           // Replace optimistic snippet with real one from server
           replaceOptimisticSnippet(tempId, createdSnippet)
         }
