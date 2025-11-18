@@ -96,7 +96,10 @@ export const FormSerialization = {
           formData.append(`${key}[${index}]`, String(item))
         })
       } else if (value !== null && value !== undefined) {
-        formData.append(key, String(value))
+        // Only append primitive values, skip objects
+        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+          formData.append(key, String(value))
+        }
       }
     }
     return formData
@@ -125,9 +128,9 @@ export const ErrorMapping = {
   mapGraphQLError: (error: unknown): string => {
     if (error && typeof error === 'object') {
       if ('graphQLErrors' in error && Array.isArray(error.graphQLErrors) && error.graphQLErrors.length > 0) {
-        const firstError = error.graphQLErrors[0]
-        if (firstError && typeof firstError === 'object' && 'message' in firstError) {
-          return String(firstError.message)
+        const firstError = error.graphQLErrors[0] as unknown
+        if (firstError && typeof firstError === 'object' && 'message' in firstError && typeof firstError.message === 'string') {
+          return firstError.message
         }
       }
       if ('message' in error && typeof error.message === 'string') {
