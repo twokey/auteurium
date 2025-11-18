@@ -531,7 +531,7 @@ export function useCanvasData(projectId: string | undefined): UseCanvasDataResul
     const combinedSnippets = [...snippetsWithRealOnes, ...newRealSnippets, ...optimisticSnippetsArray]
 
     const enrichedSnippets = combinedSnippets.map((snippet) => {
-      const hasImageAsset = Boolean(snippet.imageUrl || snippet.imageS3Key)
+      const hasImageAsset = Boolean(snippet.imageUrl ?? snippet.imageS3Key)
       const sanitizedSnippet =
         hasImageAsset && snippet.textField1 !== ''
           ? { ...snippet, textField1: '' }

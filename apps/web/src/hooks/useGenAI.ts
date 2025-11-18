@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 
 import { useGraphQLMutation } from './useGraphQLMutation'
-import { useModels } from '../contexts/ModelsContext'
+import { useModels } from './useModels'
 import {
   GENERATE_CONTENT,
   GENERATE_CONTENT_STREAM,

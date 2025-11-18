@@ -262,7 +262,7 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
     const imageRefs = referenceImages.map((img) => ({
       url: img.value,
       snippetId: img.snippetId,
-      snippetTitle: img.snippetTitle || undefined
+      snippetTitle: img.snippetTitle ?? undefined
     }))
     updateReferenceImages(imageRefs)
   }, [snippet.id, setActiveSnippet, combineFormFieldsToPrompt, updateCombinedPrompt, referenceImages, updateReferenceImages])

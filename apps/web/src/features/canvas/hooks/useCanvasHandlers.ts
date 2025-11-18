@@ -490,7 +490,7 @@ export function useCanvasHandlers({
       // Use optimistic-only pattern: mutation already shows changes via optimistic update
       // No cache invalidation needed - we only changed existing fields
       // The stale-while-revalidate cache will refresh in background if needed
-      const result = await mutateOptimisticOnly(() =>
+      const _result = await mutateOptimisticOnly(() =>
         updateSnippetMutation({
           variables: mutationVariables
         })
@@ -835,7 +835,7 @@ export function useCanvasHandlers({
     } finally {
       setGeneratingVideo(snippetId, false)
     }
-  }, [generateSnippetVideoMutation, mutateWithInvalidate, projectId, setGeneratingVideo, toast])
+  }, [generateSnippetVideoMutation, projectId, setGeneratingVideo, toast])
 
   const handleCreateUpstreamSnippet = useCallback(async (targetSnippetId: string) => {
     if (!projectId) {
@@ -960,7 +960,6 @@ export function useCanvasHandlers({
     }
   }, [
     projectId,
-    reactFlowInstance,
     addOptimisticSnippet,
     createSnippetMutation,
     replaceOptimisticSnippet,
@@ -1020,7 +1019,7 @@ export function useCanvasHandlers({
       () => createSnippetMutation({ variables }),
       ['ProjectWithSnippets']
     )
-      .then(async (result) => {
+      .then((result) => {
         if (result) {
           const createdSnippet = (result as any).createSnippet as Snippet
           // Replace optimistic snippet with real one from server
@@ -1083,7 +1082,7 @@ export function useCanvasHandlers({
       () => createSnippetMutation({ variables }),
       ['ProjectWithSnippets']
     )
-      .then(async (result) => {
+      .then((result) => {
         if (result) {
           const createdSnippet = (result as any).createSnippet as Snippet
           // Replace optimistic snippet with real one from server

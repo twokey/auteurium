@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react'
+import { createContext, useCallback, useMemo, type ReactNode } from 'react'
 
 import { GET_AVAILABLE_MODELS } from '../graphql/genai'
 import { useGraphQLQueryWithCache } from '../shared/hooks/useGraphQLQueryWithCache'
@@ -9,7 +9,7 @@ interface AvailableModelsData {
   availableModels: AvailableModel[]
 }
 
-interface ModelsContextValue {
+export interface ModelsContextValue {
   textModels: AvailableModel[]
   imageModels: AvailableModel[]
   videoModels: AvailableModel[]
@@ -24,7 +24,7 @@ interface ModelsContextValue {
   refetchVideoModels: () => Promise<void>
 }
 
-const ModelsContext = createContext<ModelsContextValue | null>(null)
+export const ModelsContext = createContext<ModelsContextValue | null>(null)
 
 interface ModelsProviderProps {
   children: ReactNode
@@ -38,7 +38,10 @@ export const ModelsProvider = ({ children }: ModelsProviderProps) => {
     refetch
   } = useGraphQLQueryWithCache<AvailableModelsData>(GET_AVAILABLE_MODELS)
 
-  const allModels = data?.availableModels ?? []
+  const allModels = useMemo(
+    () => data?.availableModels ?? [],
+    [data?.availableModels]
+  )
 
   const filterByModalities = useCallback(
     (models: AvailableModel[], modalities: AvailableModel['modality'][]) =>
@@ -85,12 +88,4 @@ export const ModelsProvider = ({ children }: ModelsProviderProps) => {
   )
 
   return <ModelsContext.Provider value={value}>{children}</ModelsContext.Provider>
-}
-
-export const useModels = (): ModelsContextValue => {
-  const context = useContext(ModelsContext)
-  if (!context) {
-    throw new Error('useModels must be used within ModelsProvider')
-  }
-  return context
 }

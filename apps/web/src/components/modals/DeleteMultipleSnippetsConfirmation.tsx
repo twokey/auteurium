@@ -125,7 +125,7 @@ export const DeleteMultipleSnippetsConfirmation = ({
 
           <div className="space-y-2">
             {displayedSnippets.map((snippet) => {
-              const snippetPreviewSource = snippet.textField1?.trim() || snippet.title?.trim()
+              const snippetPreviewSource = snippet.textField1?.trim() ?? snippet.title?.trim()
               const snippetPreview = snippetPreviewSource && snippetPreviewSource !== ''
                 ? snippetPreviewSource
                 : 'Untitled snippet'
