@@ -276,7 +276,7 @@ export const useGenAI = (options: UseGenAIOptions = {}) => {
   )
 
   const subscribeToGenerationStream = useCallback(
-    (snippetId: string, handlers: StreamHandlers) => {
+    (snippetId: string, handlers: StreamHandlers): { unsubscribe: () => void } => {
       if (!streamingSupportedRef.current) {
         return {
           unsubscribe: () => {}
