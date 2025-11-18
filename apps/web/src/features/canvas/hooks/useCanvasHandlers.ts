@@ -5,7 +5,7 @@
 
 import { useCallback, useRef } from 'react'
 import type { MutableRefObject } from 'react'
-import type { Edge, Node, ReactFlowInstance } from 'reactflow'
+import type { Node, ReactFlowInstance } from 'reactflow'
 
 import {
   COMBINE_SNIPPET_CONNECTIONS,
@@ -22,8 +22,6 @@ import { useModalStore } from '../../../shared/store/modalStore'
 import { useToast } from '../../../shared/store/toastStore'
 import { mutateWithInvalidate, mutateOptimisticOnly } from '../../../shared/utils/cacheHelpers'
 import { getColumnIndex, getRelativeColumnX, snapToColumn } from '../../../shared/utils/columnLayout'
-import { useCanvasStore } from '../store/canvasStore'
-import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
 import type {
   CombineSnippetConnectionsMutationData,
   CombineSnippetConnectionsVariables,
@@ -42,6 +40,9 @@ import type {
   UpdateSnippetVariables,
   VideoGenerationInput
 } from '../../../types'
+
+import { useCanvasStore } from '../store/canvasStore'
+import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
 
 // Custom ReactFlow node data type
 interface SnippetNodeData {
@@ -470,20 +471,22 @@ export function useCanvasHandlers({
 
     // Optimistic update
     setNodes((currentNodes: Node[]) =>
-      currentNodes.map((node: Node) =>
-        node.id === snippetId
-          ? {
-              ...node,
-              data: {
-                ...node.data,
-                snippet: {
-                  ...(node.data as SnippetNodeData).snippet,
-                  ...updateInput
-                }
+      currentNodes.map((node: Node) => {
+        if (node.id === snippetId) {
+          const snippetNode = node as Node<SnippetNodeData>
+          return {
+            ...node,
+            data: {
+              ...snippetNode.data,
+              snippet: {
+                ...snippetNode.data.snippet,
+                ...updateInput
               }
             }
-          : node
-      )
+          }
+        }
+        return node
+      })
     )
 
     try {
@@ -506,20 +509,22 @@ export function useCanvasHandlers({
       updateRealSnippet(previousSnippetSnapshot)
       // Rollback optimistic update
       setNodes((currentNodes: Node[]) =>
-        currentNodes.map((node: Node) =>
-          node.id === snippetId
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  snippet: {
-                    ...(node.data as SnippetNodeData).snippet,
-                    ...previousValues
-                  }
+        currentNodes.map((node: Node) => {
+          if (node.id === snippetId) {
+            const snippetNode = node as Node<SnippetNodeData>
+            return {
+              ...node,
+              data: {
+                ...snippetNode.data,
+                snippet: {
+                  ...snippetNode.data.snippet,
+                  ...previousValues
                 }
               }
-            : node
-        )
+            }
+          }
+          return node
+        })
       )
       throw error
     }
@@ -552,21 +557,23 @@ export function useCanvasHandlers({
 
       // Update node with combined data
       setNodes((currentNodes: Node[]) =>
-        currentNodes.map((node: Node) =>
-          node.id === snippetId
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  snippet: {
-                    ...(node.data as SnippetNodeData).snippet,
-                    textField1: updatedSnippet.textField1,
-                    connectionCount: (node.data as SnippetNodeData).snippet.connectionCount
-                  }
+        currentNodes.map((node: Node) => {
+          if (node.id === snippetId) {
+            const snippetNode = node as Node<SnippetNodeData>
+            return {
+              ...node,
+              data: {
+                ...snippetNode.data,
+                snippet: {
+                  ...snippetNode.data.snippet,
+                  textField1: updatedSnippet.textField1,
+                  connectionCount: snippetNode.data.snippet.connectionCount
                 }
               }
-            : node
-        )
+            }
+          }
+          return node
+        })
       )
     } catch (error) {
       console.error('Failed to combine snippet content:', error)
@@ -1482,7 +1489,7 @@ export function useCanvasHandlers({
     const index = keyNumber - 1
 
     // Get connectedContent from snippet
-    const node = reactFlowInstance.current.getNode(selectedSnippetId)
+    const node = reactFlowInstance.current?.getNode(selectedSnippetId) as Node<SnippetNodeData> | undefined
     const connectedContent = node?.data?.snippet?.connectedContent
 
     if (!connectedContent || connectedContent.length === 0) {
@@ -1495,7 +1502,11 @@ export function useCanvasHandlers({
     }
 
     // Get the target snippet ID
-    const targetSnippetId = connectedContent[index].snippetId
+    const targetSnippetId = connectedContent[index]?.snippetId
+
+    if (!targetSnippetId) {
+      return
+    }
 
     // Navigate to the target snippet (focus handler now updates selection state)
     handleFocusSnippet(targetSnippetId)
