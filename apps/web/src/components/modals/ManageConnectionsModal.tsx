@@ -3,8 +3,8 @@ import { useCallback, useMemo, useState } from 'react'
 import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisticUpdatesStore'
 import { CREATE_CONNECTION, DELETE_CONNECTION } from '../../graphql/mutations'
 import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
-import { invalidateQueries } from '../../shared/hooks/useGraphQLQueryWithCache'
-import { useToast } from '../../shared/store/toastStore'
+import { invalidateQueries } from '../../hooks/useGraphQLQueryWithCache'
+import { useToast } from '../../store/toastStore'
 
 import type { CreateConnectionMutationData, CreateConnectionVariables } from '../../types'
 

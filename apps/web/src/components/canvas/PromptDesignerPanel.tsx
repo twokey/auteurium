@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
-import { useToast } from '../../shared/store/toastStore'
+import { useToast } from '../../store/toastStore'
 
 const MODE_LABEL: Record<'text' | 'image' | 'video' | 'scenes', string> = {
   text: 'Text generation',

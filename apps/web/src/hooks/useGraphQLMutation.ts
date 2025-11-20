@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 
 import { getClient } from '../services/graphql'
 import type { GraphQLError, ValidationDetail } from '../types/graphql'
-import { extractValidationErrors, isGraphQLError } from '../types/graphql'
+import { isGraphQLError } from '../types/graphql'
 
 const getOperationName = (graphQLDocument: string): string => {
   const match = /\b(mutation|query|subscription)\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(graphQLDocument)

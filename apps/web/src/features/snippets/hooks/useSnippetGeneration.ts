@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react'
 
 import { useGenAI } from '../../../hooks/useGenAI'
-import { useToast } from '../../../shared/store/toastStore'
+import { useToast } from '../../../store/toastStore'
 
 export interface UseSnippetGenerationReturn {
   // Models

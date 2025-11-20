@@ -6,8 +6,8 @@
 
 import { memo } from 'react'
 
-import { CANVAS_CONSTANTS } from '../../shared/constants'
-import { getColumnBounds } from '../../shared/utils/columnLayout'
+import { CANVAS_CONSTANTS } from '../../constants'
+import { getColumnBounds } from '../../utils/columnLayout'
 
 interface ColumnGuidesProps {
   viewport: {

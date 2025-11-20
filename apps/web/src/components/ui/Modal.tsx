@@ -52,22 +52,17 @@ export const Modal = ({ isOpen, onClose, children, size = 'md' }: ModalProps) =>
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop with blur */}
       <div
-        className="fixed inset-0"
+        className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm transition-opacity animate-fade-in"
         onClick={onClose}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            onClose()
-          }
-        }}
-        role="button"
-        tabIndex={0}
-        aria-label="Close modal"
+        aria-hidden="true"
       />
-      <div 
-        className={`relative bg-white rounded-lg shadow-xl w-full ${sizeStyles[size]} max-h-[90vh] flex flex-col`}
+
+      {/* Modal Content */}
+      <div
+        className={`relative bg-white rounded-xl shadow-2xl w-full ${sizeStyles[size]} max-h-[90vh] flex flex-col animate-scale-in border border-surface-200`}
         role="dialog"
         aria-modal="true"
       >
@@ -79,7 +74,7 @@ export const Modal = ({ isOpen, onClose, children, size = 'md' }: ModalProps) =>
 
 Modal.Header = ({ children }: ModalHeaderProps) => {
   return (
-    <div className="px-6 py-4 border-b border-gray-200">
+    <div className="px-6 py-4 border-b border-surface-100">
       {children}
     </div>
   )
@@ -95,7 +90,7 @@ Modal.Body = ({ children }: ModalBodyProps) => {
 
 Modal.Footer = ({ children }: ModalFooterProps) => {
   return (
-    <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3">
+    <div className="px-6 py-4 border-t border-surface-100 flex items-center justify-end gap-3 bg-surface-50/50 rounded-b-xl">
       {children}
     </div>
   )

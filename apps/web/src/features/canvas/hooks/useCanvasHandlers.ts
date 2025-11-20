@@ -17,11 +17,11 @@ import {
   UPDATE_SNIPPET
 } from '../../../graphql/mutations'
 import { useGraphQLMutation } from '../../../hooks/useGraphQLMutation'
-import { CANVAS_CONSTANTS } from '../../../shared/constants'
-import { useModalStore } from '../../../shared/store/modalStore'
-import { useToast } from '../../../shared/store/toastStore'
-import { mutateWithInvalidate, mutateOptimisticOnly } from '../../../shared/utils/cacheHelpers'
-import { getColumnIndex, getRelativeColumnX, snapToColumn } from '../../../shared/utils/columnLayout'
+import { CANVAS_CONSTANTS } from '../../../constants'
+import { useModalStore } from '../../../store/modalStore'
+import { useToast } from '../../../store/toastStore'
+import { mutateWithInvalidate, mutateOptimisticOnly } from '../../../utils/cacheHelpers'
+import { getColumnIndex, getRelativeColumnX, snapToColumn } from '../../../utils/columnLayout'
 import type {
   CombineSnippetConnectionsMutationData,
   CombineSnippetConnectionsVariables,
@@ -163,15 +163,15 @@ export function useCanvasHandlers({
   const toast = useToast()
   const {
     openEditSnippet,
-  openDeleteSnippet,
-  openDeleteMultipleSnippets,
-  openManageConnections,
-  openVersionHistory,
-  closeGeneratedSnippetPreview,
-  closeEditSnippet,
-  generatedSnippetPreview,
-  setGeneratedSnippetCreating
-} = useModalStore()
+    openDeleteSnippet,
+    openDeleteMultipleSnippets,
+    openManageConnections,
+    openVersionHistory,
+    closeGeneratedSnippetPreview,
+    closeEditSnippet,
+    generatedSnippetPreview,
+    setGeneratedSnippetCreating
+  } = useModalStore()
 
   const { setLoading, setGeneratingImage, setGeneratingVideo } = useCanvasStore()
   const {
@@ -499,7 +499,7 @@ export function useCanvasHandlers({
       // Use optimistic-only pattern: mutation already shows changes via optimistic update
       // No cache invalidation needed - we only changed existing fields
       // The stale-while-revalidate cache will refresh in background if needed
-      const _result = await mutateOptimisticOnly(() =>
+      await mutateOptimisticOnly(() =>
         updateSnippetMutation({
           variables: mutationVariables
         })
@@ -567,7 +567,7 @@ export function useCanvasHandlers({
                 snippet: {
                   ...snippetNode.data.snippet,
                   textField1: updatedSnippet.textField1,
-                  connectionCount: snippetNode.data.snippet.connectionCount
+                  connections: snippetNode.data.snippet.connections
                 }
               }
             }
@@ -1036,7 +1036,9 @@ export function useCanvasHandlers({
         if (result) {
           const createdSnippet = (result as CreateSnippetMutationData | null)?.createSnippet
           // Replace optimistic snippet with real one from server
-          replaceOptimisticSnippet(tempId, createdSnippet)
+          if (createdSnippet) {
+            replaceOptimisticSnippet(tempId, createdSnippet)
+          }
         }
       })
       .catch((error) => {
@@ -1099,7 +1101,9 @@ export function useCanvasHandlers({
         if (result) {
           const createdSnippet = (result as CreateSnippetMutationData | null)?.createSnippet
           // Replace optimistic snippet with real one from server
-          replaceOptimisticSnippet(tempId, createdSnippet)
+          if (createdSnippet) {
+            replaceOptimisticSnippet(tempId, createdSnippet)
+          }
         }
       })
       .catch((error) => {
@@ -1488,21 +1492,21 @@ export function useCanvasHandlers({
     }
     const index = keyNumber - 1
 
-    // Get connectedContent from snippet
+    // Get connections from snippet
     const node = reactFlowInstance.current?.getNode(selectedSnippetId) as Node<SnippetNodeData> | undefined
-    const connectedContent = node?.data?.snippet?.connectedContent
+    const connections = node?.data?.snippet?.connections
 
-    if (!connectedContent || connectedContent.length === 0) {
+    if (!connections || connections.length === 0) {
       return
     }
 
     // Check if index is valid
-    if (index >= connectedContent.length) {
+    if (index >= connections.length) {
       return
     }
 
     // Get the target snippet ID
-    const targetSnippetId = connectedContent[index]?.snippetId
+    const targetSnippetId = connections[index]?.targetSnippetId
 
     if (!targetSnippetId) {
       return

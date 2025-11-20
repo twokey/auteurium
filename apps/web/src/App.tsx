@@ -4,9 +4,9 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { Navigation } from './components/ui/Navigation'
 import { AuthProvider } from './hooks/AuthProvider'
 import { useAuth } from './hooks/useAuth'
-import { ErrorBoundary } from './shared/components/ErrorBoundary'
-import { LoadingSpinner } from './shared/components/ui/LoadingSpinner'
-import { ToastContainer } from './shared/components/ui/Toast'
+import { ErrorBoundary } from './components/ErrorBoundary'
+import { LoadingSpinner } from './components/ui/LoadingSpinner'
+import { ToastContainer } from './components/ui/Toast'
 
 // Lazy load route components for code splitting
 const AuthPage = lazy(() => import('./pages/AuthPage').then(module => ({ default: module.AuthPage })))

@@ -31,7 +31,7 @@ import { useCanvasStore } from '../features/canvas/store/canvasStore'
 import { useContextMenuStore } from '../features/canvas/store/contextMenuStore'
 import { useVideoPromptStore } from '../features/snippets/store/videoPromptStore'
 import { useModels } from '../hooks/useModels'
-import { LoadingSpinner } from '../shared/components/ui/LoadingSpinner'
+import { LoadingSpinner } from '../components/ui/LoadingSpinner'
 
 const NODE_TYPES: NodeTypes = {
   snippet: SnippetNode
@@ -67,7 +67,7 @@ const CanvasContent = () => {
 
   // Create refs that will be populated after ReactFlow setup
   // eslint-disable-next-line @typescript-eslint/no-empty-function -- Initial ref value, will be replaced in useEffect
-  const setNodesRef = useRef<(nodes: Node[] | ((nodes: Node[]) => Node[])) => void>(() => {})
+  const setNodesRef = useRef<(nodes: Node[] | ((nodes: Node[]) => Node[])) => void>(() => { })
   const externalReactFlowInstanceRef = useRef<ReactFlowInstance | null>(null)
   const reactFlowWrapperRef = useRef<HTMLDivElement>(null)
 
@@ -154,12 +154,12 @@ const CanvasContent = () => {
     setupOnInit(instance)
   }, [setupOnInit])
 
-  const handleMove = useCallback((_event: React.MouseEvent | React.TouchEvent, viewport: Viewport) => {
+  const handleMove = useCallback((_event: MouseEvent | TouchEvent, viewport: Viewport) => {
     setViewport(viewport)
   }, [])
 
   // Wrap onMoveEnd to update viewport state for column guides
-  const handleMoveEnd = useCallback((_event: React.MouseEvent | React.TouchEvent, viewport: Viewport) => {
+  const handleMoveEnd = useCallback((_event: MouseEvent | TouchEvent, viewport: Viewport) => {
     setViewport(viewport)
     onMoveEnd()
   }, [onMoveEnd])
@@ -465,7 +465,7 @@ const CanvasContent = () => {
             </div>
           </ReactFlow>
         </div>
-        
+
         {/* Canvas Toolbar */}
         <CanvasToolbar
           onCreateSnippet={handlers.handleCreateSnippet}
@@ -475,7 +475,7 @@ const CanvasContent = () => {
           isLoading={false}
           reactFlowInstance={reactFlowInstance.current}
         />
-        
+
         <div className="absolute top-4 right-4 z-10 flex flex-col items-end gap-3">
           {normalisedProject && (
             <CanvasInfoPanel

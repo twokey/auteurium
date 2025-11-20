@@ -1,5 +1,5 @@
-import { Button } from '../../../shared/components/ui/Button'
-import { Modal } from '../../../shared/components/ui/Modal'
+import { Button } from '../../../components/ui/Button'
+import { Modal } from '../../../components/ui/Modal'
 import { VersionTimeline } from '../components'
 import { useSnippetVersions } from '../hooks'
 

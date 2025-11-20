@@ -5,8 +5,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { getClient } from '../../services/graphql'
-import { isGraphQLError } from '../../types/graphql'
+import { getClient } from '../services/graphql'
+import { isGraphQLError } from '../types/graphql'
 import { GRAPHQL } from '../constants'
 
 const getOperationName = (graphQLDocument: string): string => {
@@ -47,20 +47,20 @@ export const useGraphQLQueryWithCache = <TData = unknown, TVariables = Record<st
   query: string,
   options: UseGraphQLQueryWithCacheOptions<TVariables> = {}
 ): UseGraphQLQueryWithCacheResult<TData> => {
-  const { 
-    variables, 
-    skip = false, 
+  const {
+    variables,
+    skip = false,
     pollInterval,
     cacheTime = GRAPHQL.CACHE_TTL,
     staleTime = GRAPHQL.CACHE_TTL / 2
   } = options
-  
+
   const [data, setData] = useState<TData | null>(null)
   const [loading, setLoading] = useState<boolean>(!skip)
   const [isFetching, setIsFetching] = useState<boolean>(false)
   const [error, setError] = useState<Error | null>(null)
   const [isStale, setIsStale] = useState<boolean>(false)
-  
+
   const abortControllerRef = useRef<AbortController | null>(null)
   const operationName = useMemo(() => getOperationName(query), [query])
 
@@ -91,7 +91,8 @@ export const useGraphQLQueryWithCache = <TData = unknown, TVariables = Record<st
     }
 
     if (isGraphQLError(unknownError)) {
-      const messages = unknownError.errors.map((err) => err.message).filter(Boolean)
+      const err = unknownError as { errors: { message: string }[] }
+      const messages = err.errors.map((e) => e.message).filter(Boolean)
       if (messages.length > 0) {
         return messages.join(', ')
       }
@@ -123,7 +124,7 @@ export const useGraphQLQueryWithCache = <TData = unknown, TVariables = Record<st
         setData(cached.data)
         setLoading(false)
         setIsStale(!isCacheFresh(cached.timestamp))
-        
+
         // If stale, fetch in background
         if (!isCacheFresh(cached.timestamp)) {
           setIsFetching(true)
@@ -187,7 +188,7 @@ export const useGraphQLQueryWithCache = <TData = unknown, TVariables = Record<st
       if (err instanceof Error && err.name === 'AbortError') {
         return // Request was aborted, don't update state
       }
-      
+
       const errorMessage = extractErrorMessage(err)
       setError(new Error(errorMessage))
       console.error('[GraphQL Query] error', {

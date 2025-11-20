@@ -4,7 +4,7 @@ import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisti
 import { COMBINE_SNIPPET_CONNECTIONS, DELETE_SNIPPET, GENERATE_SNIPPET_IMAGE, UPDATE_SNIPPET } from '../../graphql/mutations'
 import { useGenAI } from '../../hooks/useGenAI'
 import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
-import { useToast } from '../../shared/store/toastStore'
+import { useToast } from '../../store/toastStore'
 
 type EditableField = 'textField1'
 

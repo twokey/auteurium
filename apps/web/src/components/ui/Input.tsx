@@ -24,14 +24,16 @@ export const Input = ({
   ...props
 }: InputProps) => {
   const widthClass = fullWidth ? 'w-full' : ''
-  const errorClass = error ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+  const errorClass = error
+    ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+    : 'border-surface-300 focus:ring-primary-500 focus:border-primary-500'
 
   return (
     <div className={widthClass}>
       {label && (
         <label
           htmlFor={props.id}
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-medium text-surface-700 mb-1"
         >
           {label}
           {props.required && <span className="text-red-500 ml-1">*</span>}
@@ -39,7 +41,7 @@ export const Input = ({
       )}
       <input
         ref={ref}
-        className={`${widthClass} px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 disabled:bg-gray-100 disabled:cursor-not-allowed ${errorClass} ${className}`}
+        className={`${widthClass} px-3 py-2 border rounded-lg shadow-sm placeholder-surface-400 focus:outline-none focus:ring-2 disabled:bg-surface-100 disabled:cursor-not-allowed transition-colors duration-200 ${errorClass} ${className}`}
         aria-invalid={error ? 'true' : 'false'}
         {...props}
       />

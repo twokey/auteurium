@@ -4,8 +4,8 @@ import { REVERT_SNIPPET } from '../../graphql/mutations'
 import { GET_SNIPPET_VERSIONS } from '../../graphql/queries'
 import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
 import { useGraphQLQuery } from '../../hooks/useGraphQLQuery'
-import { useToast } from '../../shared/store/toastStore'
-import { formatDetailedDateTime } from '../../shared/utils/dateFormatters'
+import { useToast } from '../../store/toastStore'
+import { formatDetailedDateTime } from '../../utils/dateFormatters'
 
 interface SnippetVersion {
   id: string

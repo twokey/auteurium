@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 
 import { UPDATE_SNIPPET, DELETE_SNIPPET, COMBINE_SNIPPET_CONNECTIONS, GENERATE_SNIPPET_IMAGE } from '../../../graphql/mutations'
 import { useGraphQLMutation } from '../../../hooks/useGraphQLMutation'
-import { useToast } from '../../../shared/store/toastStore'
+import { useToast } from '../../../store/toastStore'
 
 import type {
   Snippet,

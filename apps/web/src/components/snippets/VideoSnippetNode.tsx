@@ -5,9 +5,9 @@ import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisti
 import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
 import { StarMenu } from '../../features/snippets/components/StarMenu'
 import { useVideoPromptStore } from '../../features/snippets/store/videoPromptStore'
-import { Accordion } from '../../shared/components/ui/Accordion'
-import { VIDEO_GENERATION } from '../../shared/constants'
-import { useToast } from '../../shared/store/toastStore'
+import { Accordion } from '../../components/ui/Accordion'
+import { VIDEO_GENERATION } from '../../constants'
+import { useToast } from '../../store/toastStore'
 
 import type { AvailableModel, ConnectedContentItem, VideoGenerationInput, VideoMetadata, VideoGenerationStatus } from '../../types'
 

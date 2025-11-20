@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { CANVAS_CONSTANTS } from '../../shared/constants'
+import { CANVAS_CONSTANTS } from '../../constants'
 
 import type { ReactFlowInstance } from 'reactflow'
 

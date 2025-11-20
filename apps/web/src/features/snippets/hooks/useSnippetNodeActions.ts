@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 
-import { useToast } from '../../../shared/store/toastStore'
+import { useToast } from '../../../store/toastStore'
 
 import type { EditableField } from '../../../types'
 

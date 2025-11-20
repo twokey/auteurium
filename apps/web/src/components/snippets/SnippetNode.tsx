@@ -6,9 +6,9 @@ import { VideoSnippetNode } from './VideoSnippetNode'
 import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisticUpdatesStore'
 import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
 import { useGenAI } from '../../hooks/useGenAI'
-import { CANVAS_CONSTANTS, VIDEO_GENERATION } from '../../shared/constants'
-import { useToast } from '../../shared/store/toastStore'
-import { countWords, truncateToWords } from '../../shared/utils/textUtils'
+import { CANVAS_CONSTANTS, VIDEO_GENERATION } from '../../constants'
+import { useToast } from '../../store/toastStore'
+import { countWords, truncateToWords } from '../../utils/textUtils'
 
 import type { AvailableModel, ConnectedContentItem, VideoGenerationInput } from '../../types'
 

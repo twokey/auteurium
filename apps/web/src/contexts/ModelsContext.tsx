@@ -1,7 +1,7 @@
 import { createContext, useCallback, useMemo, type ReactNode } from 'react'
 
 import { GET_AVAILABLE_MODELS } from '../graphql/genai'
-import { useGraphQLQueryWithCache } from '../shared/hooks/useGraphQLQueryWithCache'
+import { useGraphQLQueryWithCache } from '../hooks/useGraphQLQueryWithCache'
 
 import type { AvailableModel } from '../types'
 

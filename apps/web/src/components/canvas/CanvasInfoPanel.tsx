@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { formatDateTime } from '../../shared/utils/dateFormatters'
+import { formatDateTime } from '../../utils/dateFormatters'
 
 interface Project {
   id: string

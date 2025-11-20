@@ -1,4 +1,4 @@
-import { countWords } from '../../../shared/utils/textUtils'
+import { countWords } from '../../../utils/textUtils'
 
 import type { EditableField } from '../../../types'
 

@@ -9,7 +9,7 @@ import { EditSnippetModal } from '../../../components/modals/EditSnippetModal'
 import { GeneratedSnippetPreviewModal } from '../../../components/modals/GeneratedSnippetPreviewModal'
 import { ManageConnectionsModal } from '../../../components/modals/ManageConnectionsModal'
 import { VersionHistoryModal } from '../../../components/modals/VersionHistoryModal'
-import { useModalStore } from '../../../shared/store/modalStore'
+import { useModalStore } from '../../../store/modalStore'
 
 import type { Snippet } from '../../../types'
 

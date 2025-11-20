@@ -5,7 +5,7 @@
 
 import { create } from 'zustand'
 
-import type { Snippet } from '../../types'
+import type { Snippet } from '../types'
 
 interface ModalState {
   // Edit Snippet Modal
@@ -13,7 +13,7 @@ interface ModalState {
     isOpen: boolean
     snippet: Snippet | null
   }
-  
+
   // Delete Snippet Modal
   deleteSnippet: {
     isOpen: boolean
@@ -32,13 +32,13 @@ interface ModalState {
     isOpen: boolean
     snippet: Snippet | null
   }
-  
+
   // Version History Modal
   versionHistory: {
     isOpen: boolean
     snippet: Snippet | null
   }
-  
+
   // Generated Snippet Preview Modal
   generatedSnippetPreview: {
     isOpen: boolean
@@ -46,11 +46,11 @@ interface ModalState {
     content: string
     isCreating: boolean
   }
-  
+
   // Actions
   openEditSnippet: (snippet: Snippet) => void
   closeEditSnippet: () => void
-  
+
   openDeleteSnippet: (snippet: Snippet) => void
   closeDeleteSnippet: () => void
 
@@ -59,14 +59,14 @@ interface ModalState {
 
   openManageConnections: (snippet: Snippet) => void
   closeManageConnections: () => void
-  
+
   openVersionHistory: (snippet: Snippet) => void
   closeVersionHistory: () => void
-  
+
   openGeneratedSnippetPreview: (sourceSnippetId: string, content: string) => void
   closeGeneratedSnippetPreview: () => void
   setGeneratedSnippetCreating: (isCreating: boolean) => void
-  
+
   closeAllModals: () => void
 }
 
@@ -76,7 +76,7 @@ export const useModalStore = create<ModalState>((set) => ({
     isOpen: false,
     snippet: null,
   },
-  
+
   deleteSnippet: {
     isOpen: false,
     snippet: null,
@@ -92,32 +92,32 @@ export const useModalStore = create<ModalState>((set) => ({
     isOpen: false,
     snippet: null,
   },
-  
+
   versionHistory: {
     isOpen: false,
     snippet: null,
   },
-  
+
   generatedSnippetPreview: {
     isOpen: false,
     sourceSnippetId: null,
     content: '',
     isCreating: false,
   },
-  
+
   // Actions
   openEditSnippet: (snippet) =>
     set({ editSnippet: { isOpen: true, snippet } }),
-    
+
   closeEditSnippet: () =>
-    set({ 
+    set({
       editSnippet: { isOpen: false, snippet: null },
       generatedSnippetPreview: { isOpen: false, sourceSnippetId: null, content: '', isCreating: false }
     }),
-    
+
   openDeleteSnippet: (snippet) =>
     set({ deleteSnippet: { isOpen: true, snippet } }),
-    
+
   closeDeleteSnippet: () =>
     set({ deleteSnippet: { isOpen: false, snippet: null } }),
 
@@ -129,36 +129,36 @@ export const useModalStore = create<ModalState>((set) => ({
 
   openManageConnections: (snippet) =>
     set({ manageConnections: { isOpen: true, snippet } }),
-    
+
   closeManageConnections: () =>
     set({ manageConnections: { isOpen: false, snippet: null } }),
-    
+
   openVersionHistory: (snippet) =>
     set({ versionHistory: { isOpen: true, snippet } }),
-    
+
   closeVersionHistory: () =>
     set({ versionHistory: { isOpen: false, snippet: null } }),
-    
+
   openGeneratedSnippetPreview: (sourceSnippetId, content) =>
-    set({ 
-      generatedSnippetPreview: { 
-        isOpen: true, 
-        sourceSnippetId, 
+    set({
+      generatedSnippetPreview: {
+        isOpen: true,
+        sourceSnippetId,
         content,
         isCreating: false
-      } 
+      }
     }),
-    
+
   closeGeneratedSnippetPreview: () =>
-    set({ 
-      generatedSnippetPreview: { 
-        isOpen: false, 
-        sourceSnippetId: null, 
+    set({
+      generatedSnippetPreview: {
+        isOpen: false,
+        sourceSnippetId: null,
         content: '',
         isCreating: false
-      } 
+      }
     }),
-    
+
   setGeneratedSnippetCreating: (isCreating) =>
     set((state) => ({
       generatedSnippetPreview: {
@@ -166,7 +166,7 @@ export const useModalStore = create<ModalState>((set) => ({
         isCreating
       }
     })),
-    
+
   closeAllModals: () =>
     set({
       editSnippet: { isOpen: false, snippet: null },

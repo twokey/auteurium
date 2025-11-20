@@ -6,8 +6,8 @@
 import { useMemo, useRef, useCallback, useEffect } from 'react'
 
 import { GET_PROJECT_CONNECTIONS, GET_PROJECT_WITH_SNIPPETS } from '../../../graphql/queries'
-import { useGraphQLQueryWithCache } from '../../../shared/hooks/useGraphQLQueryWithCache'
-import { snapToColumn } from '../../../shared/utils/columnLayout'
+import { useGraphQLQueryWithCache } from '../../../hooks/useGraphQLQueryWithCache'
+import { snapToColumn } from '../../../utils/columnLayout'
 import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
 import { usePendingPositionsStore } from '../store/pendingPositionsStore'
 

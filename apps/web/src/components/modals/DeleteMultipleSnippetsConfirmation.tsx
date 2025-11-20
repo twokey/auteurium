@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react'
 import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisticUpdatesStore'
 import { DELETE_SNIPPET } from '../../graphql/mutations'
 import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
-import { useToast } from '../../shared/store/toastStore'
+import { useToast } from '../../store/toastStore'
 
 interface DeleteMultipleSnippetsConfirmationProps {
   isOpen: boolean

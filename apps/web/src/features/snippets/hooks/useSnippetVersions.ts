@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 
 import { useGraphQLQuery } from '../../../hooks/useGraphQLQuery'
-import { useToast } from '../../../shared/store/toastStore'
+import { useToast } from '../../../store/toastStore'
 
 import type { SnippetVersion } from '../../../types'
 
@@ -36,7 +36,7 @@ export const useSnippetVersions = (snippetId: string): UseSnippetVersionsReturn 
 
   // Handle version revert
   const revertVersion = useCallback(
-    (_projectId: string, _snippetId: string, _version: number) => {
+    async (_projectId: string, _snippetId: string, _version: number): Promise<boolean> => {
       setIsReverting(true)
       try {
         // Note: You'll need to implement REVERT_SNIPPET_VERSION mutation in graphql/mutations.ts

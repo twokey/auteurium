@@ -7,7 +7,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 
 import { GET_PROJECT_WITH_SNIPPETS } from '../../../graphql/queries'
-import { useGraphQLQueryWithCache } from '../../../shared/hooks/useGraphQLQueryWithCache'
+import { useGraphQLQueryWithCache } from '../../../hooks/useGraphQLQueryWithCache'
 
 import type { ProjectWithSnippetsQueryData, Snippet } from '../../../types'
 
