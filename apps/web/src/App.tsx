@@ -1,12 +1,12 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 
-import { Navigation } from './components/ui/Navigation'
-import { AuthProvider } from './hooks/AuthProvider'
-import { useAuth } from './hooks/useAuth'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { LoadingSpinner } from './components/ui/LoadingSpinner'
+import { Navigation } from './components/ui/Navigation'
 import { ToastContainer } from './components/ui/Toast'
+import { AuthProvider } from './hooks/AuthProvider'
+import { useAuth } from './hooks/useAuth'
 
 // Lazy load route components for code splitting
 const AuthPage = lazy(() => import('./pages/AuthPage').then(module => ({ default: module.AuthPage })))

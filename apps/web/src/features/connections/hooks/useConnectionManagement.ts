@@ -50,6 +50,7 @@ export const useConnectionManagement = (): UseConnectionManagementReturn => {
 
       setIsCreating(true)
       try {
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- Using || intentionally to convert empty string to null
         const trimmedLabel = input.label?.trim() || null
         const result = await createMutation({
           variables: {

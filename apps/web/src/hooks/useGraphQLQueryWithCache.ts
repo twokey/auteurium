@@ -5,9 +5,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { GRAPHQL } from '../constants'
 import { getClient } from '../services/graphql'
 import { isGraphQLError } from '../types/graphql'
-import { GRAPHQL } from '../constants'
 
 const getOperationName = (graphQLDocument: string): string => {
   const match = /\b(query|mutation|subscription)\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(graphQLDocument)
@@ -40,7 +40,7 @@ interface UseGraphQLQueryWithCacheResult<TData> {
 }
 
 function getCacheKey(query: string, variables?: Record<string, unknown>): string {
-  return `${query}-${JSON.stringify(variables || {})}`
+  return `${query}-${JSON.stringify(variables ?? {})}`
 }
 
 export const useGraphQLQueryWithCache = <TData = unknown, TVariables = Record<string, unknown>>(

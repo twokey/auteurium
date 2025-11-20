@@ -16,10 +16,10 @@ import {
   type Edge
 } from 'reactflow'
 
-import { UPDATE_SNIPPET_POSITIONS } from '../../../graphql/mutations'
-import { getClient } from '../../../services/graphql'
 import { CANVAS_CONSTANTS } from '../../../constants'
+import { UPDATE_SNIPPET_POSITIONS } from '../../../graphql/mutations'
 import { useDebouncedCallback } from '../../../hooks/useDebounce'
+import { getClient } from '../../../services/graphql'
 import { mutateWithInvalidate } from '../../../utils/cacheHelpers'
 import { snapPositionToColumn } from '../../../utils/columnLayout'
 import { useCanvasKeyboardShortcut } from '../context/canvasKeyboard'
