@@ -2,7 +2,7 @@ import type { Connection } from '../../../types'
 
 interface ConnectionsListProps {
   outgoingConnections: Connection[]
-  incomingConnections: Array<Connection & { sourceSnippet?: any }>
+  incomingConnections: (Connection & { sourceSnippet?: any })[]
   onDeleteConnection: (connectionId: string) => Promise<void>
   getSnippetPreview: (snippetId: string) => string
   isDeleting?: boolean

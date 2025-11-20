@@ -1,11 +1,13 @@
 import { memo, useCallback } from 'react'
 import { Handle, Position } from 'reactflow'
-import { useSnippetNodeEditing, useSnippetNodeActions } from '../hooks'
+
 import {
   SnippetNodeContent,
   SnippetNodeToolbar,
   SnippetNodeImage
 } from '.'
+import { useSnippetNodeEditing, useSnippetNodeActions } from '../hooks'
+
 import type { EditableField, SnippetNodeProps } from '../../../types'
 
 /**
@@ -118,7 +120,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
           onDelete={() => actions.handleDelete(() => onDelete(snippet.id))}
           onManageConnections={() => onManageConnections(snippet.id)}
           onViewVersions={() => onViewVersions(snippet.id)}
-          onCombine={() => actions.handleCombine(() => onCombine(snippet.id))}
+          onCombine={() => actions.handleCombine(() => void onCombine(snippet.id))}
           onGenerateImage={() =>
             actions.handleGenerateImage(() => onGenerateImage(snippet.id))
           }

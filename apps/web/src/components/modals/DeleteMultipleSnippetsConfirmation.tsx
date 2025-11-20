@@ -8,12 +8,12 @@ import { useToast } from '../../shared/store/toastStore'
 interface DeleteMultipleSnippetsConfirmationProps {
   isOpen: boolean
   onClose: () => void
-  snippets: Array<{
+  snippets: {
     id: string
     projectId: string
     title?: string
     textField1?: string
-  }>
+  }[]
   projectId: string
   onDeleted?: () => void
 }
@@ -125,7 +125,7 @@ export const DeleteMultipleSnippetsConfirmation = ({
 
           <div className="space-y-2">
             {displayedSnippets.map((snippet) => {
-              const snippetPreviewSource = snippet.textField1?.trim() || snippet.title?.trim()
+              const snippetPreviewSource = snippet.textField1?.trim() ?? snippet.title?.trim()
               const snippetPreview = snippetPreviewSource && snippetPreviewSource !== ''
                 ? snippetPreviewSource
                 : 'Untitled snippet'

@@ -32,9 +32,21 @@ export const Card = ({
   const clickableStyles = onClick ? 'cursor-pointer' : ''
   
   return (
-    <div 
+    <div
       className={`${baseStyles} ${paddingStyles[padding]} ${hoverStyles} ${clickableStyles} ${className}`}
       onClick={onClick}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onClick()
+              }
+            }
+          : undefined
+      }
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
     >
       {children}
     </div>
@@ -47,7 +59,7 @@ interface CardHeaderProps {
   action?: ReactNode
 }
 
-Card.Header = function CardHeader({ title, description, action }: CardHeaderProps) {
+Card.Header = ({ title, description, action }: CardHeaderProps) => {
   return (
     <div className="flex items-start justify-between mb-4">
       <div>

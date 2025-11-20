@@ -1,17 +1,18 @@
 import { useCallback, useRef, useState } from 'react'
 
+import { useGraphQLMutation } from './useGraphQLMutation'
+import { useModels } from './useModels'
 import {
   GENERATE_CONTENT,
   GENERATE_CONTENT_STREAM,
   GENERATION_STREAM_SUBSCRIPTION,
   CREATE_SCENES
 } from '../graphql/genai'
-import { useModels } from '../contexts/ModelsContext'
 import { getClient } from '../services/graphql'
-import { useGraphQLMutation } from './useGraphQLMutation'
+
 import type { Snippet } from '../types'
 
-type GenerateContentResult = {
+interface GenerateContentResult {
   content: string
   tokensUsed: number
   cost: number
@@ -19,7 +20,7 @@ type GenerateContentResult = {
   generationTimeMs: number
 }
 
-type CreateScenesResult = {
+interface CreateScenesResult {
   scenes: Snippet[]
   tokensUsed: number
   cost: number
@@ -27,7 +28,7 @@ type CreateScenesResult = {
   generationTimeMs: number
 }
 
-type GenerateContentVariables = {
+interface GenerateContentVariables {
   projectId: string
   snippetId: string
   input: {
@@ -36,15 +37,15 @@ type GenerateContentVariables = {
   }
 }
 
-type GenerateContentData = {
+interface GenerateContentData {
   generateContent: GenerateContentResult
 }
 
-type GenerateContentStreamData = {
+interface GenerateContentStreamData {
   generateContentStream: GenerateContentResult
 }
 
-type CreateScenesVariables = {
+interface CreateScenesVariables {
   projectId: string
   snippetId: string
   input: {
@@ -55,11 +56,11 @@ type CreateScenesVariables = {
   }
 }
 
-type CreateScenesData = {
+interface CreateScenesData {
   createScenes: CreateScenesResult
 }
 
-type GenerationStreamSubscriptionData = {
+interface GenerationStreamSubscriptionData {
   onGenerationStream: {
     snippetId: string
     content: string | null
@@ -78,7 +79,7 @@ interface StreamHandlers {
   onComplete?: () => void
 }
 
-type GenerateStreamResponse = {
+interface GenerateStreamResponse {
   result: GenerateContentResult | null
   usedStreaming: boolean
   fallbackReason: string | null
@@ -113,7 +114,7 @@ const collectErrorMessages = (error: unknown): string[] => {
       messages.push(error.message)
     }
   } else if (typeof error === 'object') {
-    const candidate = error as { message?: unknown; errors?: Array<{ message?: unknown }> }
+    const candidate = error as { message?: unknown; errors?: { message?: unknown }[] }
     if (typeof candidate.message === 'string' && candidate.message.trim() !== '') {
       messages.push(candidate.message)
     }
@@ -275,7 +276,7 @@ export const useGenAI = (options: UseGenAIOptions = {}) => {
   )
 
   const subscribeToGenerationStream = useCallback(
-    (snippetId: string, handlers: StreamHandlers) => {
+    (snippetId: string, handlers: StreamHandlers): { unsubscribe: () => void } => {
       if (!streamingSupportedRef.current) {
         return {
           unsubscribe: () => {}

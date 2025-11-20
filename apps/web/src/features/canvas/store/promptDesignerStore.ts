@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
-import type { VideoModelSettings } from '../../snippets/store/videoPromptStore'
 import type { ConnectedContentItem } from '../../../types/components'
+import type { VideoModelSettings } from '../../snippets/store/videoPromptStore'
 
 type PromptDesignerMode = 'text' | 'image' | 'video' | 'scenes'
 

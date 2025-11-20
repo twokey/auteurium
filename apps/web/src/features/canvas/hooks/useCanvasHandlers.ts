@@ -3,43 +3,51 @@
  * Manages all event handlers, mutations, and canvas operations
  */
 
-import { useCallback, useRef, type MutableRefObject } from 'react'
-import type { ReactFlowInstance, Node } from 'reactflow'
+import { useCallback, useRef } from 'react'
+import type { MutableRefObject } from 'react'
+import type { Node, ReactFlowInstance } from 'reactflow'
 
 import {
-  CREATE_SNIPPET,
-  UPDATE_SNIPPET,
-  CREATE_CONNECTION,
-  DELETE_CONNECTION,
   COMBINE_SNIPPET_CONNECTIONS,
+  CREATE_CONNECTION,
+  CREATE_SNIPPET,
+  DELETE_CONNECTION,
   GENERATE_SNIPPET_IMAGE,
-  GENERATE_SNIPPET_VIDEO
+  GENERATE_SNIPPET_VIDEO,
+  UPDATE_SNIPPET
 } from '../../../graphql/mutations'
 import { useGraphQLMutation } from '../../../hooks/useGraphQLMutation'
 import { CANVAS_CONSTANTS } from '../../../shared/constants'
-import { mutateWithInvalidate, mutateOptimisticOnly } from '../../../shared/utils/cacheHelpers'
-import { snapToColumn, getColumnIndex, getRelativeColumnX } from '../../../shared/utils/columnLayout'
 import { useModalStore } from '../../../shared/store/modalStore'
 import { useToast } from '../../../shared/store/toastStore'
+import { mutateWithInvalidate, mutateOptimisticOnly } from '../../../shared/utils/cacheHelpers'
+import { getColumnIndex, getRelativeColumnX, snapToColumn } from '../../../shared/utils/columnLayout'
+import type {
+  CombineSnippetConnectionsMutationData,
+  CombineSnippetConnectionsVariables,
+  CreateConnectionMutationData,
+  CreateConnectionVariables,
+  CreateSnippetMutationData,
+  CreateSnippetVariables,
+  DeleteConnectionMutationData,
+  DeleteConnectionVariables,
+  GenerateSnippetImageMutationData,
+  GenerateSnippetImageVariables,
+  GenerateSnippetVideoMutationData,
+  GenerateSnippetVideoVariables,
+  Snippet,
+  UpdateSnippetMutationData,
+  UpdateSnippetVariables,
+  VideoGenerationInput
+} from '../../../types'
+
 import { useCanvasStore } from '../store/canvasStore'
 import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
 
-import type {
-  Snippet,
-  CreateSnippetVariables,
-  CreateSnippetMutationData,
-  UpdateSnippetVariables,
-  UpdateSnippetMutationData,
-  CreateConnectionVariables,
-  DeleteConnectionVariables,
-  CombineSnippetConnectionsVariables,
-  GenerateSnippetImageVariables,
-  CombineSnippetConnectionsMutationData,
-  GenerateSnippetImageMutationData,
-  GenerateSnippetVideoVariables,
-  GenerateSnippetVideoMutationData,
-  VideoGenerationInput
-} from '../../../types'
+// Custom ReactFlow node data type
+interface SnippetNodeData {
+  snippet: Snippet
+}
 
 type SnippetContentChanges = Partial<Pick<Snippet, 'textField1' | 'title'>>
 
@@ -111,7 +119,7 @@ const getNodeMeasurements = (node: Node | undefined) => {
 export interface UseCanvasHandlersProps {
   projectId: string | undefined
   snippets: Snippet[]
-  setNodes: (nodes: any) => void
+  setNodes: (nodes: Node[] | ((nodes: Node[]) => Node[])) => void
   reactFlowInstance?: MutableRefObject<ReactFlowInstance | null>
 }
 
@@ -137,9 +145,9 @@ export interface UseCanvasHandlersResult {
   handleSaveCanvas: () => void
 
   // Mutations
-  updateSnippetMutation: (options: { variables: any }) => Promise<any>
-  createConnectionMutation: ReturnType<typeof useGraphQLMutation<any, CreateConnectionVariables>>['mutate']
-  deleteConnectionMutation: ReturnType<typeof useGraphQLMutation<any, DeleteConnectionVariables>>['mutate']
+  updateSnippetMutation: (options: { variables: UpdateSnippetVariables }) => Promise<UpdateSnippetMutationData | null>
+  createConnectionMutation: ReturnType<typeof useGraphQLMutation<CreateConnectionMutationData, CreateConnectionVariables>>['mutate']
+  deleteConnectionMutation: ReturnType<typeof useGraphQLMutation<DeleteConnectionMutationData, DeleteConnectionVariables>>['mutate']
 
   // Generated Snippet Handlers
   handleCreateGeneratedSnippet: () => Promise<void>
@@ -194,7 +202,7 @@ export function useCanvasHandlers({
     }
   })
 
-  const { mutate: createConnectionMutation } = useGraphQLMutation<any, CreateConnectionVariables>(CREATE_CONNECTION, {
+  const { mutate: createConnectionMutation } = useGraphQLMutation<CreateConnectionMutationData, CreateConnectionVariables>(CREATE_CONNECTION, {
     onCompleted: () => {
       toast.success('Connection created successfully!')
     },
@@ -204,7 +212,7 @@ export function useCanvasHandlers({
     }
   })
 
-  const { mutate: deleteConnectionMutation } = useGraphQLMutation<any, DeleteConnectionVariables>(DELETE_CONNECTION, {
+  const { mutate: deleteConnectionMutation } = useGraphQLMutation<DeleteConnectionMutationData, DeleteConnectionVariables>(DELETE_CONNECTION, {
     onCompleted: () => {
       toast.success('Connection deleted successfully!')
     },
@@ -426,12 +434,6 @@ export function useCanvasHandlers({
     snippetId: string,
     changes: SnippetContentChanges
   ) => {
-    console.log('[useCanvasHandlers] handleUpdateSnippetContent called:', {
-      snippetId,
-      changes,
-      projectId
-    })
-
     if (!projectId) {
       console.error('Cannot update snippet content: no project ID')
       return
@@ -443,38 +445,22 @@ export function useCanvasHandlers({
       return
     }
 
-    console.log('[useCanvasHandlers] Current snippet state:', {
-      id: snippetBeforeUpdate.id,
-      textField1: snippetBeforeUpdate.textField1
-    })
-
     const updateInput: SnippetContentChanges = {}
     const previousValues: SnippetContentChanges = {}
 
     if (Object.prototype.hasOwnProperty.call(changes, 'textField1')) {
       updateInput.textField1 = changes.textField1 ?? ''
       previousValues.textField1 = snippetBeforeUpdate.textField1
-      console.log('[useCanvasHandlers] textField1 update prepared:', {
-        newValue: updateInput.textField1,
-        oldValue: previousValues.textField1
-      })
     }
 
     if (Object.prototype.hasOwnProperty.call(changes, 'title')) {
       updateInput.title = changes.title ?? ''
       previousValues.title = snippetBeforeUpdate.title
-      console.log('[useCanvasHandlers] title update prepared:', {
-        newValue: updateInput.title,
-        oldValue: previousValues.title
-      })
     }
 
     if (Object.keys(updateInput).length === 0) {
-      console.log('[useCanvasHandlers] No fields to update, returning early')
       return
     }
-
-    console.log('[useCanvasHandlers] Applying optimistic update and calling mutation')
 
     const previousSnippetSnapshot: Snippet = { ...snippetBeforeUpdate }
     const updatedSnippet: Snippet = {
@@ -484,21 +470,23 @@ export function useCanvasHandlers({
     updateRealSnippet(updatedSnippet)
 
     // Optimistic update
-    setNodes((currentNodes: any) =>
-      currentNodes.map((node: any) =>
-        node.id === snippetId
-          ? {
-              ...node,
-              data: {
-                ...node.data,
-                snippet: {
-                  ...node.data.snippet,
-                  ...updateInput
-                }
+    setNodes((currentNodes: Node[]) =>
+      currentNodes.map((node: Node) => {
+        if (node.id === snippetId) {
+          const snippetNode = node as Node<SnippetNodeData>
+          return {
+            ...node,
+            data: {
+              ...snippetNode.data,
+              snippet: {
+                ...snippetNode.data.snippet,
+                ...updateInput
               }
             }
-          : node
-      )
+          }
+        }
+        return node
+      })
     )
 
     try {
@@ -508,37 +496,35 @@ export function useCanvasHandlers({
         input: updateInput
       } as Record<string, unknown> & UpdateSnippetVariables
 
-      console.log('[useCanvasHandlers] Calling updateSnippetMutation with variables:', mutationVariables)
-
       // Use optimistic-only pattern: mutation already shows changes via optimistic update
       // No cache invalidation needed - we only changed existing fields
       // The stale-while-revalidate cache will refresh in background if needed
-      const result = await mutateOptimisticOnly(() =>
+      const _result = await mutateOptimisticOnly(() =>
         updateSnippetMutation({
           variables: mutationVariables
         })
       )
-
-      console.log('[useCanvasHandlers] Mutation completed, result:', result)
     } catch (error) {
       console.error('Failed to update snippet content:', error)
       updateRealSnippet(previousSnippetSnapshot)
       // Rollback optimistic update
-      setNodes((currentNodes: any) =>
-        currentNodes.map((node: any) =>
-          node.id === snippetId
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  snippet: {
-                    ...node.data.snippet,
-                    ...previousValues
-                  }
+      setNodes((currentNodes: Node[]) =>
+        currentNodes.map((node: Node) => {
+          if (node.id === snippetId) {
+            const snippetNode = node as Node<SnippetNodeData>
+            return {
+              ...node,
+              data: {
+                ...snippetNode.data,
+                snippet: {
+                  ...snippetNode.data.snippet,
+                  ...previousValues
                 }
               }
-            : node
-        )
+            }
+          }
+          return node
+        })
       )
       throw error
     }
@@ -570,22 +556,24 @@ export function useCanvasHandlers({
       }
 
       // Update node with combined data
-      setNodes((currentNodes: any) =>
-        currentNodes.map((node: any) =>
-          node.id === snippetId
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  snippet: {
-                    ...node.data.snippet,
-                    textField1: updatedSnippet.textField1,
-                    connectionCount: node.data.snippet.connectionCount
-                  }
+      setNodes((currentNodes: Node[]) =>
+        currentNodes.map((node: Node) => {
+          if (node.id === snippetId) {
+            const snippetNode = node as Node<SnippetNodeData>
+            return {
+              ...node,
+              data: {
+                ...snippetNode.data,
+                snippet: {
+                  ...snippetNode.data.snippet,
+                  textField1: updatedSnippet.textField1,
+                  connectionCount: snippetNode.data.snippet.connectionCount
                 }
               }
-            : node
-        )
+            }
+          }
+          return node
+        })
       )
     } catch (error) {
       console.error('Failed to combine snippet content:', error)
@@ -841,8 +829,6 @@ export function useCanvasHandlers({
         ...(options.movementAmplitude !== undefined && { movementAmplitude: options.movementAmplitude })
       }
 
-      console.log('generateSnippetVideo variables:', JSON.stringify(variables, null, 2))
-
       await mutateWithInvalidate(
         () => generateSnippetVideoMutation({ variables }),
         ['ProjectWithSnippets']
@@ -862,7 +848,7 @@ export function useCanvasHandlers({
     } finally {
       setGeneratingVideo(snippetId, false)
     }
-  }, [generateSnippetVideoMutation, mutateWithInvalidate, projectId, setGeneratingVideo, toast])
+  }, [generateSnippetVideoMutation, projectId, setGeneratingVideo, toast])
 
   const handleCreateUpstreamSnippet = useCallback(async (targetSnippetId: string) => {
     if (!projectId) {
@@ -987,7 +973,6 @@ export function useCanvasHandlers({
     }
   }, [
     projectId,
-    reactFlowInstance,
     addOptimisticSnippet,
     createSnippetMutation,
     replaceOptimisticSnippet,
@@ -1047,9 +1032,9 @@ export function useCanvasHandlers({
       () => createSnippetMutation({ variables }),
       ['ProjectWithSnippets']
     )
-      .then(async (result) => {
+      .then((result) => {
         if (result) {
-          const createdSnippet = (result as any).createSnippet as Snippet
+          const createdSnippet = (result as CreateSnippetMutationData | null)?.createSnippet
           // Replace optimistic snippet with real one from server
           replaceOptimisticSnippet(tempId, createdSnippet)
         }
@@ -1110,9 +1095,9 @@ export function useCanvasHandlers({
       () => createSnippetMutation({ variables }),
       ['ProjectWithSnippets']
     )
-      .then(async (result) => {
+      .then((result) => {
         if (result) {
-          const createdSnippet = (result as any).createSnippet as Snippet
+          const createdSnippet = (result as CreateSnippetMutationData | null)?.createSnippet
           // Replace optimistic snippet with real one from server
           replaceOptimisticSnippet(tempId, createdSnippet)
         }
@@ -1432,8 +1417,8 @@ export function useCanvasHandlers({
       }
 
       // Update ReactFlow selection so downstream subscribers stay in sync
-      setNodes((currentNodes: any[]) =>
-        currentNodes.map((currentNode: any) => {
+      setNodes((currentNodes: Node[]) =>
+        currentNodes.map((currentNode: Node) => {
           const shouldSelect = currentNode.id === snippetId
           if (currentNode.selected === shouldSelect) {
             return currentNode
@@ -1504,7 +1489,7 @@ export function useCanvasHandlers({
     const index = keyNumber - 1
 
     // Get connectedContent from snippet
-    const node = reactFlowInstance.current.getNode(selectedSnippetId)
+    const node = reactFlowInstance.current?.getNode(selectedSnippetId) as Node<SnippetNodeData> | undefined
     const connectedContent = node?.data?.snippet?.connectedContent
 
     if (!connectedContent || connectedContent.length === 0) {
@@ -1517,7 +1502,11 @@ export function useCanvasHandlers({
     }
 
     // Get the target snippet ID
-    const targetSnippetId = connectedContent[index].snippetId
+    const targetSnippetId = connectedContent[index]?.snippetId
+
+    if (!targetSnippetId) {
+      return
+    }
 
     // Navigate to the target snippet (focus handler now updates selection state)
     handleFocusSnippet(targetSnippetId)

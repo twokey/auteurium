@@ -1,4 +1,4 @@
-import { KeyboardEventHandler } from 'react'
+import { type KeyboardEventHandler } from 'react'
 
 interface SnippetTagsSectionProps {
   tags: string[]

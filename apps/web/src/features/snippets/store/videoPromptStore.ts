@@ -22,13 +22,13 @@ interface VideoPromptState {
   combinedPrompt: string;
 
   // Reference images
-  referenceImages: Array<{ url: string; snippetId: string; snippetTitle?: string }>;
+  referenceImages: { url: string; snippetId: string; snippetTitle?: string }[];
 
   // Actions
   setActiveSnippet: (snippetId: string | null) => void;
   updateModelSettings: (settings: Partial<VideoModelSettings>) => void;
   updateCombinedPrompt: (prompt: string) => void;
-  updateReferenceImages: (images: Array<{ url: string; snippetId: string; snippetTitle?: string }>) => void;
+  updateReferenceImages: (images: { url: string; snippetId: string; snippetTitle?: string }[]) => void;
   clearActive: () => void;
 }
 

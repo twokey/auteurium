@@ -1,4 +1,4 @@
-import { UseSnippetGenerationReturn } from '../hooks/useSnippetGeneration'
+import { type UseSnippetGenerationReturn } from '../hooks/useSnippetGeneration'
 
 interface SnippetGenerationPanelProps {
   generation: UseSnippetGenerationReturn

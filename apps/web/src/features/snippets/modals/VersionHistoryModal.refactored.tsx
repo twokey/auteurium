@@ -1,7 +1,8 @@
-import { Modal } from '../../../shared/components/ui/Modal'
 import { Button } from '../../../shared/components/ui/Button'
-import { useSnippetVersions } from '../hooks'
+import { Modal } from '../../../shared/components/ui/Modal'
 import { VersionTimeline } from '../components'
+import { useSnippetVersions } from '../hooks'
+
 import type { Snippet } from '../../../types'
 
 interface VersionHistoryModalProps {

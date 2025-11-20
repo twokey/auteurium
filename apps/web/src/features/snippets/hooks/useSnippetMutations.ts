@@ -1,24 +1,37 @@
 import { useCallback } from 'react'
+
 import { UPDATE_SNIPPET, DELETE_SNIPPET, COMBINE_SNIPPET_CONNECTIONS, GENERATE_SNIPPET_IMAGE } from '../../../graphql/mutations'
 import { useGraphQLMutation } from '../../../hooks/useGraphQLMutation'
 import { useToast } from '../../../shared/store/toastStore'
-import type { Snippet } from '../../../types'
+
+import type {
+  Snippet,
+  UpdateSnippetInput,
+  UpdateSnippetVariables,
+  UpdateSnippetMutationData,
+  DeleteSnippetVariables,
+  DeleteSnippetMutationData,
+  CombineSnippetConnectionsVariables,
+  CombineSnippetConnectionsMutationData,
+  GenerateSnippetImageVariables,
+  GenerateSnippetImageMutationData
+} from '../../../types'
 
 export interface UseSnippetMutationsReturn {
   // Update
-  updateSnippet: (projectId: string, snippetId: string, input: Record<string, any>) => Promise<Snippet | null>
-  
+  updateSnippet: (projectId: string, snippetId: string, input: UpdateSnippetInput) => Promise<Snippet | null>
+
   // Delete
   deleteSnippet: (projectId: string, snippetId: string) => Promise<boolean>
-  
+
   // Combine
   combineSnippets: (projectId: string, snippetId: string) => Promise<Snippet | null>
-  
+
   // Image generation
   generateImage: (projectId: string, snippetId: string) => Promise<Snippet | null>
-  
+
   // Batch save (title + fields)
-  saveSnippet: (projectId: string, snippetId: string, input: Record<string, any>) => Promise<Snippet | null>
+  saveSnippet: (projectId: string, snippetId: string, input: UpdateSnippetInput) => Promise<Snippet | null>
 }
 
 /**
@@ -28,14 +41,14 @@ export interface UseSnippetMutationsReturn {
 export const useSnippetMutations = (): UseSnippetMutationsReturn => {
   const toast = useToast()
 
-  const { mutate: updateMutation } = useGraphQLMutation(UPDATE_SNIPPET)
-  const { mutate: deleteMutation } = useGraphQLMutation(DELETE_SNIPPET)
-  const { mutate: combineMutation } = useGraphQLMutation(COMBINE_SNIPPET_CONNECTIONS)
-  const { mutate: generateImageMutation } = useGraphQLMutation(GENERATE_SNIPPET_IMAGE)
+  const { mutate: updateMutation } = useGraphQLMutation<UpdateSnippetMutationData, UpdateSnippetVariables>(UPDATE_SNIPPET)
+  const { mutate: deleteMutation } = useGraphQLMutation<DeleteSnippetMutationData, DeleteSnippetVariables>(DELETE_SNIPPET)
+  const { mutate: combineMutation } = useGraphQLMutation<CombineSnippetConnectionsMutationData, CombineSnippetConnectionsVariables>(COMBINE_SNIPPET_CONNECTIONS)
+  const { mutate: generateImageMutation } = useGraphQLMutation<GenerateSnippetImageMutationData, GenerateSnippetImageVariables>(GENERATE_SNIPPET_IMAGE)
 
   // Update snippet
   const updateSnippet = useCallback(
-    async (projectId: string, snippetId: string, input: Record<string, any>) => {
+    async (projectId: string, snippetId: string, input: UpdateSnippetInput) => {
       try {
         const result = await updateMutation({
           variables: {
@@ -44,7 +57,7 @@ export const useSnippetMutations = (): UseSnippetMutationsReturn => {
             input
           }
         })
-        return (result as any)?.updateSnippet || null
+        return result?.updateSnippet ?? null
       } catch (error) {
         console.error('Failed to update snippet:', error)
         toast.error('Failed to save snippet', error instanceof Error ? error.message : 'Unknown error')
@@ -65,7 +78,7 @@ export const useSnippetMutations = (): UseSnippetMutationsReturn => {
           }
         })
         toast.success('Snippet deleted successfully')
-        return (result as any)?.deleteSnippet || false
+        return result?.deleteSnippet ?? false
       } catch (error) {
         console.error('Failed to delete snippet:', error)
         toast.error('Failed to delete snippet', error instanceof Error ? error.message : 'Unknown error')
@@ -86,7 +99,7 @@ export const useSnippetMutations = (): UseSnippetMutationsReturn => {
           }
         })
         toast.success('Successfully combined connected snippets!')
-        return (result as any)?.combineSnippetConnections || null
+        return result?.combineSnippetConnections ?? null
       } catch (error) {
         console.error('Failed to combine snippets:', error)
         toast.error('Failed to combine', error instanceof Error ? error.message : 'Unknown error')
@@ -107,7 +120,7 @@ export const useSnippetMutations = (): UseSnippetMutationsReturn => {
           }
         })
         toast.success('Image generated successfully!')
-        return (result as any)?.generateSnippetImage || null
+        return result?.generateSnippetImage ?? null
       } catch (error) {
         console.error('Failed to generate image:', error)
         toast.error('Failed to generate image', error instanceof Error ? error.message : 'Unknown error')
@@ -119,7 +132,7 @@ export const useSnippetMutations = (): UseSnippetMutationsReturn => {
 
   // Batch save (shorthand for update + toast)
   const saveSnippet = useCallback(
-    async (projectId: string, snippetId: string, input: Record<string, any>) => {
+    async (projectId: string, snippetId: string, input: UpdateSnippetInput) => {
       const result = await updateSnippet(projectId, snippetId, input)
       if (result) {
         toast.success('Changes saved successfully')

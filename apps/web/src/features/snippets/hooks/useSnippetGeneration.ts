@@ -1,10 +1,11 @@
 import React, { useState, useRef, useCallback } from 'react'
+
 import { useGenAI } from '../../../hooks/useGenAI'
 import { useToast } from '../../../shared/store/toastStore'
 
 export interface UseSnippetGenerationReturn {
   // Models
-  models: Array<{ id: string; displayName: string; description?: string | null }>
+  models: { id: string; displayName: string; description?: string | null }[]
   isLoadingModels: boolean
   modelsError: Error | null
   

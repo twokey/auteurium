@@ -3,8 +3,8 @@
  * Centralizes all modal rendering for the canvas
  */
 
-import { DeleteSnippetConfirmation } from '../../../components/modals/DeleteSnippetConfirmation'
 import { DeleteMultipleSnippetsConfirmation } from '../../../components/modals/DeleteMultipleSnippetsConfirmation'
+import { DeleteSnippetConfirmation } from '../../../components/modals/DeleteSnippetConfirmation'
 import { EditSnippetModal } from '../../../components/modals/EditSnippetModal'
 import { GeneratedSnippetPreviewModal } from '../../../components/modals/GeneratedSnippetPreviewModal'
 import { ManageConnectionsModal } from '../../../components/modals/ManageConnectionsModal'
@@ -76,7 +76,7 @@ export const CanvasModals = ({
           isOpen={true}
           onClose={closeDeleteSnippet}
           snippet={currentDeleteSnippet}
-          onDeleted={refetch}
+          onDeleted={() => void refetch()}
         />
       )}
 
@@ -87,7 +87,7 @@ export const CanvasModals = ({
           onClose={closeDeleteMultipleSnippets}
           snippets={deleteMultipleSnippets.snippets}
           projectId={deleteMultipleSnippets.projectId ?? ''}
-          onDeleted={refetch}
+          onDeleted={() => void refetch()}
         />
       )}
 

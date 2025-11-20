@@ -53,7 +53,7 @@ export const SnippetFormFields = ({
             ref={textField1Ref}
             value={formState.textField1}
             onChange={(e) => onTextField1Change(e.target.value)}
-            onBlur={(e) => onFieldBlur('textField1', e.target.value)}
+            onBlur={(e) => void onFieldBlur('textField1', e.target.value)}
             className="w-full px-3 py-2 border border-blue-500 rounded-md focus:outline-none resize-none"
             rows={4}
             disabled={isDisabled || savingField === 'textField1'}
@@ -61,6 +61,12 @@ export const SnippetFormFields = ({
         ) : (
           <div
             onClick={() => onFieldActivate('textField1')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onFieldActivate('textField1')
+              }
+            }}
             role="button"
             tabIndex={0}
             className="w-full px-3 py-2 bg-gray-100 rounded-md cursor-pointer hover:bg-gray-200 min-h-[100px] text-sm text-gray-700"

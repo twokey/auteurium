@@ -1,12 +1,13 @@
 import { memo, useState, useRef, useCallback, useEffect } from 'react'
 import { Handle, Position } from 'reactflow'
-import { Accordion } from '../../shared/components/ui/Accordion'
+
 import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisticUpdatesStore'
-import { useToast } from '../../shared/store/toastStore'
 import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
-import { useVideoPromptStore } from '../../features/snippets/store/videoPromptStore'
-import { VIDEO_GENERATION } from '../../shared/constants'
 import { StarMenu } from '../../features/snippets/components/StarMenu'
+import { useVideoPromptStore } from '../../features/snippets/store/videoPromptStore'
+import { Accordion } from '../../shared/components/ui/Accordion'
+import { VIDEO_GENERATION } from '../../shared/constants'
+import { useToast } from '../../shared/store/toastStore'
 
 import type { AvailableModel, ConnectedContentItem, VideoGenerationInput, VideoMetadata, VideoGenerationStatus } from '../../types'
 
@@ -261,7 +262,7 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
     const imageRefs = referenceImages.map((img) => ({
       url: img.value,
       snippetId: img.snippetId,
-      snippetTitle: img.snippetTitle || undefined
+      snippetTitle: img.snippetTitle ?? undefined
     }))
     updateReferenceImages(imageRefs)
   }, [snippet.id, setActiveSnippet, combineFormFieldsToPrompt, updateCombinedPrompt, referenceImages, updateReferenceImages])
@@ -342,6 +343,14 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
         data-testid="video-snippet-node"
         data-snippet-id={snippet.id}
         onClick={handleSnippetClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            handleSnippetClick()
+          }
+        }}
+        role="button"
+        tabIndex={0}
       >
         {/* Header with Editable Title */}
         <div className="flex items-center justify-between mb-5">
@@ -709,7 +718,7 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
                     type="button"
                     className="inline-flex items-center rounded border border-red-300 bg-white px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={isGeneratingVideo}
-                    onClick={async (event) => {
+                    onClick={(event) => {
                       event.stopPropagation()
                       const fallbackModel = selectedVideoModel || videoModels[0]?.id || VIDEO_GENERATION.DEFAULT_MODEL
                       const retryRequest = lastRequestRef.current ?? {
@@ -721,13 +730,15 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
                         movementAmplitude: VIDEO_GENERATION.DEFAULT_MOVEMENT_AMPLITUDE
                       }
                       lastRequestRef.current = retryRequest
-                      try {
-                        await onGenerateVideo(snippet.id, retryRequest)
-                        toast.success('Retry started', 'Video generation retry has been queued.')
-                      } catch (retryError) {
-                        console.error('Failed to retry video generation:', retryError)
-                        toast.error('Retry failed', retryError instanceof Error ? retryError.message : 'Unknown error')
-                      }
+                      void (async () => {
+                        try {
+                          await onGenerateVideo(snippet.id, retryRequest)
+                          toast.success('Retry started', 'Video generation retry has been queued.')
+                        } catch (retryError) {
+                          console.error('Failed to retry video generation:', retryError)
+                          toast.error('Retry failed', retryError instanceof Error ? retryError.message : 'Unknown error')
+                        }
+                      })()
                     }}
                   >
                     Retry
@@ -751,7 +762,10 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
               src={snippet.videoUrl}
               controls
               playsInline
-            />
+              muted
+            >
+              <track kind="captions" />
+            </video>
             {snippet.videoMetadata && (
               <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-700">
                 <div>

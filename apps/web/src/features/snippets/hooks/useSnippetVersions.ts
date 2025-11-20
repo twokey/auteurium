@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react'
+
 import { useGraphQLQuery } from '../../../hooks/useGraphQLQuery'
 import { useToast } from '../../../shared/store/toastStore'
+
 import type { SnippetVersion } from '../../../types'
 
 export interface UseSnippetVersionsReturn {
@@ -34,7 +36,7 @@ export const useSnippetVersions = (snippetId: string): UseSnippetVersionsReturn 
 
   // Handle version revert
   const revertVersion = useCallback(
-    async (_projectId: string, _snippetId: string, _version: number) => {
+    (_projectId: string, _snippetId: string, _version: number) => {
       setIsReverting(true)
       try {
         // Note: You'll need to implement REVERT_SNIPPET_VERSION mutation in graphql/mutations.ts
@@ -61,7 +63,7 @@ export const useSnippetVersions = (snippetId: string): UseSnippetVersionsReturn 
   return {
     versions: data?.snippetVersions ?? [],
     isLoading: loading,
-    error: error as Error | null,
+    error: error,
     revertVersion,
     isReverting
   }

@@ -3,30 +3,43 @@
  * Manages ReactFlow configuration, viewport, and node/edge updates
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { addEdge, useEdgesState, useNodesState } from 'reactflow'
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import {
+  addEdge,
+  useEdgesState,
+  useNodesState,
+  type OnNodesChange,
+  type OnEdgesChange,
+  type ReactFlowInstance,
+  type Connection,
+  type Node,
+  type Edge
+} from 'reactflow'
 
+import { UPDATE_SNIPPET_POSITIONS } from '../../../graphql/mutations'
+import { getClient } from '../../../services/graphql'
+import { CANVAS_CONSTANTS } from '../../../shared/constants'
 import { useDebouncedCallback } from '../../../shared/hooks/useDebounce'
 import { mutateWithInvalidate } from '../../../shared/utils/cacheHelpers'
 import { snapPositionToColumn } from '../../../shared/utils/columnLayout'
-import { UPDATE_SNIPPET_POSITIONS } from '../../../graphql/mutations'
-import { CANVAS_CONSTANTS } from '../../../shared/constants'
-import { getClient } from '../../../services/graphql'
+import { useCanvasKeyboardShortcut } from '../context/canvasKeyboard'
 import { useCanvasStore } from '../store/canvasStore'
 import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
 import { usePendingPositionsStore } from '../store/pendingPositionsStore'
-import { useCanvasKeyboardShortcut } from '../context/canvasKeyboard'
 
 import type {
   Snippet,
   SnippetNodeData,
   UseGraphQLMutationResult,
   CreateConnectionVariables,
+  CreateConnectionMutationData,
   DeleteConnectionVariables,
+  DeleteConnectionMutationData,
   UpdateSnippetPositionsMutationData,
-  UpdateSnippetPositionsVariables
+  UpdateSnippetPositionsVariables,
+  UpdateSnippetMutationData,
+  UpdateSnippetVariables
 } from '../../../types'
-import type { ReactFlowInstance, Connection, Node, Edge } from 'reactflow'
 
 interface ConnectionEdgeData {
   connectionId?: string
@@ -36,13 +49,13 @@ const BULK_POSITION_CHUNK_SIZE = 20 // Conservative chunk size to stay well belo
 const BULK_POSITION_SUPPORT_STORAGE_KEY = 'canvas-bulk-position-mutation-supported-v2'
 const BULK_POSITION_SUPPORT_RETRY_MS = 30 * 60 * 1000 // Retry bulk detection every 30 minutes
 
-type GraphQLClient = {
+interface GraphQLClient {
   graphql: <TData = unknown, TVariables = Record<string, unknown>>(input: {
     query: string
     variables?: TVariables
   }) => Promise<{
     data?: TData | null
-    errors?: Array<{ message?: string }>
+    errors?: { message?: string }[]
   }>
 }
 
@@ -121,20 +134,20 @@ const haveEdgesChanged = (
 export interface UseReactFlowSetupProps {
   projectId: string | undefined
   flowNodes: Node<SnippetNodeData>[]
-  flowEdges: any[]
+  flowEdges: Edge<ConnectionEdgeData>[]
   snippets: Snippet[]
-  updateSnippetMutation: any
-  createConnectionMutation: UseGraphQLMutationResult<any, CreateConnectionVariables>['mutate']
-  deleteConnectionMutation: UseGraphQLMutationResult<any, DeleteConnectionVariables>['mutate']
+  updateSnippetMutation: UseGraphQLMutationResult<UpdateSnippetMutationData, UpdateSnippetVariables>['mutate']
+  createConnectionMutation: UseGraphQLMutationResult<CreateConnectionMutationData, CreateConnectionVariables>['mutate']
+  deleteConnectionMutation: UseGraphQLMutationResult<DeleteConnectionMutationData, DeleteConnectionVariables>['mutate']
 }
 
 export interface UseReactFlowSetupResult {
   nodes: Node<SnippetNodeData>[]
-  edges: any[]
-  setNodes: any
-  setEdges: any
-  onNodesChange: any
-  onEdgesChange: any
+  edges: Edge<ConnectionEdgeData>[]
+  setNodes: Dispatch<SetStateAction<Node<SnippetNodeData>[]>>
+  setEdges: Dispatch<SetStateAction<Edge<ConnectionEdgeData>[]>>
+  onNodesChange: OnNodesChange
+  onEdgesChange: OnEdgesChange
   onConnect: (params: Connection) => void
   onInit: (instance: ReactFlowInstance) => void
   onNodeDragStop: (_event: React.MouseEvent, node: Node) => void
@@ -193,7 +206,7 @@ export function useReactFlowSetup({
         }
       }
     } catch (error) {
-      console.debug('[useReactFlowSetup] Failed to read bulk position support flag from storage.', error)
+      console.warn('[useReactFlowSetup] Failed to read bulk position support flag from storage.', error)
     }
   }, [allowBulkPositionMutation])
 
@@ -244,11 +257,11 @@ export function useReactFlowSetup({
       return
     }
 
-    const preparedUpdates = snippetIds.reduce<Array<{
+    const preparedUpdates = snippetIds.reduce<{
       snippetId: string
       position: { x: number; y: number }
       fallbackSnippet?: Snippet
-    }>>((acc, snippetId) => {
+    }[]>((acc, snippetId) => {
       const position = pendingPositions[snippetId]
       if (!position) {
         return acc
@@ -336,7 +349,7 @@ export function useReactFlowSetup({
                 JSON.stringify({ status: 'unsupported', updatedAt: Date.now() })
               )
             } catch (error) {
-              console.debug('[useReactFlowSetup] Failed to persist bulk position support flag.', error)
+              console.warn('[useReactFlowSetup] Failed to persist bulk position support flag.', error)
             }
           }
         }
@@ -350,7 +363,7 @@ export function useReactFlowSetup({
               JSON.stringify({ status: 'supported', updatedAt: Date.now() })
             )
           } catch (error) {
-            console.debug('[useReactFlowSetup] Failed to persist bulk position support flag.', error)
+            console.warn('[useReactFlowSetup] Failed to persist bulk position support flag.', error)
           }
         }
 
@@ -514,8 +527,8 @@ export function useReactFlowSetup({
     (params: Connection) => {
       if (!projectId || !params.source || !params.target) return
 
-      const sourceSnippetId = params.source!
-      const targetSnippetId = params.target!
+      const sourceSnippetId = params.source
+      const targetSnippetId = params.target
 
       // Generate temporary ID for optimistic connection
       const tempId = `temp-conn-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`

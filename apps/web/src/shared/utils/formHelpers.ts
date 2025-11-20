@@ -33,7 +33,7 @@ export const FormValidation = {
   /**
    * Validate required field
    */
-  required: (value: any): string | null => {
+  required: (value: unknown): string | null => {
     if (!value || (typeof value === 'string' && !value.trim())) {
       return 'This field is required'
     }
@@ -61,11 +61,11 @@ export const FormSerialization = {
   /**
    * Trim all string fields in an object
    */
-  trimAll: <T extends Record<string, any>>(data: T): T => {
+  trimAll: <T extends Record<string, unknown>>(data: T): T => {
     const trimmed = {} as T
     for (const [key, value] of Object.entries(data)) {
       trimmed[key as keyof T] =
-        typeof value === 'string' ? (value.trim() as any) : value
+        (typeof value === 'string' ? value.trim() : value) as T[keyof T]
     }
     return trimmed
   },
@@ -73,11 +73,11 @@ export const FormSerialization = {
   /**
    * Remove empty fields from an object
    */
-  removeEmpty: <T extends Record<string, any>>(data: T): Partial<T> => {
+  removeEmpty: <T extends Record<string, unknown>>(data: T): Partial<T> => {
     const result = {} as Partial<T>
     for (const [key, value] of Object.entries(data)) {
       if (value !== '' && value !== null && value !== undefined) {
-        result[key as keyof T] = value
+        result[key as keyof T] = value as T[keyof T]
       }
     }
     return result
@@ -86,17 +86,20 @@ export const FormSerialization = {
   /**
    * Convert form data to FormData object for multipart uploads
    */
-  toFormData: (data: Record<string, any>): FormData => {
+  toFormData: (data: Record<string, unknown>): FormData => {
     const formData = new FormData()
     for (const [key, value] of Object.entries(data)) {
       if (value instanceof File) {
         formData.append(key, value)
       } else if (Array.isArray(value)) {
-        value.forEach((item, index) => {
-          formData.append(`${key}[${index}]`, item)
+        value.forEach((item: unknown, index) => {
+          formData.append(`${key}[${index}]`, String(item))
         })
       } else if (value !== null && value !== undefined) {
-        formData.append(key, String(value))
+        // Only append primitive values, skip objects
+        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+          formData.append(key, String(value))
+        }
       }
     }
     return formData
@@ -105,10 +108,10 @@ export const FormSerialization = {
   /**
    * Parse form data back from FormData object
    */
-  fromFormData: <T extends Record<string, any>>(formData: FormData): Partial<T> => {
+  fromFormData: <T extends Record<string, unknown>>(formData: FormData): Partial<T> => {
     const result: Partial<T> = {}
     formData.forEach((value, key) => {
-      result[key as keyof T] = value as any
+      result[key as keyof T] = value as T[keyof T]
     })
     return result
   }
@@ -122,30 +125,48 @@ export const ErrorMapping = {
   /**
    * Map GraphQL errors to user-friendly messages
    */
-  mapGraphQLError: (error: any): string => {
-    if (error.graphQLErrors && error.graphQLErrors.length > 0) {
-      return error.graphQLErrors[0].message
+  mapGraphQLError: (error: unknown): string => {
+    if (error && typeof error === 'object') {
+      if ('graphQLErrors' in error && Array.isArray(error.graphQLErrors) && error.graphQLErrors.length > 0) {
+        const firstError = error.graphQLErrors[0] as unknown
+        if (firstError && typeof firstError === 'object' && 'message' in firstError && typeof firstError.message === 'string') {
+          return firstError.message
+        }
+      }
+      if ('message' in error && typeof error.message === 'string') {
+        return error.message
+      }
     }
-    if (error.message) return error.message
     return 'An error occurred'
   },
 
   /**
    * Extract validation errors from API response
    */
-  extractValidationErrors: (error: any): Record<string, string> => {
+  extractValidationErrors: (error: unknown): Record<string, string> => {
     const errors: Record<string, string> = {}
 
-    if (error.graphQLErrors) {
-      error.graphQLErrors.forEach((gqlError: any) => {
-        if (gqlError.extensions?.validationErrors) {
-          Object.assign(errors, gqlError.extensions.validationErrors)
-        }
-      })
-    }
+    if (error && typeof error === 'object') {
+      if ('graphQLErrors' in error && Array.isArray(error.graphQLErrors)) {
+        error.graphQLErrors.forEach((gqlError: unknown) => {
+          if (
+            gqlError &&
+            typeof gqlError === 'object' &&
+            'extensions' in gqlError &&
+            gqlError.extensions &&
+            typeof gqlError.extensions === 'object' &&
+            'validationErrors' in gqlError.extensions &&
+            gqlError.extensions.validationErrors &&
+            typeof gqlError.extensions.validationErrors === 'object'
+          ) {
+            Object.assign(errors, gqlError.extensions.validationErrors)
+          }
+        })
+      }
 
-    if (error.fieldErrors) {
-      Object.assign(errors, error.fieldErrors)
+      if ('fieldErrors' in error && error.fieldErrors && typeof error.fieldErrors === 'object') {
+        Object.assign(errors, error.fieldErrors)
+      }
     }
 
     return errors
@@ -154,26 +175,51 @@ export const ErrorMapping = {
   /**
    * Check if error is validation error
    */
-  isValidationError: (error: any): boolean => {
-    return (
-      error.graphQLErrors?.some((e: any) => e.extensions?.validationErrors) ||
-      !!error.fieldErrors
-    )
+  isValidationError: (error: unknown): boolean => {
+    if (error && typeof error === 'object') {
+      if ('graphQLErrors' in error && Array.isArray(error.graphQLErrors)) {
+        return error.graphQLErrors.some((e: unknown) => {
+          return (
+            e &&
+            typeof e === 'object' &&
+            'extensions' in e &&
+            e.extensions &&
+            typeof e.extensions === 'object' &&
+            'validationErrors' in e.extensions
+          )
+        })
+      }
+      if ('fieldErrors' in error && error.fieldErrors) {
+        return true
+      }
+    }
+    return false
   },
 
   /**
    * Check if error is auth error
    */
-  isAuthError: (error: any): boolean => {
-    const message = error.message?.toLowerCase() || ''
-    return message.includes('unauthorized') || message.includes('not authenticated')
+  isAuthError: (error: unknown): boolean => {
+    if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
+      const message = error.message.toLowerCase()
+      return message.includes('unauthorized') || message.includes('not authenticated')
+    }
+    return false
   },
 
   /**
    * Check if error is network error
    */
-  isNetworkError: (error: any): boolean => {
-    return error.networkError !== undefined || error.message?.includes('network')
+  isNetworkError: (error: unknown): boolean => {
+    if (error && typeof error === 'object') {
+      if ('networkError' in error) {
+        return true
+      }
+      if ('message' in error && typeof error.message === 'string' && error.message.includes('network')) {
+        return true
+      }
+    }
+    return false
   }
 }
 
@@ -185,11 +231,11 @@ export const FormFields = {
   /**
    * Get field value safely
    */
-  getFieldValue: <T extends Record<string, any>>(
+  getFieldValue: <T extends Record<string, unknown>>(
     data: T,
     field: keyof T,
-    defaultValue: any = ''
-  ): any => {
+    defaultValue: unknown = ''
+  ): unknown => {
     return data?.[field] ?? defaultValue
   },
 
@@ -224,7 +270,7 @@ export const FormState = {
   /**
    * Check if form has changes
    */
-  hasChanges: <T extends Record<string, any>>(
+  hasChanges: <T extends Record<string, unknown>>(
     original: T,
     current: T
   ): boolean => {
@@ -234,7 +280,7 @@ export const FormState = {
   /**
    * Get changed fields
    */
-  getChanges: <T extends Record<string, any>>(
+  getChanges: <T extends Record<string, unknown>>(
     original: T,
     current: T
   ): Partial<T> => {
@@ -250,7 +296,7 @@ export const FormState = {
   /**
    * Check if form is pristine (unchanged from original)
    */
-  isPristine: <T extends Record<string, any>>(
+  isPristine: <T extends Record<string, unknown>>(
     original: T,
     current: T
   ): boolean => {

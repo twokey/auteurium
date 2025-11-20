@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+
 import type { Snippet } from '../../../types'
 
 type EditableField = 'textField1'
@@ -165,7 +166,7 @@ export const useSnippetForm = (
   }, [activeField, savingField, focusField])
 
   // Handle field blur with autosave
-  const handleFieldBlur = useCallback(async (field: EditableField) => {
+  const handleFieldBlur = useCallback((field: EditableField) => {
     setActiveField(current => (current === field ? null : current))
 
     const currentValue = formState.textField1
@@ -176,16 +177,18 @@ export const useSnippetForm = (
     }
 
     setSavingField(field)
-    try {
-      await onFieldSave(field, currentValue)
-      lastSavedValuesRef.current[field] = currentValue
-    } catch (error) {
-      console.error('Failed to save field:', error)
-      // Revert to last saved value
-      setTextField1(lastSavedValue)
-    } finally {
-      setSavingField(null)
-    }
+    void (async () => {
+      try {
+        await onFieldSave(field, currentValue)
+        lastSavedValuesRef.current[field] = currentValue
+      } catch (error) {
+        console.error('Failed to save field:', error)
+        // Revert to last saved value
+        setTextField1(lastSavedValue)
+      } finally {
+        setSavingField(null)
+      }
+    })()
   }, [formState.textField1, onFieldSave, setTextField1])
 
   return {

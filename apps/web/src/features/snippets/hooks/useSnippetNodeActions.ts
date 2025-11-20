@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react'
+
 import { useToast } from '../../../shared/store/toastStore'
+
 import type { EditableField } from '../../../types'
 
 export interface UseSnippetNodeActionsReturn {

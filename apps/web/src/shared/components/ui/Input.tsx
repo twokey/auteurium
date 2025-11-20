@@ -14,7 +14,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   ref?: React.Ref<HTMLInputElement>
 }
 
-export function Input({
+export const Input = ({
   label,
   error,
   helperText,
@@ -22,7 +22,7 @@ export function Input({
   className = '',
   ref,
   ...props
-}: InputProps) {
+}: InputProps) => {
   const widthClass = fullWidth ? 'w-full' : ''
   const errorClass = error ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
 

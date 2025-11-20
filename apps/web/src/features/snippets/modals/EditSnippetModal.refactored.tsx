@@ -1,6 +1,7 @@
-import { Modal } from '../../../shared/components/ui/Modal'
 import { Button } from '../../../shared/components/ui/Button'
+import { Modal } from '../../../shared/components/ui/Modal'
 import { useSnippetForm, useSnippetMutations } from '../hooks'
+
 import type { Snippet } from '../../../types'
 
 interface EditSnippetModalProps {
@@ -57,8 +58,11 @@ export const EditSnippetModal = ({
       {/* Body */}
       <div className="max-h-[60vh] overflow-y-auto space-y-4 p-6">
         <div>
-          <label className="block text-sm text-gray-700 mb-2">Title</label>
+          <label htmlFor="snippet-title" className="block text-sm text-gray-700 mb-2">
+            Title
+          </label>
           <input
+            id="snippet-title"
             type="text"
             value={form.formState.title}
             onChange={(e) => form.setTitle(e.target.value)}
@@ -67,8 +71,11 @@ export const EditSnippetModal = ({
         </div>
 
         <div>
-          <label className="block text-sm text-gray-700 mb-2">Content</label>
+          <label htmlFor="snippet-content" className="block text-sm text-gray-700 mb-2">
+            Content
+          </label>
           <textarea
+            id="snippet-content"
             ref={form.textField1Ref}
             value={form.formState.textField1}
             onChange={(e) => form.setTextField1(e.target.value)}
@@ -83,7 +90,7 @@ export const EditSnippetModal = ({
         <Button variant="secondary" onClick={onClose}>
           Cancel
         </Button>
-        <Button variant="primary" onClick={handleSave}>
+        <Button variant="primary" onClick={() => void handleSave()}>
           Save Changes
         </Button>
       </Modal.Footer>

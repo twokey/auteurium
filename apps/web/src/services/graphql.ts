@@ -18,7 +18,7 @@ export const getClient = () => {
 }
 
 // Error handler utility for logging GraphQL errors
-export const logGraphQLErrors = (errors: Array<{ message: string; locations?: unknown; path?: unknown }>) => {
+export const logGraphQLErrors = (errors: { message: string; locations?: unknown; path?: unknown }[]) => {
   errors.forEach((error) => {
     const formattedLocations = error.locations
       ? JSON.stringify(error.locations)

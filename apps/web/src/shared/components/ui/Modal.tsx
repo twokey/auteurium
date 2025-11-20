@@ -4,6 +4,7 @@
  */
 
 import { type ReactNode, useEffect } from 'react'
+
 import { useKeyPress } from '../../hooks/useKeyPress'
 
 interface ModalProps {
@@ -52,9 +53,17 @@ export const Modal = ({ isOpen, onClose, children, size = 'md' }: ModalProps) =>
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-      <div 
-        className="fixed inset-0" 
+      <div
+        className="fixed inset-0"
         onClick={onClose}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onClose()
+          }
+        }}
+        role="button"
+        tabIndex={0}
         aria-label="Close modal"
       />
       <div 
@@ -68,7 +77,7 @@ export const Modal = ({ isOpen, onClose, children, size = 'md' }: ModalProps) =>
   )
 }
 
-Modal.Header = function ModalHeader({ children }: ModalHeaderProps) {
+Modal.Header = ({ children }: ModalHeaderProps) => {
   return (
     <div className="px-6 py-4 border-b border-gray-200">
       {children}
@@ -76,7 +85,7 @@ Modal.Header = function ModalHeader({ children }: ModalHeaderProps) {
   )
 }
 
-Modal.Body = function ModalBody({ children }: ModalBodyProps) {
+Modal.Body = ({ children }: ModalBodyProps) => {
   return (
     <div className="px-6 py-4 overflow-y-auto flex-1">
       {children}
@@ -84,7 +93,7 @@ Modal.Body = function ModalBody({ children }: ModalBodyProps) {
   )
 }
 
-Modal.Footer = function ModalFooter({ children }: ModalFooterProps) {
+Modal.Footer = ({ children }: ModalFooterProps) => {
   return (
     <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3">
       {children}

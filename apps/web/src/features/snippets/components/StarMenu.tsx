@@ -5,8 +5,10 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
-import { useGraphQLQueryWithCache } from '../../../shared/hooks/useGraphQLQueryWithCache'
+
 import { GET_PROJECT_WITH_SNIPPETS } from '../../../graphql/queries'
+import { useGraphQLQueryWithCache } from '../../../shared/hooks/useGraphQLQueryWithCache'
+
 import type { ProjectWithSnippetsQueryData, Snippet } from '../../../types'
 
 interface StarMenuProps {
@@ -35,7 +37,7 @@ export const StarMenu = ({ fieldType, onSelect }: StarMenuProps) => {
   // Filter snippets by tag matching fieldType
   const matchingSnippets: Snippet[] = data?.project?.snippets
     ? data.project.snippets.filter((snippet) =>
-        snippet.tags && snippet.tags.includes(fieldType)
+        snippet.tags?.includes(fieldType)
       )
     : []
 

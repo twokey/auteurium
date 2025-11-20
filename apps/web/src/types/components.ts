@@ -146,7 +146,7 @@ export interface SnippetNodeData {
       aspectRatio: string
     } | null
     connectedContent?: ConnectedContentItem[]
-    downstreamConnections?: Array<{ id: string; title?: string }>
+    downstreamConnections?: { id: string; title?: string }[]
     snippetType?: 'text' | 'video'
     videoUrl?: string | null
     videoS3Key?: string | null
@@ -177,7 +177,7 @@ export interface SnippetNodeData {
     onCreateUpstreamSnippet: (snippetId: string) => Promise<void> | void
     isGeneratingImage: boolean
     isGeneratingVideo: boolean
-    connectedSnippets?: Array<{ id: string; imageS3Key?: string | null }>
+    connectedSnippets?: { id: string; imageS3Key?: string | null }[]
 }
 
 export interface SnippetNodeProps {

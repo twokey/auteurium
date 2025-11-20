@@ -20,7 +20,7 @@ export const Navigation = ({ currentProject }: NavigationProps) => {
   const handleSignOut = async () => {
     try {
       await signOut()
-      navigate('/')
+      void navigate('/')
     } catch (error) {
       console.error('Error signing out:', error)
     }
@@ -38,7 +38,7 @@ export const Navigation = ({ currentProject }: NavigationProps) => {
           {/* Left side - Logo and navigation */}
           <div className="flex items-center">
             <button
-              onClick={() => navigate('/')}
+              onClick={() => void navigate('/')}
               className="flex items-center text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors"
             >
               Auteurium
@@ -49,7 +49,7 @@ export const Navigation = ({ currentProject }: NavigationProps) => {
               <div className="ml-6 flex items-center text-gray-500">
                 <span className="mx-2">/</span>
                 <button
-                  onClick={() => navigate('/')}
+                  onClick={() => void navigate('/')}
                   className="text-blue-600 hover:text-blue-800 transition-colors"
                 >
                   Dashboard
@@ -101,7 +101,7 @@ export const Navigation = ({ currentProject }: NavigationProps) => {
                   
                   <button
                     onClick={() => {
-                      navigate('/')
+                      void navigate('/')
                       setShowUserMenu(false)
                     }}
                     className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -112,7 +112,7 @@ export const Navigation = ({ currentProject }: NavigationProps) => {
                   {user?.role === UserRole.ADMIN && (
                     <button
                       onClick={() => {
-                        navigate('/admin')
+                        void navigate('/admin')
                         setShowUserMenu(false)
                       }}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
