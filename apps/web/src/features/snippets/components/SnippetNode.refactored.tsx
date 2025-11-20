@@ -66,7 +66,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
   )
 
   // Display title
-  const displayTitle = snippet.title || 'Snippet'
+  const displayTitle = snippet.title ?? 'Snippet'
 
   return (
     <>
@@ -120,7 +120,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
           onDelete={() => actions.handleDelete(() => onDelete(snippet.id))}
           onManageConnections={() => onManageConnections(snippet.id)}
           onViewVersions={() => onViewVersions(snippet.id)}
-          onCombine={() => actions.handleCombine(async () => { await onCombine(snippet.id) })}
+          onCombine={() => { void actions.handleCombine(async () => { await onCombine(snippet.id) }) }}
           onGenerateImage={() =>
             actions.handleGenerateImage(() => onGenerateImage(snippet.id))
           }
@@ -129,7 +129,7 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
         />
 
         {/* Tags/Categories */}
-        {(snippet.tags?.length || 0) > 0 && (
+        {(snippet.tags?.length ?? 0) > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
             {snippet.tags?.map((tag) => (
               <span key={tag} className="px-1.5 py-0.5 text-[10px] bg-indigo-100 text-indigo-800 rounded">

@@ -4,9 +4,8 @@
  */
 
 import { useCallback, useRef } from 'react'
-import type { MutableRefObject } from 'react'
-import type { Node, ReactFlowInstance } from 'reactflow'
 
+import { CANVAS_CONSTANTS } from '../../../constants'
 import {
   COMBINE_SNIPPET_CONNECTIONS,
   CREATE_CONNECTION,
@@ -17,11 +16,13 @@ import {
   UPDATE_SNIPPET
 } from '../../../graphql/mutations'
 import { useGraphQLMutation } from '../../../hooks/useGraphQLMutation'
-import { CANVAS_CONSTANTS } from '../../../constants'
 import { useModalStore } from '../../../store/modalStore'
 import { useToast } from '../../../store/toastStore'
 import { mutateWithInvalidate, mutateOptimisticOnly } from '../../../utils/cacheHelpers'
 import { getColumnIndex, getRelativeColumnX, snapToColumn } from '../../../utils/columnLayout'
+import { useCanvasStore } from '../store/canvasStore'
+import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
+
 import type {
   CombineSnippetConnectionsMutationData,
   CombineSnippetConnectionsVariables,
@@ -40,9 +41,8 @@ import type {
   UpdateSnippetVariables,
   VideoGenerationInput
 } from '../../../types'
-
-import { useCanvasStore } from '../store/canvasStore'
-import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
+import type { MutableRefObject } from 'react'
+import type { Node, ReactFlowInstance } from 'reactflow'
 
 // Custom ReactFlow node data type
 interface SnippetNodeData {

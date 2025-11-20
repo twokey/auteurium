@@ -33,7 +33,7 @@ const sizeStyles = {
   xl: 'max-w-4xl'
 }
 
-export const Modal = ({ isOpen, onClose, children, size = 'md' }: ModalProps) => {
+const ModalMain = ({ isOpen, onClose, children, size = 'md' }: ModalProps) => {
   // Close on Escape key
   useKeyPress('Escape', onClose, { preventDefault: false })
 
@@ -72,29 +72,40 @@ export const Modal = ({ isOpen, onClose, children, size = 'md' }: ModalProps) =>
   )
 }
 
-Modal.Header = ({ children }: ModalHeaderProps) => {
+ModalMain.displayName = 'Modal'
+
+const ModalHeader = ({ children }: ModalHeaderProps) => {
   return (
     <div className="px-6 py-4 border-b border-surface-100">
       {children}
     </div>
   )
 }
+ModalHeader.displayName = 'ModalHeader'
 
-Modal.Body = ({ children }: ModalBodyProps) => {
+const ModalBody = ({ children }: ModalBodyProps) => {
   return (
     <div className="px-6 py-4 overflow-y-auto flex-1">
       {children}
     </div>
   )
 }
+ModalBody.displayName = 'ModalBody'
 
-Modal.Footer = ({ children }: ModalFooterProps) => {
+const ModalFooter = ({ children }: ModalFooterProps) => {
   return (
     <div className="px-6 py-4 border-t border-surface-100 flex items-center justify-end gap-3 bg-surface-50/50 rounded-b-xl">
       {children}
     </div>
   )
 }
+ModalFooter.displayName = 'ModalFooter'
+
+export const Modal = Object.assign(ModalMain, {
+  Header: ModalHeader,
+  Body: ModalBody,
+  Footer: ModalFooter
+})
 
 
 

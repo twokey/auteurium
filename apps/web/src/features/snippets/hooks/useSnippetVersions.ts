@@ -36,7 +36,7 @@ export const useSnippetVersions = (snippetId: string): UseSnippetVersionsReturn 
 
   // Handle version revert
   const revertVersion = useCallback(
-    async (_projectId: string, _snippetId: string, _version: number): Promise<boolean> => {
+    (_projectId: string, _snippetId: string, _version: number): Promise<boolean> => {
       setIsReverting(true)
       try {
         // Note: You'll need to implement REVERT_SNIPPET_VERSION mutation in graphql/mutations.ts
@@ -44,15 +44,15 @@ export const useSnippetVersions = (snippetId: string): UseSnippetVersionsReturn 
         const confirmed = window.confirm(
           'Are you sure you want to revert to this version? This action cannot be undone.'
         )
-        if (!confirmed) return false
+        if (!confirmed) return Promise.resolve(false)
 
         // Call mutation here once implemented
         toast.success('Reverted to previous version')
-        return true
+        return Promise.resolve(true)
       } catch (error) {
         console.error('Failed to revert version:', error)
         toast.error('Failed to revert', error instanceof Error ? error.message : 'Unknown error')
-        return false
+        return Promise.resolve(false)
       } finally {
         setIsReverting(false)
       }

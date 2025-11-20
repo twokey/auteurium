@@ -1,12 +1,12 @@
 import { memo, useState, useRef, useCallback, useEffect } from 'react'
 import { Handle, Position } from 'reactflow'
 
+import { Accordion } from '../../components/ui/Accordion'
+import { VIDEO_GENERATION } from '../../constants'
 import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisticUpdatesStore'
 import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
 import { StarMenu } from '../../features/snippets/components/StarMenu'
 import { useVideoPromptStore } from '../../features/snippets/store/videoPromptStore'
-import { Accordion } from '../../components/ui/Accordion'
-import { VIDEO_GENERATION } from '../../constants'
 import { useToast } from '../../store/toastStore'
 
 import type { AvailableModel, ConnectedContentItem, VideoGenerationInput, VideoMetadata, VideoGenerationStatus } from '../../types'

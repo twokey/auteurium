@@ -1,8 +1,9 @@
 import { useCallback, useState } from 'react'
 
 import { getClient } from '../services/graphql'
-import type { GraphQLError, ValidationDetail } from '../types/graphql'
 import { isGraphQLError } from '../types/graphql'
+
+import type { GraphQLError, ValidationDetail } from '../types/graphql'
 
 const getOperationName = (graphQLDocument: string): string => {
   const match = /\b(mutation|query|subscription)\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(graphQLDocument)
@@ -38,17 +39,22 @@ export const useGraphQLMutation = <TData = unknown, TVariables = Record<string, 
       setError(null)
 
       try {
-        const startedAt = performance.now()
+        // const startedAt = performance.now()
 
-        console.info('[GraphQL Mutation] request', {
-          operation: operationName,
-          variables: mutationOptions.variables
-        })
+        // console.info('[GraphQL Mutation] request', {
+        //   operation: operationName,
+        //   variables: mutationOptions.variables
+        // })
 
-        const result = await getClient().graphql({
+        // Define minimal client interface to avoid unsafe call on any
+        const client = getClient() as {
+          graphql: (options: { query: string; variables?: Record<string, unknown> }) => Promise<unknown>
+        }
+
+        const result = (await client.graphql({
           query: mutation,
           variables: mutationOptions.variables as Record<string, unknown>
-        })
+        })) as { data?: TData; errors?: GraphQLError[] }
 
         // Check if result has errors property (GraphQLResult vs GraphqlSubscriptionResult)
         if ('errors' in result && result.errors && result.errors.length > 0) {
@@ -64,11 +70,11 @@ export const useGraphQLMutation = <TData = unknown, TVariables = Record<string, 
           onCompleted(mutationData)
         }
 
-        const durationMs = Math.round((performance.now() - startedAt) * 100) / 100
-        console.info('[GraphQL Mutation] success', {
-          operation: operationName,
-          durationMs
-        })
+        // const durationMs = Math.round((performance.now() - startedAt) * 100) / 100
+        // console.info('[GraphQL Mutation] success', {
+        //   operation: operationName,
+        //   durationMs
+        // })
 
         return mutationData
       } catch (err: unknown) {
@@ -92,14 +98,14 @@ export const useGraphQLMutation = <TData = unknown, TVariables = Record<string, 
               .map((detail) => `${detail.field}: ${detail.message}`)
               .join(', ')
           } else {
-            errorMessage = errors.map((e) => e.message || String(e)).join(', ')
+            errorMessage = errors.map((e) => e.message || JSON.stringify(e)).join(', ')
           }
         } else if (err && typeof err === 'object' && 'message' in err) {
           errorMessage = String(err.message)
         } else if (err && typeof err === 'object') {
           errorMessage = JSON.stringify(err)
         } else if (err) {
-          errorMessage = String(err)
+          errorMessage = JSON.stringify(err)
         }
 
         const errorObj = new Error(errorMessage)

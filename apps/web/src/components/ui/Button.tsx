@@ -47,7 +47,7 @@ export const Button = ({
   return (
     <button
       className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${widthStyles} ${className}`}
-      disabled={disabled || isLoading}
+      disabled={(disabled === true) || isLoading}
       {...props}
     >
       {isLoading && (

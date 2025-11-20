@@ -20,7 +20,7 @@ const paddingStyles = {
   lg: 'p-6'
 }
 
-export const Card = ({
+const CardMain = ({
   children,
   className = '',
   padding = 'md',
@@ -53,13 +53,15 @@ export const Card = ({
   )
 }
 
+CardMain.displayName = 'Card'
+
 interface CardHeaderProps {
   title: string
   description?: string
   action?: ReactNode
 }
 
-Card.Header = ({ title, description, action }: CardHeaderProps) => {
+const CardHeader = ({ title, description, action }: CardHeaderProps) => {
   return (
     <div className="flex items-start justify-between mb-4">
       <div>
@@ -72,6 +74,10 @@ Card.Header = ({ title, description, action }: CardHeaderProps) => {
     </div>
   )
 }
+
+CardHeader.displayName = 'CardHeader'
+
+export const Card = Object.assign(CardMain, { Header: CardHeader })
 
 
 
