@@ -604,22 +604,13 @@ export function useCanvasHandlers({
       const baseX = snippet.position?.x ?? 0
       const baseY = snippet.position?.y ?? 0
 
-      let sourceNodeHeight: number = CANVAS_CONSTANTS.ESTIMATED_SNIPPET_HEIGHT
-      if (reactFlowInstance?.current && typeof reactFlowInstance.current.getNode === 'function') {
-        try {
-          const sourceNode = reactFlowInstance.current.getNode(snippetId)
-          const { height } = getNodeMeasurements(sourceNode)
-          if (typeof height === 'number') {
-            sourceNodeHeight = height
-          }
-        } catch (error) {
-          console.error('Failed to get node dimensions:', error)
-        }
-      }
+      // Calculate target column (one to the right)
+      const sourceColumnIndex = getColumnIndex(baseX)
+      const targetX = getRelativeColumnX(sourceColumnIndex, 1)
 
       const targetPosition = {
-        x: snapToColumn(baseX),
-        y: baseY + sourceNodeHeight + CANVAS_CONSTANTS.GENERATED_SNIPPET_SPACING
+        x: targetX,
+        y: baseY
       }
 
       const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
@@ -869,9 +860,36 @@ export function useCanvasHandlers({
     const targetColumnIndex = getColumnIndex(baseX)
     const newColumnX = getRelativeColumnX(targetColumnIndex, -1)
 
+    // Find snippets in the target column to stack below
+    const columnSnippets = snippetsRef.current.filter(s =>
+      Math.abs((s.position?.x ?? 0) - newColumnX) < 10 // Allow small float diffs
+    )
+
+    let targetY = baseY
+
+    if (columnSnippets.length > 0) {
+      // Find the lowest point
+      const lowestSnippet = columnSnippets.reduce((prev, current) => {
+        const prevY = prev.position?.y ?? 0
+        const currentY = current.position?.y ?? 0
+        return prevY > currentY ? prev : current
+      })
+
+      // Get height from ReactFlow if available, otherwise use estimate
+      let height: number = CANVAS_CONSTANTS.ESTIMATED_SNIPPET_HEIGHT
+      if (reactFlowInstance?.current) {
+        const node = reactFlowInstance.current.getNode(lowestSnippet.id)
+        if (node && node.height) {
+          height = node.height
+        }
+      }
+
+      targetY = (lowestSnippet.position?.y ?? 0) + height + 5 // 5px gap
+    }
+
     const targetPosition = {
       x: newColumnX,
-      y: baseY
+      y: targetY
     }
 
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
@@ -1181,9 +1199,13 @@ export function useCanvasHandlers({
     const sourceSnippet = snippetsRef.current.find(s => s.id === sourceSnippetId)
     const baseX = sourceSnippet?.position?.x ?? 0
     const baseY = sourceSnippet?.position?.y ?? 0
+    // Calculate target column (one to the right)
+    const sourceColumnIndex = getColumnIndex(baseX)
+    const targetX = getRelativeColumnX(sourceColumnIndex, 1)
+
     const targetPosition = {
-      x: baseX,
-      y: baseY + CANVAS_CONSTANTS.GENERATED_SNIPPET_VERTICAL_OFFSET
+      x: targetX,
+      y: baseY
     }
 
     // Generate temporary ID for optimistic update
@@ -1318,25 +1340,13 @@ export function useCanvasHandlers({
     const baseX = sourceSnippet?.position?.x ?? 0
     const baseY = sourceSnippet?.position?.y ?? 0
 
-    // Try to get actual node height from React Flow, fallback to estimated height
-    let sourceNodeHeight: number = CANVAS_CONSTANTS.ESTIMATED_SNIPPET_HEIGHT
-    if (reactFlowInstance?.current && typeof reactFlowInstance.current.getNode === 'function') {
-      try {
-        const sourceNode = reactFlowInstance.current.getNode(sourceSnippetId)
-        const { height } = getNodeMeasurements(sourceNode)
-        if (typeof height === 'number') {
-          sourceNodeHeight = height
-        }
-      } catch (error) {
-        // If getting node fails, use estimated height
-        console.error('Failed to get node dimensions:', error)
-      }
-    }
+    // Position new snippet to the right of source in the next column
+    const sourceColumnIndex = getColumnIndex(baseX)
+    const targetX = getRelativeColumnX(sourceColumnIndex, 1)
 
-    // Position new snippet below source in the same column
     const targetPosition = {
-      x: snapToColumn(baseX),
-      y: baseY + sourceNodeHeight + CANVAS_CONSTANTS.GENERATED_SNIPPET_SPACING
+      x: targetX,
+      y: baseY
     }
 
     // Generate temporary ID for optimistic update
