@@ -23,6 +23,7 @@ import type {
   ConnectedContentItem,
   AvailableModel,
   VideoGenerationInput,
+  GeneratedVideoSnippetData,
   VideoMetadata
 } from '../../../types'
 import type { Node, Edge } from 'reactflow'
@@ -612,6 +613,7 @@ export function useFlowNodes(
     onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
     onGenerateText: (snippetId: string, content: string) => Promise<void>
     onGenerateVideo: (snippetId: string, options: VideoGenerationInput) => Promise<void>
+    onGenerateVideoSnippetFromJson: (sourceSnippetId: string, data: GeneratedVideoSnippetData) => Promise<void>
     onFocusSnippet: (snippetId: string) => void
     onCreateUpstreamSnippet: (snippetId: string) => Promise<void> | void
   },

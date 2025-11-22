@@ -39,6 +39,7 @@ import type {
   Snippet,
   UpdateSnippetMutationData,
   UpdateSnippetVariables,
+  GeneratedVideoSnippetData,
   VideoGenerationInput
 } from '../../../types'
 import type { MutableRefObject } from 'react'
@@ -152,6 +153,7 @@ export interface UseCanvasHandlersResult {
   // Generated Snippet Handlers
   handleCreateGeneratedSnippet: () => Promise<void>
   handleGenerateTextSnippet: (sourceSnippetId: string, generatedContent: string) => Promise<void>
+  handleGenerateVideoSnippetFromJson: (sourceSnippetId: string, data: GeneratedVideoSnippetData) => Promise<void>
 }
 
 export function useCanvasHandlers({
@@ -1461,6 +1463,162 @@ export function useCanvasHandlers({
     reactFlowInstance
   ])
 
+  const handleGenerateVideoSnippetFromJson = useCallback(async (sourceSnippetId: string, generatedData: GeneratedVideoSnippetData) => {
+    if (!projectId) {
+      console.error('Cannot create generated video snippet: no project ID')
+      return
+    }
+
+    const sourceSnippet = snippetsRef.current.find(s => s.id === sourceSnippetId)
+    const baseX = sourceSnippet?.position?.x ?? 0
+    const baseY = sourceSnippet?.position?.y ?? 0
+
+    // Position new snippet to the right of source in the next column
+    const sourceColumnIndex = getColumnIndex(baseX)
+    const targetX = getRelativeColumnX(sourceColumnIndex, 1)
+
+    const targetPosition = {
+      x: targetX,
+      y: baseY
+    }
+
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+    const now = new Date().toISOString()
+    const resolvedTitle = generatedData.title?.trim() || 'Generated video snippet'
+    const resolvedText = generatedData.textField1?.trim() ?? ''
+    const resolvedTags = generatedData.tags ?? []
+    const resolvedCategories = generatedData.categories ?? []
+
+    const buildTextFromFields = (): string | undefined => {
+      const parts: string[] = []
+      const push = (label: string, value?: string) => {
+        if (value && value.trim() !== '') {
+          parts.push(`${label}: ${value.trim()}`)
+        }
+      }
+      push('Subject', generatedData.subject)
+      push('Action', generatedData.action)
+      push('Camera & Motion', generatedData.cameraMotion)
+      push('Composition', generatedData.composition)
+      push('Focus & Lens', generatedData.focusLens)
+      push('Style', generatedData.style)
+      push('Ambiance', generatedData.ambiance)
+      push('Dialogue', generatedData.dialogue)
+      push('Sound Effects', generatedData.soundEffects)
+      push('Ambient Noise', generatedData.ambientNoise)
+      if (parts.length === 0) {
+        return undefined
+      }
+      return parts.join('\n')
+    }
+
+    const combinedText = resolvedText || buildTextFromFields() || ''
+
+    addOptimisticSnippet({
+      id: tempId,
+      projectId,
+      title: resolvedTitle,
+      textField1: combinedText,
+      position: targetPosition,
+      tags: resolvedTags,
+      categories: resolvedCategories,
+      connections: [],
+      createdAt: now,
+      updatedAt: now,
+      version: 1,
+      isOptimistic: true,
+      snippetType: 'video'
+    })
+
+    try {
+      const creationResult = await mutateWithInvalidate(
+        () =>
+          createSnippetMutation({
+            variables: {
+              input: {
+                projectId,
+                title: resolvedTitle,
+                textField1: combinedText,
+                position: targetPosition,
+                tags: resolvedTags,
+                categories: resolvedCategories,
+                snippetType: 'video',
+                createdFrom: sourceSnippetId
+              }
+            }
+          }),
+        ['ProjectWithSnippets']
+      )
+
+      const createdSnippet = creationResult?.createSnippet
+      if (!createdSnippet) {
+        throw new Error('Failed to create video snippet: missing ID in response')
+      }
+
+      const newSnippetId = createdSnippet.id
+      replaceOptimisticSnippet(tempId, createdSnippet)
+
+      const optimisticConnectionId = `temp-conn-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+      const connectionTimestamp = new Date().toISOString()
+
+      addOptimisticConnection({
+        id: optimisticConnectionId,
+        projectId,
+        sourceSnippetId,
+        targetSnippetId: newSnippetId,
+        label: '',
+        createdAt: connectionTimestamp,
+        updatedAt: connectionTimestamp,
+        isOptimistic: true
+      })
+
+      try {
+        const connectionResult = await mutateWithInvalidate(
+          () =>
+            createConnectionMutation({
+              variables: {
+                input: {
+                  projectId,
+                  sourceSnippetId,
+                  targetSnippetId: newSnippetId,
+                  label: ''
+                }
+              }
+            }),
+          ['ProjectConnections']
+        )
+
+        const createdConnection = connectionResult?.createConnection
+        if (createdConnection) {
+          replaceOptimisticConnection(optimisticConnectionId, createdConnection)
+        } else {
+          console.warn('createConnection mutation returned no data; optimistic connection will remain until refresh')
+        }
+      } catch (connectionError) {
+        console.error('Failed to connect generated video snippet:', connectionError)
+        removeOptimisticConnection(optimisticConnectionId)
+        toast.error('Failed to connect new video snippet', connectionError instanceof Error ? connectionError.message : 'Unknown error')
+      }
+
+      toast.success('Generated video snippet created successfully!')
+    } catch (error) {
+      console.error('Failed to create generated video snippet:', error)
+      removeOptimisticSnippet(tempId)
+      toast.error('Failed to create video snippet', error instanceof Error ? error.message : 'Unknown error')
+    }
+  }, [
+    projectId,
+    createSnippetMutation,
+    createConnectionMutation,
+    addOptimisticSnippet,
+    replaceOptimisticSnippet,
+    removeOptimisticSnippet,
+    addOptimisticConnection,
+    replaceOptimisticConnection,
+    removeOptimisticConnection,
+    toast
+  ])
+
   // Focus on a snippet: center and zoom to make it take ~80% of viewport height
   const handleFocusSnippet = useCallback((snippetId: string) => {
     if (!reactFlowInstance?.current || typeof reactFlowInstance.current.getNode !== 'function') {
@@ -1600,6 +1758,7 @@ export function useCanvasHandlers({
 
     // Generated Snippet Handlers
     handleCreateGeneratedSnippet,
-    handleGenerateTextSnippet
+    handleGenerateTextSnippet,
+    handleGenerateVideoSnippetFromJson
   }
 }

@@ -92,6 +92,23 @@ export interface CanvasInfoPanelProps {
   className?: string
 }
 
+export interface GeneratedVideoSnippetData {
+  title?: string
+  textField1?: string
+  tags?: string[]
+  categories?: string[]
+  subject?: string
+  action?: string
+  cameraMotion?: string
+  composition?: string
+  focusLens?: string
+  style?: string
+  ambiance?: string
+  dialogue?: string
+  soundEffects?: string
+  ambientNoise?: string
+}
+
 // Snippet Node Types
 export type EditableField = 'textField1'
 
@@ -169,15 +186,16 @@ export interface SnippetNodeData {
   onManageConnections: (snippetId: string) => void
   onViewVersions: (snippetId: string) => void
   onUpdateContent: (snippetId: string, changes: Partial<Pick<Snippet, 'textField1' | 'title'>>) => Promise<void>
-    onCombine: (snippetId: string) => Promise<void>
-    onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
-    onGenerateText: (snippetId: string, content: string) => Promise<void>
-    onGenerateVideo: (snippetId: string, options: VideoGenerationInput) => Promise<void> | void
-    onFocusSnippet: (snippetId: string) => void
-    onCreateUpstreamSnippet: (snippetId: string) => Promise<void> | void
-    isGeneratingImage: boolean
-    isGeneratingVideo: boolean
-    connectedSnippets?: { id: string; imageS3Key?: string | null }[]
+  onCombine: (snippetId: string) => Promise<void>
+  onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
+  onGenerateText: (snippetId: string, content: string) => Promise<void>
+  onGenerateVideo: (snippetId: string, options: VideoGenerationInput) => Promise<void> | void
+  onGenerateVideoSnippetFromJson: (sourceSnippetId: string, data: GeneratedVideoSnippetData) => Promise<void>
+  onFocusSnippet: (snippetId: string) => void
+  onCreateUpstreamSnippet: (snippetId: string) => Promise<void> | void
+  isGeneratingImage: boolean
+  isGeneratingVideo: boolean
+  connectedSnippets?: { id: string; imageS3Key?: string | null }[]
 }
 
 export interface SnippetNodeProps {

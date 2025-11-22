@@ -10,7 +10,7 @@ import { useGenAI } from '../../hooks/useGenAI'
 import { useToast } from '../../store/toastStore'
 import { countWords, truncateToWords } from '../../utils/textUtils'
 
-import type { AvailableModel, ConnectedContentItem, VideoGenerationInput } from '../../types'
+import type { AvailableModel, ConnectedContentItem, GeneratedVideoSnippetData, VideoGenerationInput } from '../../types'
 
 interface SnippetNodeProps {
   id: string
@@ -54,6 +54,7 @@ interface SnippetNodeProps {
     onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
     onGenerateText: (snippetId: string, content: string) => Promise<void>
     onGenerateVideo: (snippetId: string, options: VideoGenerationInput) => Promise<void> | void
+    onGenerateVideoSnippetFromJson: (snippetId: string, data: GeneratedVideoSnippetData) => Promise<void>
     onFocusSnippet: (snippetId: string) => void
     onCreateUpstreamSnippet: (snippetId: string) => Promise<void> | void
     isGeneratingImage: boolean
@@ -89,6 +90,210 @@ const getVideoReferenceLimit = (modelId: string): number => {
   return 3
 }
 
+const stripMarkdownFence = (content: string): string => {
+  const trimmed = content.trim()
+  if (!trimmed.startsWith('```')) {
+    return trimmed
+  }
+
+  const lines = trimmed.split('\n')
+  lines.shift()
+  if (lines.length > 0 && lines[lines.length - 1].trim().startsWith('```')) {
+    lines.pop()
+  }
+
+  return lines.join('\n').trim()
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+
+const safeString = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+  const trimmed = value.trim()
+  return trimmed === '' ? undefined : trimmed
+}
+
+const safeStringArray = (value: unknown): string[] | undefined => {
+  if (!Array.isArray(value)) {
+    return undefined
+  }
+
+  const cleaned = value
+    .map((entry) => safeString(entry))
+    .filter((entry): entry is string => Boolean(entry))
+
+  return cleaned.length > 0 ? cleaned : undefined
+}
+
+const parseJsonWithRecovery = (rawContent: string): unknown => {
+  const cleaned = stripMarkdownFence(rawContent)
+
+  try {
+    return JSON.parse(cleaned)
+  } catch (error) {
+    const lastBrace = cleaned.lastIndexOf('}')
+    const lastBracket = cleaned.lastIndexOf(']')
+    const cutPos = Math.max(lastBrace, lastBracket)
+
+    if (cutPos === -1) {
+      throw error
+    }
+
+    const truncated = cleaned.slice(0, cutPos + 1)
+    return JSON.parse(truncated)
+  }
+}
+
+const normalizeVideoSnippetPayload = (parsed: unknown): Record<string, unknown> => {
+  if (Array.isArray(parsed)) {
+    const firstRecord = parsed.find(isRecord)
+    if (firstRecord) {
+      return firstRecord as Record<string, unknown>
+    }
+  }
+
+  if (isRecord(parsed)) {
+    const candidateSources: unknown[] = [
+      parsed.videoSnippet,
+      parsed.video_snippet,
+      parsed.snippet,
+      parsed.video,
+      parsed.videoSnippets,
+      parsed.video_snippets,
+      parsed.snippets
+    ]
+
+    for (const candidate of candidateSources) {
+      if (isRecord(candidate)) {
+        return candidate as Record<string, unknown>
+      }
+      if (Array.isArray(candidate)) {
+        const nestedRecord = candidate.find(isRecord)
+        if (nestedRecord) {
+          return nestedRecord as Record<string, unknown>
+        }
+      }
+    }
+
+    return parsed as Record<string, unknown>
+  }
+
+  throw new Error('Model response did not include a video snippet payload')
+}
+
+const parseLabeledValue = (source: string, labels: string[]): string | undefined => {
+  for (const label of labels) {
+    const regex = new RegExp(`${label}\\s*:\\s*([^\\n]+)`, 'i')
+    const match = source.match(regex)
+    if (match?.[1]) {
+      const value = match[1].trim()
+      if (value) {
+        return value
+      }
+    }
+  }
+  return undefined
+}
+
+const parseVideoSnippetContent = (content: string): GeneratedVideoSnippetData => {
+  let parsed: unknown
+
+  try {
+    parsed = parseJsonWithRecovery(content)
+  } catch (error) {
+    const parseError = new Error('Model response was not valid JSON for a video snippet')
+    Object.assign(parseError, { cause: error })
+    throw parseError
+  }
+
+  const payload = normalizeVideoSnippetPayload(parsed)
+
+  const directSubject = safeString(payload.subject)
+  const directAction = safeString(payload.action)
+  const directStyle = safeString(payload.style)
+  const directCameraMotion = safeString(payload.cameraMotion ?? payload.camera_positioning_and_motion)
+  const directComposition = safeString(payload.composition)
+  const directFocusLens = safeString(payload.focusLens ?? payload.focus_and_lens_effects)
+  const directAmbiance = safeString(payload.ambiance ?? payload.ambience)
+  const directDialogue = safeString(payload.dialogue)
+  const directSfx = safeString(payload.soundEffects ?? payload.sound_effects)
+  const directAmbientNoise = safeString(payload.ambientNoise ?? payload.ambient_noise)
+
+  let sceneTitle: string | undefined
+  let sceneContent: string | undefined
+  if (Array.isArray(payload.scenes) && payload.scenes.length > 0) {
+    const firstScene = payload.scenes.find(isRecord) as Record<string, unknown> | undefined
+    if (firstScene) {
+      sceneTitle = safeString(firstScene.title)
+      sceneContent = safeString(firstScene.content)
+    }
+  }
+
+  const combinedContent = safeString(payload.content) ?? sceneContent ?? safeString(payload.textField1 ?? payload.prompt ?? payload.description)
+
+  const parsedSubject = parseLabeledValue(combinedContent ?? '', ['Subject'])
+  const parsedAction = parseLabeledValue(combinedContent ?? '', ['Action'])
+  const parsedStyle = parseLabeledValue(combinedContent ?? '', ['Style'])
+  const parsedCameraMotion = parseLabeledValue(combinedContent ?? '', ['Camera positioning and motion', 'Camera & Motion'])
+  const parsedComposition = parseLabeledValue(combinedContent ?? '', ['Composition'])
+  const parsedFocusLens = parseLabeledValue(combinedContent ?? '', ['Focus and lens effects', 'Focus & Lens'])
+  const parsedAmbiance = parseLabeledValue(combinedContent ?? '', ['Ambiance', 'Ambience'])
+  const parsedDialogue = parseLabeledValue(combinedContent ?? '', ['Dialogue'])
+  const parsedSfx = parseLabeledValue(combinedContent ?? '', ['Sound Effects', 'Sound Effects (SFX)', 'Sound'])
+  const parsedAmbientNoise = parseLabeledValue(combinedContent ?? '', ['Ambient Noise'])
+
+  const title = safeString(payload.title ?? payload.name ?? sceneTitle)
+  const textField1 = combinedContent
+  const tags = safeStringArray(payload.tags)
+  const categories = safeStringArray(payload.categories)
+
+  return {
+    ...(title ? { title } : {}),
+    ...(textField1 ? { textField1 } : {}),
+    ...(tags ? { tags } : {}),
+    ...(categories ? { categories } : {}),
+    subject: directSubject ?? parsedSubject ?? undefined,
+    action: directAction ?? parsedAction ?? undefined,
+    style: directStyle ?? parsedStyle ?? undefined,
+    cameraMotion: directCameraMotion ?? parsedCameraMotion ?? undefined,
+    composition: directComposition ?? parsedComposition ?? undefined,
+    focusLens: directFocusLens ?? parsedFocusLens ?? undefined,
+    ambiance: directAmbiance ?? parsedAmbiance ?? undefined,
+    dialogue: directDialogue ?? parsedDialogue ?? undefined,
+    soundEffects: directSfx ?? parsedSfx ?? undefined,
+    ambientNoise: directAmbientNoise ?? parsedAmbientNoise ?? undefined
+  }
+}
+
+const buildVideoSnippetText = (data: GeneratedVideoSnippetData): string => {
+  const parts: string[] = []
+  const push = (label: string, value?: string) => {
+    if (value && value.trim() !== '') {
+      parts.push(`${label}: ${value.trim()}`)
+    }
+  }
+  push('Subject', data.subject)
+  push('Action', data.action)
+  push('Camera & Motion', data.cameraMotion)
+  push('Composition', data.composition)
+  push('Focus & Lens', data.focusLens)
+  push('Style', data.style)
+  push('Ambiance', data.ambiance)
+  push('Dialogue', data.dialogue)
+  push('Sound Effects', data.soundEffects)
+  push('Ambient Noise', data.ambientNoise)
+  if (parts.length === 0 && data.textField1) {
+    return data.textField1
+  }
+  if (data.textField1 && parts.length > 0) {
+    parts.push(`Notes: ${data.textField1}`)
+  }
+  return parts.join('\n')
+}
+
 export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
   // Call all hooks before any conditional returns (Rules of Hooks)
   const toast = useToast()
@@ -104,6 +309,7 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
     onGenerateImage,
     onGenerateText,
     onGenerateVideo,
+    onGenerateVideoSnippetFromJson,
     onFocusSnippet,
     onCreateUpstreamSnippet,
     isGeneratingImage,
@@ -139,8 +345,10 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
   const [selectedImageModel, setSelectedImageModel] = useState<string>('')
   const [selectedVideoModel, setSelectedVideoModel] = useState<string>('')
   const [selectedSceneModel, setSelectedSceneModel] = useState<string>('')
+  const [selectedVideoSnippetModel, setSelectedVideoSnippetModel] = useState<string>('')
   const [isGeneratingText, setIsGeneratingText] = useState(false)
   const [isGeneratingScenes, setIsGeneratingScenes] = useState(false)
+  const [isGeneratingVideoSnippet, setIsGeneratingVideoSnippet] = useState(false)
   const [isGenerateExpanded, setIsGenerateExpanded] = useState(false)
 
   const connectedImageReferences = connectedContent.filter((item) => item.type === 'image')
@@ -183,6 +391,12 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
       setSelectedTextModel(textModels[0].id)
     }
   }, [textModels, selectedTextModel])
+
+  useEffect(() => {
+    if (textModels.length > 0 && selectedVideoSnippetModel === '') {
+      setSelectedVideoSnippetModel(textModels[0].id)
+    }
+  }, [textModels, selectedVideoSnippetModel])
 
   // Auto-select first image model when models load
   useEffect(() => {
@@ -589,6 +803,99 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
       setIsGeneratingScenes(false)
     }
   }, [selectedSceneModel, projectId, createScenes, snippet.id, toast])
+
+  const runVideoSnippetJsonGeneration = useCallback(async (rawPrompt: string) => {
+    const trimmedPrompt = rawPrompt.trim()
+
+    if (trimmedPrompt === '') {
+      toast.warning('Please provide prompt content before generating a video snippet')
+      const handledError = new Error('Missing prompt content')
+      Object.assign(handledError, { handled: true })
+      throw handledError
+    }
+
+    if (!selectedVideoSnippetModel || selectedVideoSnippetModel === '') {
+      toast.warning('Please select a model')
+      const handledError = new Error('Missing model selection')
+      Object.assign(handledError, { handled: true })
+      throw handledError
+    }
+
+    if (!projectId) {
+      toast.error('Cannot generate video snippet: missing project ID')
+      const handledError = new Error('Missing project identifier')
+      Object.assign(handledError, { handled: true })
+      throw handledError
+    }
+
+    setIsGeneratingVideoSnippet(true)
+
+    try {
+      const { result, fallbackReason } = await generateStream(
+        projectId,
+        snippet.id,
+        selectedVideoSnippetModel,
+        trimmedPrompt
+      )
+
+      if (!result?.content || result.content.trim() === '') {
+        toast.warning(
+          'The selected model did not return any content',
+          'Please try again or choose another model'
+        )
+        const handledError = new Error('Empty generation result')
+        Object.assign(handledError, { handled: true })
+        throw handledError
+      }
+
+      const debugPayload = {
+        snippetId: snippet.id,
+        modelId: selectedVideoSnippetModel,
+        contentPreview: result.content.slice(0, 1000),
+        contentLength: result.content.length,
+        fallbackReason
+      }
+
+      console.info('[VideoSnippetGeneration] Raw model response', debugPayload)
+      if (typeof window !== 'undefined') {
+        // Helpful for inspection if console output is filtered/minified
+        ;(window as unknown as { __AUTEURIUM_LAST_VIDEO_SNIPPET_RESPONSE?: unknown }).__AUTEURIUM_LAST_VIDEO_SNIPPET_RESPONSE = {
+          ...debugPayload,
+          fullContent: result.content
+        }
+      }
+
+      const parsedData = parseVideoSnippetContent(result.content)
+      const payload: GeneratedVideoSnippetData = {
+        ...parsedData
+      }
+
+      const composedText = buildVideoSnippetText({
+        ...parsedData,
+        textField1: parsedData.textField1 ?? trimmedPrompt
+      })
+      payload.textField1 = composedText
+
+      await onGenerateVideoSnippetFromJson(snippet.id, payload)
+
+      if (fallbackReason) {
+        toast.info('Generation completed with fallback', fallbackReason)
+      }
+    } catch (error) {
+      console.error('=== Video Snippet Generation Error ===')
+      console.error('Error:', error)
+      if (!(error instanceof Error && 'handled' in error && (error as { handled?: boolean }).handled)) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        toast.error('Failed to generate video snippet', message)
+        if (error instanceof Error) {
+          Object.assign(error, { handled: true })
+        }
+      }
+      throw error
+    } finally {
+      setIsGeneratingVideoSnippet(false)
+    }
+  }, [selectedVideoSnippetModel, projectId, generateStream, snippet.id, onGenerateVideoSnippetFromJson, toast])
 
   // Route to VideoSnippetNode if this is a video snippet
   if (data.snippet.snippetType === 'video') {
@@ -1201,6 +1508,84 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
                   }
                 >
                   {isGeneratingVideo ? (
+                    <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+
+              {/* Video Snippet Generation Row */}
+              <div className="flex gap-2">
+                <select
+                  value={selectedVideoSnippetModel}
+                  onChange={(e) => {
+                    e.stopPropagation()
+                    setSelectedVideoSnippetModel(e.target.value)
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex-1 text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  disabled={savingField !== null}
+                  style={POINTER_EVENTS_STYLES.interactive}
+                >
+                  <option value="" disabled>
+                    {isLoadingTextModels ? 'Loading models...' : 'Select model...'}
+                  </option>
+                  {textModels.map((model) => (
+                    <option key={model.id} value={model.id} title={model.description ?? undefined}>
+                      {model.displayName}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center p-2 text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    if (event.metaKey || event.ctrlKey) {
+                      event.preventDefault()
+                      return
+                    }
+
+                    openPromptDesigner({
+                      snippetId: snippet.id,
+                      snippetTitle: displayTitle,
+                      mode: 'video',
+                      initialPrompt: snippet.textField1,
+                      connectedContent,
+                      onGenerate: async (finalPrompt) => {
+                        await runVideoSnippetJsonGeneration(finalPrompt)
+                      }
+                    })
+                  }}
+                  disabled={
+                    isGeneratingVideoSnippet ||
+                    isLoadingTextModels ||
+                    (!selectedVideoSnippetModel && textModels.length > 0) ||
+                    savingField !== null
+                  }
+                  style={POINTER_EVENTS_STYLES.interactive}
+                  aria-label="Generate video snippet from model"
+                  title={
+                    isGeneratingVideoSnippet
+                      ? 'Video snippet generation in progress...'
+                      : isLoadingTextModels
+                        ? 'Loading models...'
+                        : !selectedVideoSnippetModel
+                          ? 'Please select a model first'
+                          : 'Generate a new video snippet from model JSON'
+                  }
+                >
+                  {isGeneratingVideoSnippet ? (
                     <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path

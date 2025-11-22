@@ -110,6 +110,20 @@ const POINTER_EVENTS_STYLES = {
   interactive: { pointerEvents: 'auto' as const }
 } as const
 
+const parseLabeledValue = (source: string, labels: string[]): string | undefined => {
+  for (const label of labels) {
+    const regex = new RegExp(`${label}\\s*:\\s*([^\\n]+)`, 'i')
+    const match = source.match(regex)
+    if (match?.[1]) {
+      const value = match[1].trim()
+      if (value) {
+        return value
+      }
+    }
+  }
+  return undefined
+}
+
 const getVideoReferenceLimit = (modelId: string): number => {
   if (!modelId) {
     return VIDEO_GENERATION.MAX_REFERENCE_IMAGES
@@ -164,6 +178,7 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
     visualTone: true, // Expanded by default
     audioDetails: true // Expanded by default
   })
+  const [isHydratedFromSnippet, setIsHydratedFromSnippet] = useState(false)
 
   // Editable title state
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -181,6 +196,36 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
       setSelectedVideoModel(videoModels[0].id)
     }
   }, [videoModels, selectedVideoModel])
+
+  // Pre-fill form fields from snippet text (if labeled) to show generated values
+  useEffect(() => {
+    if (isHydratedFromSnippet) return
+    const sourceText = snippet.textField1?.trim() ?? ''
+    if (!sourceText) return
+
+    const nextData: Partial<VideoFormData> = {}
+    const setIfPresent = (key: keyof VideoFormData, value?: string) => {
+      if (value) {
+        nextData[key] = value
+      }
+    }
+
+    setIfPresent('subject', parseLabeledValue(sourceText, ['Subject']))
+    setIfPresent('action', parseLabeledValue(sourceText, ['Action']))
+    setIfPresent('cameraMotion', parseLabeledValue(sourceText, ['Camera & Motion', 'Camera positioning and motion']))
+    setIfPresent('composition', parseLabeledValue(sourceText, ['Composition']))
+    setIfPresent('focusLens', parseLabeledValue(sourceText, ['Focus & Lens', 'Focus and lens effects']))
+    setIfPresent('style', parseLabeledValue(sourceText, ['Style']))
+    setIfPresent('ambiance', parseLabeledValue(sourceText, ['Ambiance', 'Ambience']))
+    setIfPresent('dialogue', parseLabeledValue(sourceText, ['Dialogue']))
+    setIfPresent('soundEffects', parseLabeledValue(sourceText, ['Sound Effects', 'Sound Effects (SFX)', 'Sound']))
+    setIfPresent('ambientNoise', parseLabeledValue(sourceText, ['Ambient Noise']))
+
+    if (Object.keys(nextData).length > 0) {
+      setFormData((prev) => ({ ...prev, ...nextData }))
+      setIsHydratedFromSnippet(true)
+    }
+  }, [isHydratedFromSnippet, snippet.textField1])
 
   const connectedContent = snippet.connectedContent ?? []
   const connectedImageReferences = connectedContent.filter((item) => item.type === 'image')

@@ -129,6 +129,7 @@ const CanvasContent = () => {
     onGenerateImage: handlers.handleGenerateImage,
     onGenerateText: handlers.handleGenerateTextSnippet,
     onGenerateVideo: handlers.handleGenerateVideo,
+    onGenerateVideoSnippetFromJson: handlers.handleGenerateVideoSnippetFromJson,
     onFocusSnippet: handlers.handleFocusSnippet,
     onCreateUpstreamSnippet: handlers.handleCreateUpstreamSnippet
   }), [
@@ -141,6 +142,7 @@ const CanvasContent = () => {
     handlers.handleGenerateImage,
     handlers.handleGenerateTextSnippet,
     handlers.handleGenerateVideo,
+    handlers.handleGenerateVideoSnippetFromJson,
     handlers.handleFocusSnippet,
     handlers.handleCreateUpstreamSnippet
   ])
