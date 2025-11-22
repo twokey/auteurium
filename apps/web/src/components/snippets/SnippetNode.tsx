@@ -3,10 +3,10 @@ import { useParams } from 'react-router-dom'
 import { Handle, Position } from 'reactflow'
 
 import { VideoSnippetNode } from './VideoSnippetNode'
+import { CANVAS_CONSTANTS, VIDEO_GENERATION } from '../../constants'
 import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisticUpdatesStore'
 import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
 import { useGenAI } from '../../hooks/useGenAI'
-import { CANVAS_CONSTANTS, VIDEO_GENERATION } from '../../constants'
 import { useToast } from '../../store/toastStore'
 import { countWords, truncateToWords } from '../../utils/textUtils'
 

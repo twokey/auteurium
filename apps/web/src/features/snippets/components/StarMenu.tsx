@@ -29,7 +29,7 @@ export const StarMenu = ({ fieldType, onSelect }: StarMenuProps) => {
   const { data, loading } = useGraphQLQueryWithCache<ProjectWithSnippetsQueryData>(
     GET_PROJECT_WITH_SNIPPETS,
     {
-      variables: { projectId: projectId || '' },
+      variables: { projectId: projectId ?? '' },
       skip: !projectId || !isOpen
     }
   )
@@ -107,6 +107,7 @@ export const StarMenu = ({ fieldType, onSelect }: StarMenuProps) => {
                     onClick={() => handleSnippetSelect(snippet)}
                     className="w-full text-left px-3 py-2 rounded hover:bg-blue-50 transition-colors text-sm text-gray-700 hover:text-blue-700"
                   >
+                    {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- Using || intentionally to show default for empty strings */}
                     {snippet.title || 'Untitled Snippet'}
                   </button>
                 ))}

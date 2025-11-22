@@ -34,7 +34,7 @@ export const SnippetNodeImage = ({
             alt="Generated snippet"
             className="w-full h-auto object-cover"
             style={{
-              aspectRatio: imageMetadata?.aspectRatio || 'auto'
+              aspectRatio: imageMetadata?.aspectRatio ?? 'auto'
             }}
           />
           {imageMetadata && (

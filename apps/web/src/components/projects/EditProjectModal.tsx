@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 
+import { Modal } from '../../components/ui/Modal'
 import { UPDATE_PROJECT } from '../../graphql/mutations'
 import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
-import { Modal } from '../../components/ui/Modal'
 
 interface Project {
   id: string

@@ -52,8 +52,8 @@ export const BaseFormModal = ({
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size={config.size || 'md'}>
-      <form onSubmit={handleSubmit}>
+    <Modal isOpen={isOpen} onClose={onClose} size={config.size ?? 'md'}>
+      <form onSubmit={(e) => void handleSubmit(e)}>
         <Modal.Header>
           <h2 className="text-lg font-semibold text-gray-900">{config.title}</h2>
         </Modal.Header>
@@ -74,7 +74,7 @@ export const BaseFormModal = ({
             onClick={onClose}
             disabled={isLoading}
           >
-            {config.cancelText || 'Cancel'}
+            {config.cancelText ?? 'Cancel'}
           </Button>
           <Button 
             type="submit"
@@ -82,7 +82,7 @@ export const BaseFormModal = ({
             isLoading={isLoading}
             disabled={isLoading}
           >
-            {config.submitText || 'Submit'}
+            {config.submitText ?? 'Submit'}
           </Button>
         </Modal.Footer>
       </form>

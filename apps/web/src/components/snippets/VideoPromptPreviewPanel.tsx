@@ -1,9 +1,9 @@
 import { useEffect, useMemo } from 'react';
 
-import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore';
-import { useVideoPromptStore } from '../../features/snippets/store/videoPromptStore';
 import { Accordion } from '../../components/ui/Accordion';
 import { VIDEO_GENERATION } from '../../constants';
+import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore';
+import { useVideoPromptStore } from '../../features/snippets/store/videoPromptStore';
 
 import type { AvailableModel, Snippet, VideoGenerationInput } from '../../types';
 import type { Viewport } from 'reactflow';

@@ -11,9 +11,7 @@ let client: any = null
  * Authentication is handled automatically via Amplify.configure() in config/amplify.ts
  */
 export const getClient = () => {
-  if (!client) {
-    client = generateClient()
-  }
+  client ??= generateClient()
   return client
 }
 

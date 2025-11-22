@@ -19,6 +19,7 @@ import { ColumnGuides } from '../components/canvas/ColumnGuides'
 import { PromptDesignerPanel } from '../components/canvas/PromptDesignerPanel'
 import { SnippetNode } from '../components/snippets/SnippetNode'
 import { VideoPromptPreviewPanel } from '../components/snippets/VideoPromptPreviewPanel'
+import { LoadingSpinner } from '../components/ui/LoadingSpinner'
 import { Navigation } from '../components/ui/Navigation'
 import { ModelsProvider } from '../contexts/ModelsContext'
 import { CanvasModals } from '../features/canvas/components/CanvasModals'
@@ -31,7 +32,6 @@ import { useCanvasStore } from '../features/canvas/store/canvasStore'
 import { useContextMenuStore } from '../features/canvas/store/contextMenuStore'
 import { useVideoPromptStore } from '../features/snippets/store/videoPromptStore'
 import { useModels } from '../hooks/useModels'
-import { LoadingSpinner } from '../components/ui/LoadingSpinner'
 
 const NODE_TYPES: NodeTypes = {
   snippet: SnippetNode

@@ -23,7 +23,7 @@ export const FormSection = ({
 }: FormSectionProps) => {
   return (
     <div className="space-y-4">
-      {(title || description) && (
+      {(title != null || description != null) && (
         <div className="border-b border-gray-200 pb-4">
           {title && (
             <h3 className="text-sm font-medium text-gray-900">{title}</h3>

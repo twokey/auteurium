@@ -161,7 +161,7 @@ export const useOptimisticUpdatesStore = create<OptimisticUpdatesState>((set) =>
   })),
 
   replaceOptimisticSnippet: (tempId, realSnippet) => set((state) => {
-    const { [tempId]: removed, ...remainingOptimistic } = state.optimisticSnippets
+    const { [tempId]: _removed, ...remainingOptimistic } = state.optimisticSnippets
     return {
       optimisticSnippets: remainingOptimistic,
       realSnippets: {
@@ -176,7 +176,7 @@ export const useOptimisticUpdatesStore = create<OptimisticUpdatesState>((set) =>
   }),
 
   removeOptimisticSnippet: (tempId) => set((state) => {
-    const { [tempId]: removed, ...remaining } = state.optimisticSnippets
+    const { [tempId]: _removed, ...remaining } = state.optimisticSnippets
     return {
       optimisticSnippets: remaining
     }
@@ -231,7 +231,7 @@ export const useOptimisticUpdatesStore = create<OptimisticUpdatesState>((set) =>
   })),
 
   replaceOptimisticConnection: (tempId, realConnection) => set((state) => {
-    const { [tempId]: removed, ...remainingOptimistic } = state.optimisticConnections
+    const { [tempId]: _removed, ...remainingOptimistic } = state.optimisticConnections
     return {
       optimisticConnections: remainingOptimistic,
       realConnections: {
@@ -246,7 +246,7 @@ export const useOptimisticUpdatesStore = create<OptimisticUpdatesState>((set) =>
   }),
 
   removeOptimisticConnection: (tempId) => set((state) => {
-    const { [tempId]: removed, ...remaining } = state.optimisticConnections
+    const { [tempId]: _removed, ...remaining } = state.optimisticConnections
     return {
       optimisticConnections: remaining
     }
