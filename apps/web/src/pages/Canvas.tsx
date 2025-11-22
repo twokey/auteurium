@@ -211,6 +211,15 @@ const CanvasContent = () => {
     }
   }, [])
 
+  // Force update for synchronized dragging
+  const [dragUpdateCount, setDragUpdateCount] = useState(0)
+
+  const handleNodeDrag = useCallback((_event: React.MouseEvent, node: Node) => {
+    if (isPromptDesignerOpen && promptDesignerSnippetId === node.id) {
+      setDragUpdateCount((n) => n + 1)
+    }
+  }, [isPromptDesignerOpen, promptDesignerSnippetId])
+
   // Handle Prompt Designer open - pan to snippet
   useEffect(() => {
     if (!isPromptDesignerOpen || !promptDesignerSnippetId || !externalReactFlowInstanceRef.current) {
@@ -257,7 +266,7 @@ const CanvasContent = () => {
     const { width: measuredWidth, height: measuredHeight } = getNodeDimensions(node)
     const nodeWidth = measuredWidth ?? CANVAS_CONSTANTS.COLUMN_WIDTH
     const nodeHeight = measuredHeight ?? CANVAS_CONSTANTS.ESTIMATED_SNIPPET_HEIGHT
-    const gap = CANVAS_CONSTANTS.COLUMN_GAP / 2
+    const gap = CANVAS_CONSTANTS.COLUMN_GAP / 4
 
     const flowX = node.position.x + nodeWidth + gap
     const flowY = node.position.y
@@ -269,13 +278,15 @@ const CanvasContent = () => {
       width: nodeWidth,
       height: nodeHeight,
       style: {
-        left: screenX,
-        top: screenY,
-        transform: `scale(${viewport.zoom})`,
-        transformOrigin: 'top left'
+        left: flowX,
+        top: flowY,
+        width: nodeWidth,
+        transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
+        transformOrigin: 'top left',
+        zIndex: node.zIndex
       } as CSSProperties
     }
-  }, [isPromptDesignerOpen, promptDesignerSnippetId, viewport])
+  }, [isPromptDesignerOpen, promptDesignerSnippetId, viewport, dragUpdateCount])
 
   const promptDesignerStyle = promptDesignerPlacement.style
   const promptDesignerWidth = promptDesignerPlacement.width
@@ -508,6 +519,7 @@ const CanvasContent = () => {
             onConnect={onConnect}
             onInit={onInit}
             onNodeDragStop={onNodeDragStop}
+            onNodeDrag={handleNodeDrag}
             onSelectionChange={handleSelectionChange}
             onNodeContextMenu={handleNodeContextMenu}
             onPaneContextMenu={handlePaneContextMenu}

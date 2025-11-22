@@ -32,7 +32,7 @@ interface VideoPromptState {
   clearActive: () => void;
 }
 
-const DEFAULT_SETTINGS: VideoModelSettings = {
+export const DEFAULT_SETTINGS: VideoModelSettings = {
   model: 'vidu-q2-turbo',
   duration: 4,
   resolution: '720p',

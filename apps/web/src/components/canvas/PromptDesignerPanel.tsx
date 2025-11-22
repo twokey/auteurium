@@ -1,8 +1,18 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 
-import { CANVAS_CONSTANTS } from '../../constants'
+import { CANVAS_CONSTANTS, VIDEO_GENERATION } from '../../constants'
 import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
 import { useToast } from '../../store/toastStore'
+import {
+  CAPABILITY_LABELS,
+  VIDU_Q2_MODEL_CONFIG,
+  calculatePricing,
+  determineCapability,
+  formatUsd,
+  getPricingDefinition,
+  isResolutionOption,
+  type ResolutionOption
+} from '../snippets/videoPromptUtils'
 
 const MODE_LABEL: Record<'text' | 'image' | 'video' | 'scenes', string> = {
   text: 'Text generation',
@@ -11,15 +21,12 @@ const MODE_LABEL: Record<'text' | 'image' | 'video' | 'scenes', string> = {
   scenes: 'Scene generation'
 }
 
-const VIDEO_MODEL_LABELS: Record<string, string> = {
-  'vidu-q2-pro': 'Vidu Q2 Pro',
-  'vidu-q2-turbo': 'Vidu Q2 Turbo',
-  'vidu-q2': 'Vidu Q2',
-  // legacy identifiers kept for backwards compatibility with saved requests
-  'viduq2-pro': 'Vidu Q2 Pro',
-  'viduq2-turbo': 'Vidu Q2 Turbo',
-  'viduq2': 'Vidu Q2'
-}
+// Available voice IDs (placeholder - should be loaded from API or constants)
+const VOICE_IDS = [
+  { id: 'voice_1', name: 'Voice 1 - Natural' },
+  { id: 'voice_2', name: 'Voice 2 - Energetic' },
+  { id: 'voice_3', name: 'Voice 3 - Calm' },
+]
 
 export interface PromptDesignerPanelProps {
   width?: number
@@ -28,6 +35,7 @@ export interface PromptDesignerPanelProps {
 
 export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) => {
   const toast = useToast()
+
   const isOpen = usePromptDesignerStore((state) => state.isOpen)
   const isGenerating = usePromptDesignerStore((state) => state.isGenerating)
   const snippetId = usePromptDesignerStore((state) => state.snippetId)
@@ -40,8 +48,11 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
   const close = usePromptDesignerStore((state) => state.close)
   const setPrompt = usePromptDesignerStore((state) => state.setPrompt)
   const setGenerating = usePromptDesignerStore((state) => state.setGenerating)
+  const updateGenerationSettings = usePromptDesignerStore((state) => state.updateGenerationSettings)
 
   const [isEditing, setIsEditing] = useState(false)
+  const [isSettingsExpanded, setIsSettingsExpanded] = useState(true)
+  const [isReferenceImagesExpanded, setIsReferenceImagesExpanded] = useState(true)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
   useEffect(() => {
@@ -71,58 +82,59 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
 
   const generationSettingsEntries = useMemo(() => {
     if (generationSettings?.type !== 'video') {
-      return []
+      return null
     }
 
     const { settings } = generationSettings
-    const entries: { label: string; value: string }[] = [
-      {
-        label: 'Model',
-        value: VIDEO_MODEL_LABELS[settings.model] ?? settings.model
-      },
-      {
-        label: 'Duration',
-        value: typeof settings.duration === 'number' ? `${settings.duration}s` : 'Default'
-      },
-      {
-        label: 'Resolution',
-        value: settings.resolution ?? 'Default'
-      },
-      {
-        label: 'Movement',
-        value: settings.movementAmplitude ?? 'auto'
-      },
-      {
-        label: 'Audio',
-        value: settings.audio ? 'Enabled' : 'Disabled'
-      },
-      {
-        label: 'Off-peak',
-        value: settings.offPeak ? 'Enabled' : 'Disabled'
-      }
-    ]
+    const selectedModelId = VIDU_Q2_MODEL_CONFIG[settings.model] ? settings.model : VIDEO_GENERATION.DEFAULT_MODEL
+    const modelConfig = VIDU_Q2_MODEL_CONFIG[selectedModelId]
 
-    if (settings.audio && settings.voiceId) {
-      const offPeakIndex = entries.findIndex((entry) => entry.label === 'Off-peak')
-      const insertIndex = offPeakIndex >= 0 ? offPeakIndex : entries.length
-      entries.splice(insertIndex, 0, {
-        label: 'Voice',
-        value: settings.voiceId
-      })
+    // Ensure valid settings
+    const activeDuration = modelConfig.durations.includes(settings.duration)
+      ? settings.duration
+      : modelConfig.defaultDuration
+
+    const sanitizedResolution = isResolutionOption(settings.resolution)
+      ? settings.resolution
+      : modelConfig.defaultResolution
+    const activeResolution = modelConfig.resolutions.includes(sanitizedResolution)
+      ? sanitizedResolution
+      : modelConfig.defaultResolution
+
+    // Calculate pricing
+    const hasReferenceImages = connectedContent.some(c => c.type === 'image')
+    const capability = determineCapability(modelConfig, hasReferenceImages)
+    const pricingDefinition = getPricingDefinition(modelConfig, capability, activeResolution)
+
+    const pricingSummary = pricingDefinition
+      ? calculatePricing(activeDuration, pricingDefinition)
+      : null
+
+    const appliedCredits = pricingSummary
+      ? (settings.offPeak ? pricingSummary.offPeakCredits : pricingSummary.standardCredits)
+      : null
+    const appliedUsd = pricingSummary
+      ? (settings.offPeak ? pricingSummary.offPeakUsd : pricingSummary.standardUsd)
+      : null
+
+    return {
+      modelConfig,
+      activeDuration,
+      activeResolution,
+      pricingSummary,
+      appliedCredits,
+      appliedUsd,
+      capabilityLabel: CAPABILITY_LABELS[capability]
     }
-
-    if (typeof settings.seed === 'number') {
-      entries.push({
-        label: 'Seed',
-        value: settings.seed.toString()
-      })
-    }
-
-    return entries
-  }, [generationSettings])
+  }, [generationSettings, connectedContent])
 
   const sanitizedSnippetTitle = snippetTitle?.trim() ?? ''
   const shouldRenderSource = sanitizedSnippetTitle !== '' ? true : Boolean(snippetId)
+
+  // Separate content types
+  const textContent = useMemo(() => connectedContent.filter(c => c.type === 'text'), [connectedContent])
+  const referenceImages = useMemo(() => connectedContent.filter(c => c.type === 'image'), [connectedContent])
+  const videoContent = useMemo(() => connectedContent.filter(c => c.type === 'video'), [connectedContent])
 
   if (!isOpen) {
     return null
@@ -171,7 +183,7 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
         finalPrompt = connectedText || currentText || ''
       }
 
-      await Promise.resolve(onGenerate(finalPrompt))
+      await Promise.resolve(onGenerate(finalPrompt, generationSettings))
       close()
     } catch (error) {
       console.error('Prompt designer generation failed:', error)
@@ -195,7 +207,7 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
 
   return (
     <div
-      className="rounded-lg border border-gray-200 bg-white shadow-lg transition-all duration-200 ease-out origin-top-left"
+      className="rounded-lg border border-gray-200 bg-white shadow-lg origin-top-left"
       style={{
         width: panelWidth,
         position: 'absolute',
@@ -234,13 +246,301 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
       </div>
 
       <div className="px-3 py-3">
-        {connectedContent.length > 0 && (
+        {/* Generate Button moved to top */}
+        <button
+          type="button"
+          onClick={() => {
+            void handleGenerate()
+          }}
+          disabled={isGenerating}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-purple-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-purple-300 mb-3"
+        >
+          {isGenerating ? (
+            <>
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+              Generating...
+            </>
+          ) : (
+            'Generate'
+          )}
+        </button>
+
+        {/* Settings Section */}
+        <div className="mb-3">
+          <button
+            type="button"
+            onClick={() => setIsSettingsExpanded(!isSettingsExpanded)}
+            className="flex w-full items-center justify-between mb-1 group"
+          >
+            <p className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 group-hover:text-gray-700">
+              Settings
+            </p>
+            <svg
+              className={`h-3 w-3 text-gray-400 transition-transform duration-200 ${isSettingsExpanded ? 'rotate-180' : ''}`}
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
+
+          {isSettingsExpanded && (
+            <div className="space-y-2 rounded-md border border-gray-200 bg-gray-50 p-2">
+              {/* Model Selection */}
+              <div>
+                <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                  Model
+                </label>
+                <select
+                  value={generationSettings?.settings.model ?? ''}
+                  onChange={(e) => {
+                    const newModel = e.target.value
+                    if (generationSettings?.type === 'video') {
+                      const nextConfig = VIDU_Q2_MODEL_CONFIG[newModel] ?? generationSettingsEntries?.modelConfig
+                      updateGenerationSettings({
+                        model: newModel,
+                        duration: nextConfig?.defaultDuration,
+                        resolution: nextConfig?.defaultResolution
+                      })
+                    }
+                  }}
+                  className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                >
+                  {Object.values(VIDU_Q2_MODEL_CONFIG).map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                {generationSettingsEntries && (
+                  <p className="mt-1 text-[10px] text-gray-500">
+                    {generationSettingsEntries.modelConfig.description}
+                  </p>
+                )}
+              </div>
+
+              {/* Video Specific Settings */}
+              {generationSettingsEntries && generationSettings?.type === 'video' && (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Duration */}
+                    <div>
+                      <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                        Duration
+                      </label>
+                      <select
+                        value={generationSettingsEntries.activeDuration}
+                        onChange={(e) => updateGenerationSettings({ duration: Number(e.target.value) })}
+                        className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      >
+                        {generationSettingsEntries.modelConfig.durations.map((duration) => (
+                          <option key={duration} value={duration}>
+                            {duration}s
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Resolution */}
+                    <div>
+                      <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                        Resolution
+                      </label>
+                      <select
+                        value={generationSettingsEntries.activeResolution}
+                        onChange={(e) => updateGenerationSettings({ resolution: e.target.value as ResolutionOption })}
+                        className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      >
+                        {generationSettingsEntries.modelConfig.resolutions.map((resolution) => (
+                          <option key={resolution} value={resolution}>
+                            {resolution}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Movement & Audio */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                        Movement
+                      </label>
+                      <select
+                        value={generationSettings.settings.movementAmplitude ?? 'auto'}
+                        onChange={(e) => updateGenerationSettings({ movementAmplitude: e.target.value })}
+                        className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      >
+                        <option value="auto">Auto</option>
+                        <option value="small">Small</option>
+                        <option value="medium">Medium</option>
+                        <option value="large">Large</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-end pb-1">
+                      <label className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={generationSettings.settings.audio}
+                          onChange={(e) => updateGenerationSettings({ audio: e.target.checked })}
+                          className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-4 w-4"
+                        />
+                        <span className="text-xs font-medium text-gray-700">Audio</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Voice Selection (if Audio enabled) */}
+                  {generationSettings.settings.audio && (
+                    <div>
+                      <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                        Voice
+                      </label>
+                      <select
+                        value={generationSettings.settings.voiceId ?? ''}
+                        onChange={(e) => updateGenerationSettings({ voiceId: e.target.value })}
+                        className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      >
+                        <option value="">Select voice...</option>
+                        {VOICE_IDS.map((voice) => (
+                          <option key={voice.id} value={voice.id}>
+                            {voice.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Seed */}
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                      Seed (optional)
+                    </label>
+                    <input
+                      type="number"
+                      value={generationSettings.settings.seed ?? ''}
+                      onChange={(e) => updateGenerationSettings({ seed: e.target.value ? Number(e.target.value) : undefined })}
+                      placeholder="Random"
+                      className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 placeholder-gray-400 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    />
+                  </div>
+
+                  {/* Off-peak Toggle */}
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                      Off-peak Mode
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => updateGenerationSettings({ offPeak: !generationSettings.settings.offPeak })}
+                      className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors ${generationSettings.settings.offPeak ? 'bg-purple-600' : 'bg-gray-300'
+                        }`}
+                    >
+                      <span
+                        className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${generationSettings.settings.offPeak ? 'translate-x-4' : 'translate-x-0.5'
+                          }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Cost Preview */}
+                  {generationSettingsEntries.pricingSummary && (
+                    <div className="mt-2 rounded border border-purple-100 bg-purple-50 px-2 py-1.5">
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="font-medium text-purple-900">Estimated Cost</span>
+                        <span className="font-bold text-purple-700">
+                          {generationSettingsEntries.appliedCredits} credits
+                          <span className="text-purple-400 mx-1">·</span>
+                          {generationSettingsEntries.appliedUsd !== null ? formatUsd(generationSettingsEntries.appliedUsd) : '—'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Reference Images Section */}
+        {referenceImages.length > 0 && generationSettingsEntries && (
+          <div className="mb-3">
+            <button
+              type="button"
+              onClick={() => setIsReferenceImagesExpanded(!isReferenceImagesExpanded)}
+              className="flex w-full items-center justify-between mb-1 group"
+            >
+              <div className="flex items-center gap-2">
+                <p className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 group-hover:text-gray-700">
+                  Reference Images
+                </p>
+                <span className="text-[10px] text-gray-500">
+                  {referenceImages.length} / {generationSettingsEntries.modelConfig.maxReferenceImages}
+                </span>
+              </div>
+              <svg
+                className={`h-3 w-3 text-gray-400 transition-transform duration-200 ${isReferenceImagesExpanded ? 'rotate-180' : ''}`}
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+
+            {isReferenceImagesExpanded && (
+              <>
+                <div className="grid grid-cols-3 gap-2 rounded-md border border-gray-200 bg-gray-50 p-2">
+                  {referenceImages.slice(0, generationSettingsEntries.modelConfig.maxReferenceImages).map((item, index) => (
+                    <div key={`ref-img-${index}`} className="relative aspect-square">
+                      <img
+                        src={item.value}
+                        alt={item.snippetTitle || `Reference ${index + 1}`}
+                        className="w-full h-full object-cover rounded border border-gray-200"
+                      />
+                    </div>
+                  ))}
+                </div>
+                {referenceImages.length > generationSettingsEntries.modelConfig.maxReferenceImages && (
+                  <p className="text-[10px] text-red-500 mt-1">
+                    Warning: Only first {generationSettingsEntries.modelConfig.maxReferenceImages} images will be used
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Content Section (Text & Video) */}
+        {(textContent.length > 0 || videoContent.length > 0) && (
           <div className="mb-3">
             <p className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
               Content
             </p>
             <div className="mt-1 space-y-2">
-              {connectedContent.map((item, index) => {
+              {[...textContent, ...videoContent].map((item, index) => {
                 const connectedTitle = item.snippetTitle?.trim() ?? ''
                 return (
                   <div key={`connected-${item.snippetId}-${index}-${item.type}`}>
@@ -257,14 +557,6 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
                         <p className="px-2 py-1 text-sm font-medium text-gray-900 whitespace-pre-wrap">
                           {item.value}
                         </p>
-                      ) : item.type === 'image' ? (
-                        <img
-                          src={item.value}
-                          alt={`Connected from snippet ${item.snippetId}`}
-                          className="block w-full h-auto max-h-48 object-cover"
-                          loading="lazy"
-                          decoding="async"
-                        />
                       ) : (
                         <video
                           src={item.value}
@@ -285,37 +577,21 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
           </div>
         )}
 
-        {generationSettingsEntries.length > 0 && (
-          <div className="mb-3">
-            <p className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
-              Generation settings
-            </p>
-            <dl className="divide-y divide-gray-100 rounded-md border border-gray-200 bg-gray-50">
-              {generationSettingsEntries.map((entry) => (
-                <div
-                  key={entry.label}
-                  className="flex items-center justify-between px-2.5 py-1.5"
-                >
-                  <dt className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                    {entry.label}
-                  </dt>
-                  <dd className="text-sm font-semibold text-gray-900">
-                    {entry.value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        )}
-
         <div className="mb-3">
           <div className="flex items-center justify-between mb-0.5">
             <p className="text-[10px] text-gray-500 font-medium">
               {sanitizedSnippetTitle !== '' ? sanitizedSnippetTitle : 'Snippet'}
             </p>
-            <p className="text-[10px] text-gray-400 font-mono">
-              #{snippetId?.slice(0, 8)}
-            </p>
+            <div className="flex items-center gap-2">
+              {isEditing && (
+                <span className={`text-[10px] font-mono ${prompt.length > 2000 ? 'text-red-500' : 'text-gray-400'}`}>
+                  {prompt.length}/2000
+                </span>
+              )}
+              <p className="text-[10px] text-gray-400 font-mono">
+                #{snippetId?.slice(0, 8)}
+              </p>
+            </div>
           </div>
 
           {isEditing ? (
@@ -355,45 +631,6 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
             </button>
           )}
         </div>
-
-        <button
-          type="button"
-          className="w-full text-xs font-semibold text-blue-600 border border-blue-200 rounded-md py-1 mb-3 transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
-        >
-          + snippet
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            void handleGenerate()
-          }}
-          disabled={isGenerating}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-purple-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-purple-300"
-        >
-          {isGenerating ? (
-            <>
-              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              Generating...
-            </>
-          ) : (
-            'Generate'
-          )}
-        </button>
       </div>
     </div>
   )

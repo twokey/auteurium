@@ -1,15 +1,15 @@
 import { create } from 'zustand'
 
 import type { ConnectedContentItem } from '../../../types/components'
-import type { VideoModelSettings } from '../../snippets/store/videoPromptStore'
+import { DEFAULT_SETTINGS, type VideoModelSettings } from '../../snippets/store/videoPromptStore'
 
 type PromptDesignerMode = 'text' | 'image' | 'video' | 'scenes'
 
 export type PromptDesignerGenerationSettings =
   | {
-      type: 'video'
-      settings: VideoModelSettings
-    }
+    type: 'video'
+    settings: VideoModelSettings
+  }
 
 interface PromptDesignerOpenPayload {
   snippetId: string
@@ -17,7 +17,7 @@ interface PromptDesignerOpenPayload {
   mode: PromptDesignerMode
   initialPrompt: string
   connectedContent?: ConnectedContentItem[]
-  onGenerate?: (prompt: string) => Promise<void> | void
+  onGenerate?: (prompt: string, settings?: PromptDesignerGenerationSettings | null) => Promise<void> | void
   generationSettings?: PromptDesignerGenerationSettings | null
 }
 
@@ -30,16 +30,17 @@ interface PromptDesignerState {
   prompt: string
   connectedContent: ConnectedContentItem[]
   generationSettings: PromptDesignerGenerationSettings | null
-  onGenerate: ((prompt: string) => Promise<void> | void) | null
+  onGenerate: ((prompt: string, settings?: PromptDesignerGenerationSettings | null) => Promise<void> | void) | null
   open: (payload: PromptDesignerOpenPayload) => void
   close: () => void
   setPrompt: (prompt: string) => void
   setGenerating: (isGenerating: boolean) => void
+  updateGenerationSettings: (settings: Partial<VideoModelSettings>) => void
 }
 
 const INITIAL_STATE: Omit<
   PromptDesignerState,
-  'open' | 'close' | 'setPrompt' | 'setGenerating'
+  'open' | 'close' | 'setPrompt' | 'setGenerating' | 'updateGenerationSettings'
 > = {
   isOpen: false,
   isGenerating: false,
@@ -63,6 +64,14 @@ export const usePromptDesignerStore = create<PromptDesignerState>((set, get) => 
     onGenerate,
     generationSettings = null
   }) => {
+    let initialSettings = generationSettings
+    if (!initialSettings && mode === 'video') {
+      initialSettings = {
+        type: 'video',
+        settings: DEFAULT_SETTINGS
+      }
+    }
+
     set({
       isOpen: true,
       isGenerating: false,
@@ -71,7 +80,7 @@ export const usePromptDesignerStore = create<PromptDesignerState>((set, get) => 
       mode,
       prompt: initialPrompt,
       connectedContent,
-      generationSettings,
+      generationSettings: initialSettings,
       onGenerate: onGenerate ?? null
     })
   },
@@ -89,9 +98,22 @@ export const usePromptDesignerStore = create<PromptDesignerState>((set, get) => 
     set({ prompt })
   },
   setGenerating: (isGenerating) => {
-    if (get().isGenerating === isGenerating) {
-      return
-    }
     set({ isGenerating })
+  },
+  updateGenerationSettings: (settings) => {
+    set((state) => {
+      if (!state.generationSettings || state.generationSettings.type !== 'video') {
+        return state
+      }
+      return {
+        generationSettings: {
+          ...state.generationSettings,
+          settings: {
+            ...state.generationSettings.settings,
+            ...settings
+          }
+        }
+      }
+    })
   }
 }))
