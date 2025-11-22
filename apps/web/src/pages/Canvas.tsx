@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect, useCallback, useState } from 'react'
+import { useMemo, useRef, useEffect, useCallback, useState, type CSSProperties } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Background,
@@ -30,11 +30,46 @@ import { useCanvasHandlers } from '../features/canvas/hooks/useCanvasHandlers'
 import { useReactFlowSetup } from '../features/canvas/hooks/useReactFlowSetup'
 import { useCanvasStore } from '../features/canvas/store/canvasStore'
 import { useContextMenuStore } from '../features/canvas/store/contextMenuStore'
+import { usePromptDesignerStore } from '../features/canvas/store/promptDesignerStore'
 import { useVideoPromptStore } from '../features/snippets/store/videoPromptStore'
 import { useModels } from '../hooks/useModels'
+import { CANVAS_CONSTANTS } from '../constants'
 
 const NODE_TYPES: NodeTypes = {
   snippet: SnippetNode
+}
+
+type MeasuredReactFlowNode = Node & {
+  measured?: {
+    width?: number
+    height?: number
+  }
+  width?: number
+  height?: number
+}
+
+const getNodeDimensions = (node: Node | undefined) => {
+  if (!node) {
+    return { width: undefined as number | undefined, height: undefined as number | undefined }
+  }
+
+  const measuredNode = node as MeasuredReactFlowNode
+
+  const width =
+    typeof measuredNode.measured?.width === 'number'
+      ? measuredNode.measured.width
+      : typeof measuredNode.width === 'number'
+        ? measuredNode.width
+        : undefined
+
+  const height =
+    typeof measuredNode.measured?.height === 'number'
+      ? measuredNode.measured.height
+      : typeof measuredNode.height === 'number'
+        ? measuredNode.height
+        : undefined
+
+  return { width, height }
 }
 
 /**
@@ -48,6 +83,8 @@ const CanvasContent = () => {
   const { generatingImageSnippetIds, generatingVideoSnippetIds, setSelectedSnippetIds } = useCanvasStore()
   const { openContextMenu, closeContextMenu } = useContextMenuStore()
   const { activeSnippetId, clearActive } = useVideoPromptStore()
+  const isPromptDesignerOpen = usePromptDesignerStore((state) => state.isOpen)
+  const promptDesignerSnippetId = usePromptDesignerStore((state) => state.snippetId)
 
   // Track viewport for column guides
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 })
@@ -171,6 +208,75 @@ const CanvasContent = () => {
       externalReactFlowInstanceRef.current.zoomTo(1, { duration: 300 })
     }
   }, [])
+
+  // Handle Prompt Designer open - pan to snippet
+  useEffect(() => {
+    if (!isPromptDesignerOpen || !promptDesignerSnippetId || !externalReactFlowInstanceRef.current) {
+      return
+    }
+
+    const instance = externalReactFlowInstanceRef.current
+    const node = instance.getNode(promptDesignerSnippetId)
+    if (!node) {
+      return
+    }
+
+    // Center the snippet + designer pair and zoom to 100%
+    const { width: measuredWidth, height: measuredHeight } = getNodeDimensions(node)
+    const nodeWidth = measuredWidth ?? CANVAS_CONSTANTS.COLUMN_WIDTH
+    const nodeHeight = measuredHeight ?? CANVAS_CONSTANTS.ESTIMATED_SNIPPET_HEIGHT
+    const gap = CANVAS_CONSTANTS.COLUMN_GAP / 2
+
+    const pairWidth = nodeWidth * 2 + gap
+    const pairHeight = nodeHeight
+
+    const targetZoom = 1
+
+    const targetCenterX = node.position.x + (pairWidth / 2)
+    const targetCenterY = node.position.y + pairHeight / 2
+
+    instance.setCenter(targetCenterX, targetCenterY, {
+      zoom: targetZoom,
+      duration: 800
+    })
+  }, [isPromptDesignerOpen, promptDesignerSnippetId])
+
+  // Calculate Prompt Designer position
+  const promptDesignerPlacement = useMemo(() => {
+    if (!isPromptDesignerOpen || !promptDesignerSnippetId || !externalReactFlowInstanceRef.current) {
+      return { style: undefined as CSSProperties | undefined, width: undefined as number | undefined, height: undefined as number | undefined }
+    }
+
+    const node = externalReactFlowInstanceRef.current.getNode(promptDesignerSnippetId)
+    if (!node) {
+      return { style: undefined, width: undefined, height: undefined }
+    }
+
+    const { width: measuredWidth, height: measuredHeight } = getNodeDimensions(node)
+    const nodeWidth = measuredWidth ?? CANVAS_CONSTANTS.COLUMN_WIDTH
+    const nodeHeight = measuredHeight ?? CANVAS_CONSTANTS.ESTIMATED_SNIPPET_HEIGHT
+    const gap = CANVAS_CONSTANTS.COLUMN_GAP / 2
+
+    const flowX = node.position.x + nodeWidth + gap
+    const flowY = node.position.y
+
+    const screenX = (flowX * viewport.zoom) + viewport.x
+    const screenY = (flowY * viewport.zoom) + viewport.y
+
+    return {
+      width: nodeWidth,
+      height: nodeHeight,
+      style: {
+        left: screenX,
+        top: screenY,
+        transform: `scale(${viewport.zoom})`,
+        transformOrigin: 'top left'
+      } as CSSProperties
+    }
+  }, [isPromptDesignerOpen, promptDesignerSnippetId, viewport])
+
+  const promptDesignerStyle = promptDesignerPlacement.style
+  const promptDesignerWidth = promptDesignerPlacement.width
 
   // Context menu handlers with viewport-aware positioning
   const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
@@ -485,8 +591,17 @@ const CanvasContent = () => {
               className="pointer-events-auto"
             />
           )}
-          <PromptDesignerPanel />
         </div>
+
+        {promptDesignerStyle && (
+          <PromptDesignerPanel
+            width={promptDesignerWidth}
+            style={{
+              ...promptDesignerStyle,
+              zIndex: 50
+            }}
+          />
+        )}
 
         {/* Video Prompt Preview Panel - positioned relative to active video snippet */}
         {activeSnippetId && (

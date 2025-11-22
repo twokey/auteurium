@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 
+import { CANVAS_CONSTANTS } from '../../constants'
 import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
 import { useToast } from '../../store/toastStore'
 
@@ -20,7 +21,12 @@ const VIDEO_MODEL_LABELS: Record<string, string> = {
   'viduq2': 'Vidu Q2'
 }
 
-export const PromptDesignerPanel = () => {
+export interface PromptDesignerPanelProps {
+  width?: number
+  style?: CSSProperties
+}
+
+export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) => {
   const toast = useToast()
   const isOpen = usePromptDesignerStore((state) => state.isOpen)
   const isGenerating = usePromptDesignerStore((state) => state.isGenerating)
@@ -183,8 +189,19 @@ export const PromptDesignerPanel = () => {
     }
   }
 
+  // Calculate dynamic width based on snippet width
+  // Default to the canvas column width if no width provided
+  const panelWidth = width ?? CANVAS_CONSTANTS.COLUMN_WIDTH
+
   return (
-    <div className="w-[320px] rounded-lg border border-gray-200 bg-white shadow-lg">
+    <div
+      className="rounded-lg border border-gray-200 bg-white shadow-lg transition-all duration-200 ease-out origin-top-left"
+      style={{
+        width: panelWidth,
+        position: 'absolute',
+        ...style
+      }}
+    >
       <div className="flex items-start justify-between border-b border-gray-200 px-3 py-2.5">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-gray-900 leading-tight">Prompt designer</h3>
