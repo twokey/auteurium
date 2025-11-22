@@ -996,9 +996,38 @@ export function useCanvasHandlers({
     const now = new Date().toISOString()
 
     // Snap position to column constraints
+    const snappedX = snapToColumn(position.x)
+
+    // Find snippets in this column to stack below
+    const columnSnippets = snippetsRef.current.filter(s =>
+      Math.abs((s.position?.x ?? 0) - snappedX) < 10 // Allow small float diffs
+    )
+
+    let targetY = position.y
+
+    if (columnSnippets.length > 0) {
+      // Find the lowest point
+      const lowestSnippet = columnSnippets.reduce((prev, current) => {
+        const prevY = prev.position?.y ?? 0
+        const currentY = current.position?.y ?? 0
+        return prevY > currentY ? prev : current
+      })
+
+      // Get height from ReactFlow if available, otherwise use estimate
+      let height: number = CANVAS_CONSTANTS.ESTIMATED_SNIPPET_HEIGHT
+      if (reactFlowInstance?.current) {
+        const node = reactFlowInstance.current.getNode(lowestSnippet.id)
+        if (node && node.height) {
+          height = node.height
+        }
+      }
+
+      targetY = (lowestSnippet.position?.y ?? 0) + height + 5 // 5px gap
+    }
+
     const snappedPosition = {
-      x: snapToColumn(position.x),
-      y: position.y
+      x: snappedX,
+      y: targetY
     }
 
     // Add optimistic snippet immediately
@@ -1016,6 +1045,12 @@ export function useCanvasHandlers({
       version: 1,
       isOptimistic: true
     })
+
+    // Scroll to the new snippet to ensure visibility
+    // Use a small timeout to allow ReactFlow to render the new node
+    setTimeout(() => {
+      handleFocusSnippet(tempId)
+    }, 100)
 
     const variables = {
       input: {
@@ -1038,7 +1073,13 @@ export function useCanvasHandlers({
           // Replace optimistic snippet with real one from server
           if (createdSnippet) {
             replaceOptimisticSnippet(tempId, createdSnippet)
+          } else {
+            // Snippet missing in response
+            removeOptimisticSnippet(tempId)
           }
+        } else {
+          // Mutation returned null (error handled internally)
+          removeOptimisticSnippet(tempId)
         }
       })
       .catch((error) => {
@@ -1103,7 +1144,11 @@ export function useCanvasHandlers({
           // Replace optimistic snippet with real one from server
           if (createdSnippet) {
             replaceOptimisticSnippet(tempId, createdSnippet)
+          } else {
+            removeOptimisticSnippet(tempId)
           }
+        } else {
+          removeOptimisticSnippet(tempId)
         }
       })
       .catch((error) => {
@@ -1451,8 +1496,9 @@ export function useCanvasHandlers({
       // Calculate zoom level to make snippet take 80% of viewport height
       const targetZoom = (viewportHeight * 0.8) / nodeHeight
 
-      // Clamp zoom between reasonable bounds (0.5x to 2x)
-      const clampedZoom = Math.max(0.5, Math.min(2, targetZoom))
+      // Clamp zoom between reasonable bounds (0.5x to 1x)
+      // User requested not to zoom beyond 100%
+      const clampedZoom = Math.max(0.5, Math.min(1, targetZoom))
 
       // Get node center coordinates
       const nodeCenterX = node.position.x + nodeWidth / 2

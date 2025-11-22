@@ -218,15 +218,15 @@ const analyzeSnippetConnections = (
             ...(hasText ? { text: trimmedText } : {}),
             ...(hasImage
               ? {
-                  imageUrl,
-                  imageMetadata: sourceSnippet?.imageMetadata ?? null
-                }
+                imageUrl,
+                imageMetadata: sourceSnippet?.imageMetadata ?? null
+              }
               : {}),
             ...(hasVideo
               ? {
-                  videoUrl,
-                  videoMetadata: sourceSnippet?.videoMetadata ?? null
-                }
+                videoUrl,
+                videoMetadata: sourceSnippet?.videoMetadata ?? null
+              }
               : {})
           }
         ]
@@ -523,11 +523,13 @@ export function useCanvasData(projectId: string | undefined): UseCanvasDataResul
 
     // Add real snippets that aren't in the server data yet (just created)
     const newRealSnippets = Object.values(realSnippets).filter(
-      snippet => !existingIds.has(snippet.id) && !deletedSnippets.has(snippet.id)
+      snippet => !existingIds.has(snippet.id) && !deletedSnippets.has(snippet.id) && !deletingSnippets.has(snippet.id)
     )
 
     // Add optimistic snippets (converting to Snippet type)
-    const optimisticSnippetsArray = Object.values(optimisticSnippets) as Snippet[]
+    const optimisticSnippetsArray = (Object.values(optimisticSnippets) as Snippet[]).filter(
+      snippet => !deletingSnippets.has(snippet.id) && !deletedSnippets.has(snippet.id)
+    )
     const combinedSnippets = [...snippetsWithRealOnes, ...newRealSnippets, ...optimisticSnippetsArray]
 
     const enrichedSnippets = combinedSnippets.map((snippet) => {
@@ -555,6 +557,16 @@ export function useCanvasData(projectId: string | undefined): UseCanvasDataResul
     if (areSnippetsEqual(previousSnippetsRef.current, enrichedSnippets)) {
       return previousSnippetsRef.current
     }
+
+    console.log('[useCanvasData] Snippets updated:', {
+      total: enrichedSnippets.length,
+      ids: enrichedSnippets.map(s => s.id),
+      deleting: Array.from(deletingSnippets),
+      deleted: Array.from(deletedSnippets),
+      optimistic: Object.keys(optimisticSnippets),
+      real: Object.keys(realSnippets),
+      server: rawSnippets?.length
+    })
 
     previousSnippetsRef.current = enrichedSnippets
     return enrichedSnippets

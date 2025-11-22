@@ -15,12 +15,10 @@ const COLUMN_FULL_WIDTH = CANVAS_CONSTANTS.COLUMN_WIDTH + CANVAS_CONSTANTS.COLUM
  * @returns The column index (0-based)
  */
 export function getColumnIndex(x: number): number {
-  // Handle negative coordinates (columns extend infinitely in both directions)
-  if (x < 0) {
-    return Math.floor((x - CANVAS_CONSTANTS.COLUMN_WIDTH / 2) / COLUMN_FULL_WIDTH)
-  }
-
-  return Math.floor((x + CANVAS_CONSTANTS.COLUMN_WIDTH / 2) / COLUMN_FULL_WIDTH)
+  // Use Math.round for symmetric column snapping around the center of each column
+  // Column 0 center is at 450 (half width)
+  // Formula: round((x - halfWidth) / fullWidth)
+  return Math.round((x - CANVAS_CONSTANTS.COLUMN_WIDTH / 2) / COLUMN_FULL_WIDTH)
 }
 
 /**
