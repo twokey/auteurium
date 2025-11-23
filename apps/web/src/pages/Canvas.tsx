@@ -18,7 +18,7 @@ import { CanvasToolbar } from '../components/canvas/CanvasToolbar'
 import { ColumnGuides } from '../components/canvas/ColumnGuides'
 import { PromptDesignerPanel } from '../components/canvas/PromptDesignerPanel'
 import { SnippetNode } from '../components/snippets/SnippetNode'
-import { VideoPromptPreviewPanel } from '../components/snippets/VideoPromptPreviewPanel'
+
 import { LoadingSpinner } from '../components/ui/LoadingSpinner'
 import { Navigation } from '../components/ui/Navigation'
 import { ModelsProvider } from '../contexts/ModelsContext'
@@ -82,9 +82,10 @@ const CanvasContent = () => {
   const navigate = useNavigate()
   const { generatingImageSnippetIds, generatingVideoSnippetIds, setSelectedSnippetIds } = useCanvasStore()
   const { openContextMenu, closeContextMenu } = useContextMenuStore()
-  const { activeSnippetId, clearActive } = useVideoPromptStore()
+  const { clearActive } = useVideoPromptStore()
   const isPromptDesignerOpen = usePromptDesignerStore((state) => state.isOpen)
   const promptDesignerSnippetId = usePromptDesignerStore((state) => state.snippetId)
+  const lastOpenedAt = usePromptDesignerStore((state) => state.lastOpenedAt)
 
   // Track viewport for column guides
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 })
@@ -233,24 +234,29 @@ const CanvasContent = () => {
     }
 
     // Center the snippet + designer pair and zoom to 100%
-    const { width: measuredWidth, height: measuredHeight } = getNodeDimensions(node)
+    const { width: measuredWidth } = getNodeDimensions(node)
     const nodeWidth = measuredWidth ?? CANVAS_CONSTANTS.COLUMN_WIDTH
-    const nodeHeight = measuredHeight ?? CANVAS_CONSTANTS.ESTIMATED_SNIPPET_HEIGHT
     const gap = CANVAS_CONSTANTS.COLUMN_GAP / 2
 
     const pairWidth = nodeWidth * 2 + gap
-    const pairHeight = nodeHeight
 
     const targetZoom = 1
 
     const targetCenterX = node.position.x + (pairWidth / 2)
-    const targetCenterY = node.position.y + pairHeight / 2
+
+    // Calculate target Y to position the top of the snippet near the top of the screen
+    // We want the node's top Y to be at TOP_OFFSET pixels from the top of the viewport
+    const TOP_OFFSET = 120
+    const containerHeight = reactFlowWrapperRef.current?.clientHeight ?? 800
+
+    // Formula: cy = node.y + (containerHeight / 2) - TOP_OFFSET (assuming zoom = 1)
+    const targetCenterY = node.position.y + (containerHeight / 2) - TOP_OFFSET
 
     instance.setCenter(targetCenterX, targetCenterY, {
       zoom: targetZoom,
       duration: 800
     })
-  }, [isPromptDesignerOpen, promptDesignerSnippetId])
+  }, [isPromptDesignerOpen, promptDesignerSnippetId, lastOpenedAt])
 
   // Calculate Prompt Designer position
   const promptDesignerPlacement = useMemo(() => {
@@ -271,17 +277,16 @@ const CanvasContent = () => {
     const flowX = node.position.x + nodeWidth + gap
     const flowY = node.position.y
 
-    const screenX = (flowX * viewport.zoom) + viewport.x
-    const screenY = (flowY * viewport.zoom) + viewport.y
+
 
     return {
       width: nodeWidth,
       height: nodeHeight,
       style: {
-        left: flowX,
-        top: flowY,
+        left: (flowX * viewport.zoom) + viewport.x,
+        top: (flowY * viewport.zoom) + viewport.y,
         width: nodeWidth,
-        transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
+        transform: `scale(${viewport.zoom})`,
         transformOrigin: 'top left',
         zIndex: node.zIndex
       } as CSSProperties
@@ -617,18 +622,7 @@ const CanvasContent = () => {
           />
         )}
 
-        {/* Video Prompt Preview Panel - positioned relative to active video snippet */}
-        {activeSnippetId && (
-          <VideoPromptPreviewPanel
-            snippets={snippets}
-            viewport={viewport}
-            videoModels={videoModels}
-            isLoadingVideoModels={isLoadingVideoModels}
-            isGeneratingVideo={!!generatingVideoSnippetIds[activeSnippetId]}
-            onGenerateVideo={handlers.handleGenerateVideo}
-            onUpdateContent={handlers.handleUpdateSnippetContent}
-          />
-        )}
+
       </div>
 
       {/* All Modals - Now managed centrally */}

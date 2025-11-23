@@ -36,6 +36,7 @@ interface PromptDesignerState {
   setPrompt: (prompt: string) => void
   setGenerating: (isGenerating: boolean) => void
   updateGenerationSettings: (settings: Partial<VideoModelSettings>) => void
+  lastOpenedAt: number | null
 }
 
 const INITIAL_STATE: Omit<
@@ -50,7 +51,8 @@ const INITIAL_STATE: Omit<
   prompt: '',
   connectedContent: [],
   generationSettings: null,
-  onGenerate: null
+  onGenerate: null,
+  lastOpenedAt: null
 }
 
 export const usePromptDesignerStore = create<PromptDesignerState>((set, get) => ({
@@ -81,7 +83,8 @@ export const usePromptDesignerStore = create<PromptDesignerState>((set, get) => 
       prompt: initialPrompt,
       connectedContent,
       generationSettings: initialSettings,
-      onGenerate: onGenerate ?? null
+      onGenerate: onGenerate ?? null,
+      lastOpenedAt: Date.now()
     })
   },
   close: () => {

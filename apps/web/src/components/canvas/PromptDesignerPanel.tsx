@@ -211,9 +211,16 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
       style={{
         width: panelWidth,
         position: 'absolute',
+        animation: 'fadeIn 0.2s ease-out',
         ...style
       }}
     >
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+      `}</style>
       <div className="flex items-start justify-between border-b border-gray-200 px-3 py-2.5">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-gray-900 leading-tight">Prompt designer</h3>
