@@ -198,6 +198,32 @@ const CanvasContent = () => {
     setViewport(viewport)
   }, [])
 
+  // When a new video snippet appears (typically from the async Vidu callback), trigger a single refetch
+  // to pull the freshest connections/metadata without continuous polling.
+  const hasInitializedVideoSet = useRef(false)
+  const seenVideoSnippetIdsRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    const currentVideoIds = new Set(
+      snippets
+        .filter(snippet => (snippet.videoS3Key || snippet.videoUrl) && snippet.createdFrom)
+        .map(snippet => snippet.id)
+    )
+
+    if (!hasInitializedVideoSet.current) {
+      seenVideoSnippetIdsRef.current = currentVideoIds
+      hasInitializedVideoSet.current = true
+      return
+    }
+
+    const newlyAdded = [...currentVideoIds].some(id => !seenVideoSnippetIdsRef.current.has(id))
+    seenVideoSnippetIdsRef.current = currentVideoIds
+
+    if (newlyAdded) {
+      void refetch()
+    }
+  }, [snippets, refetch])
+
   // Wrap onMoveEnd to update viewport state for column guides
   const handleMoveEnd = useCallback((_event: MouseEvent | TouchEvent, viewport: Viewport) => {
     setViewport(viewport)

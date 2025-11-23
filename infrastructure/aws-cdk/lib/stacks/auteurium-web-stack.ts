@@ -87,7 +87,9 @@ export class AuteuriumWebStack extends cdk.Stack {
         sources: [s3deploy.Source.asset(webAssetsPath)],
         destinationBucket: this.websiteBucket,
         distribution: this.distribution,
-        distributionPaths: ['/*']
+        distributionPaths: ['/*'],
+        // Avoid waiting on CloudFront invalidation completion to dodge regression: https://github.com/aws/aws-cdk/issues/15891
+        waitForDistributionInvalidation: false
       })
     } catch (_error) {
       // Dist folder doesn't exist yet, skip deployment

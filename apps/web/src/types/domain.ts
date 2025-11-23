@@ -72,6 +72,7 @@ export interface Snippet {
   videoGenerationStatus?: VideoGenerationStatus | null
   videoGenerationTaskId?: string | null
   videoGenerationError?: string | null
+  createdFrom?: string | null
   connections?: Connection[]
   snippetType?: 'text' | 'video'
 }

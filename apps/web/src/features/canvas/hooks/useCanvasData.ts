@@ -8,6 +8,7 @@ import { useMemo, useRef, useCallback, useEffect } from 'react'
 import { GET_PROJECT_CONNECTIONS, GET_PROJECT_WITH_SNIPPETS } from '../../../graphql/queries'
 import { useGraphQLQueryWithCache } from '../../../hooks/useGraphQLQueryWithCache'
 import { snapToColumn } from '../../../utils/columnLayout'
+import { CANVAS_CONSTANTS } from '../../../constants'
 import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
 import { usePendingPositionsStore } from '../store/pendingPositionsStore'
 
@@ -628,6 +629,7 @@ export function useFlowNodes(
 ): Node<SnippetNodeData>[] {
   // Track which snippets have been migrated to column layout
   const migratedSnippetsRef = useRef<Set<string>>(new Set())
+  const autoPlacedVideoSnippetsRef = useRef<Set<string>>(new Set())
   const { addPendingPosition } = usePendingPositionsStore()
 
   // Migrate existing snippets to column layout on first render
@@ -662,6 +664,46 @@ export function useFlowNodes(
       // in useReactFlowSetup, so no need to trigger flush here
       console.warn(`Migrated ${snippetsNeedingMigration.length} snippets to column layout`)
     }
+  }, [snippets, addPendingPosition])
+
+  // Auto-place derived video snippets at the bottom of their column to avoid overlap.
+  useEffect(() => {
+    snippets.forEach(snippet => {
+      const hasVideo = Boolean(snippet.videoS3Key || snippet.videoUrl)
+      const hasSource = Boolean((snippet as Partial<Snippet> & { createdFrom?: string }).createdFrom)
+
+      if (!hasVideo || !hasSource) {
+        return
+      }
+
+      if (autoPlacedVideoSnippetsRef.current.has(snippet.id)) {
+        return
+      }
+
+      const snappedX = snapToColumn(snippet.position?.x ?? CANVAS_CONSTANTS.DEFAULT_NODE_POSITION.x)
+
+      // Find all snippets already in this column (excluding the current one)
+      const siblings = snippets.filter(s => {
+        if (s.id === snippet.id) return false
+        const siblingX = snapToColumn(s.position?.x ?? CANVAS_CONSTANTS.DEFAULT_NODE_POSITION.x)
+        return siblingX === snappedX
+      })
+
+      if (siblings.length === 0) {
+        return
+      }
+
+      const maxY = Math.max(...siblings.map(s => s.position?.y ?? 0))
+      const targetY = maxY + CANVAS_CONSTANTS.ESTIMATED_SNIPPET_HEIGHT + CANVAS_CONSTANTS.GENERATED_SNIPPET_SPACING
+      const currentY = snippet.position?.y ?? 0
+
+      if (targetY <= currentY + 1) {
+        return
+      }
+
+      addPendingPosition(snippet.id, { x: snappedX, y: targetY })
+      autoPlacedVideoSnippetsRef.current.add(snippet.id)
+    })
   }, [snippets, addPendingPosition])
 
   // Memoize connection analysis separately - only recompute when snippets actually change

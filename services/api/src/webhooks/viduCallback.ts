@@ -38,11 +38,18 @@ const viduCreationSchema = z.object({
 const viduCallbackSchema = z.object({
   task_id: z.string().optional(),
   id: z.string().optional(),
-  state: z.string(),
+  state: z.string().optional(),
+  status: z.string().optional(),
   err_code: z.string().optional(),
   error: z.string().optional(),
+  credits: z.number().optional(),
+  payload: z.string().optional(),
+  bgm: z.boolean().optional(),
+  off_peak: z.boolean().optional(),
   creations: z.array(viduCreationSchema).optional()
-}).passthrough()
+}).passthrough().refine(data => data.state || data.status, {
+  message: 'Missing state/status in Vidu callback'
+})
 
 interface GenerationTaskRecord extends GenerationRecord {
   PK: string
@@ -485,6 +492,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     }
 
     const payload = viduCallbackSchema.parse(JSON.parse(rawBody))
+    const normalizedState = (payload.state ?? payload.status ?? '').toLowerCase()
     const taskId = payload.task_id ?? payload.id
 
     if (!taskId) {
@@ -492,7 +500,12 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       return respond(400, { message: 'Missing task identifier' })
     }
 
-    logger.info('Received Vidu webhook', { ...payload, task_id: taskId })
+    if (!normalizedState) {
+      logger.error('Vidu webhook missing state/status value after normalization', { payload })
+      return respond(400, { message: 'Missing state/status' })
+    }
+
+    logger.info('Received Vidu webhook', { ...payload, task_id: taskId, normalizedState })
 
     const taskQuery = await dynamoClient.send(new QueryCommand({
       TableName: GENERATIONS_TABLE,
@@ -513,10 +526,22 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       return respond(202, { message: 'Task not recognized' })
     }
 
-    if (SUCCESS_STATES.has(payload.state)) {
-      const creation = payload.creations?.[0]
+    if (SUCCESS_STATES.has(normalizedState)) {
+      const creation = payload.creations?.find((item: z.infer<typeof viduCreationSchema>) => Boolean(item?.url))
       if (!creation?.url) {
-        throw new Error('Missing creation URL in success payload')
+        const errorMessage = 'Missing creation URL in success payload'
+
+        await updateSnippetStatus(record, 'FAILED', {
+          videoGenerationError: errorMessage
+        })
+
+        await updateGenerationRecord(record, 'FAILED', {
+          errorMessage,
+          result: 'failed'
+        })
+
+        logger.error(errorMessage, { taskId, payload })
+        return respond(400, { message: errorMessage })
       }
 
       const videoBuffer = await downloadVideo(creation.url)
@@ -584,7 +609,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       })
     }
 
-    if (FAILURE_STATES.has(payload.state)) {
+    if (FAILURE_STATES.has(normalizedState)) {
       const errorMessage = payload.error ?? payload.err_code ?? 'Video generation failed'
 
       await updateSnippetStatus(record, 'FAILED', {
@@ -614,7 +639,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
 
     logger.info('Updated Vidu task status', {
       taskId,
-      state: payload.state
+      state: normalizedState
     })
 
     return respond(200, { message: 'Task status updated' })

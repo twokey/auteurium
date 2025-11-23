@@ -609,6 +609,7 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
               onChange={(event) => setPrompt(event.target.value)}
               onBlur={() => setIsEditing(false)}
               onKeyDown={(event) => {
+                event.stopPropagation()
                 if (event.key === 'Escape') {
                   event.preventDefault()
                   setIsEditing(false)

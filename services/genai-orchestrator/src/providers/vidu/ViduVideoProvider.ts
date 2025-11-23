@@ -58,13 +58,12 @@ export class ViduVideoProvider implements IVideoProvider {
       // Validate prompt
       await this.validatePrompt(request.prompt)
 
-      // Determine endpoint based on whether images are provided
-      const endpoint = this.resolveEndpoint(request)
-      const apiModelId = this.formatModelIdForEndpoint(modelConfig.modelId, endpoint)
+      const hasImages = request.inputImages?.length ? request.inputImages.length > 0 : false
+      const endpoint = hasImages ? 'reference2video' : 'text2video'
 
       logger.info('Generating video with Vidu', {
         modelId: modelConfig.modelId,
-        apiModelId,
+        apiModelId: this.normalizeModelId(modelConfig.modelId),
         endpoint,
         promptLength: request.prompt.length,
         imageCount: request.inputImages?.length || 0,
@@ -73,7 +72,7 @@ export class ViduVideoProvider implements IVideoProvider {
       })
 
       // Submit video generation task
-      const taskResponse = await this.submitVideoTask(endpoint, request, apiModelId)
+      const taskResponse = await this.submitVideoTask(request)
 
       const generationTimeMs = Date.now() - startTime
       const cost = this.calculateCost(1, request.modelId)
@@ -102,36 +101,35 @@ export class ViduVideoProvider implements IVideoProvider {
     }
   }
 
-  private resolveEndpoint(request: VideoGenerationRequest): 'text2video' | 'img2video' {
-    if (request.inputImages && request.inputImages.length > 0) {
-      return 'img2video'
+  private normalizeModelId(modelId: string): string {
+    const normalized = modelId.toLowerCase()
+    if (normalized.startsWith('vidu-q2') || normalized.startsWith('viduq2')) {
+      return 'viduq2'
     }
-    return 'text2video'
+    return normalized
   }
 
-  private formatModelIdForEndpoint(modelId: string, endpoint: 'text2video' | 'img2video'): string {
-    if (endpoint === 'img2video') {
-      const match = modelId.match(/^(viduq\d)([a-z]+)$/i)
-      if (match) {
-        return `${match[1]}-${match[2]}`.toLowerCase()
-      }
-    }
-    return modelId
-  }
-
-  private async submitVideoTask(endpoint: string, request: VideoGenerationRequest, apiModelId: string): Promise<ViduTaskResponse> {
+  private async submitVideoTask(request: VideoGenerationRequest): Promise<ViduTaskResponse> {
+    const hasImages = Array.isArray(request.inputImages) && request.inputImages.length > 0
+    const endpoint = hasImages ? 'reference2video' : 'text2video'
     const url = `${this.baseUrl}/${endpoint}`
 
+    if (!hasImages && endpoint === 'reference2video') {
+      throw new Error('Vidu Q2 requires at least one reference image')
+    }
+
     const body: Record<string, unknown> = {
-      model: apiModelId,
+      model: this.normalizeModelId(request.modelId),
       prompt: request.prompt,
-      audio: false
+      audio: false,
+      bgm: false
+    }
+
+    if (hasImages) {
+      body.images = request.inputImages
     }
 
     // Add optional parameters
-    if (request.inputImages && request.inputImages.length > 0) {
-      body.images = request.inputImages
-    }
     if (request.duration !== undefined) {
       body.duration = request.duration
     }
@@ -161,7 +159,14 @@ export class ViduVideoProvider implements IVideoProvider {
       logger.warn('No webhook URL configured for Vidu provider; callbacks will not be received')
     }
 
-    logger.info('Submitting Vidu task', { url, model: request.modelId, requestBody: body })
+    logger.info('Submitting Vidu task', {
+      url,
+      model: body.model,
+      requestBody: {
+        ...body,
+        images: Array.isArray(body.images) ? (body.images as unknown[]).length : body.images
+      }
+    })
 
     const response = await fetch(url, {
       method: 'POST',

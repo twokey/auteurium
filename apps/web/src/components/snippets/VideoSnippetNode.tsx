@@ -96,6 +96,7 @@ const TextareaField = ({
             maxLength={maxLength}
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
           />
         </div>
         <StarMenu fieldType={label} onSelect={handleSnippetSelect} />

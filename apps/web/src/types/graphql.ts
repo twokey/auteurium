@@ -111,6 +111,7 @@ export interface CreateSnippetInput {
   position?: Position
   tags?: string[]
   categories?: string[]
+  createdFrom?: string
   snippetType?: 'text' | 'video'
 }
 
