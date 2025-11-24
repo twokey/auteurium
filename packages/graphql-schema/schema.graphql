@@ -38,6 +38,12 @@ type VideoMetadata {
   format: String!
   fileSize: Int
   movementAmplitude: String
+  model: String
+  taskId: String
+  bgm: Boolean
+  credits: Int
+  offPeak: Boolean
+  createdAt: String
 }
 
 enum VideoGenerationStatus {
@@ -68,6 +74,10 @@ type Snippet {
   videoMetadata: VideoMetadata
   versions: [SnippetVersion!]!
   createdFrom: ID
+  outputSnippetId: ID
+  generated: Boolean
+  generationId: ID
+  generationCreatedAt: String
   snippetType: String!
 }
 
@@ -169,6 +179,9 @@ input CreateSnippetInput {
   position: PositionInput!
   tags: [String!]
   createdFrom: ID
+  generated: Boolean
+  generationId: ID
+  generationCreatedAt: String
   snippetType: String
 }
 
@@ -177,6 +190,9 @@ input UpdateSnippetInput {
   content: AWSJSON
   position: PositionInput
   tags: [String!]
+  generated: Boolean
+  generationId: ID
+  generationCreatedAt: String
 }
 
 input UpdateSnippetPositionInput {
@@ -302,6 +318,8 @@ type GenerationResult {
   cost: Float!
   modelUsed: String!
   generationTimeMs: Int!
+  generationId: ID
+  generationCreatedAt: String
 }
 
 type GenerationStreamEvent {
@@ -323,6 +341,7 @@ type GenerationRecord {
   userId: ID!
   snippetId: ID!
   projectId: ID!
+  outputSnippetId: ID
   modelProvider: String!
   modelId: String!
   prompt: String!

@@ -119,6 +119,7 @@ const deleteSnippetMedia = async (snippet: Snippet | undefined): Promise<void> =
 const buildSnippet = (input: SnippetInput, userId: string, now: string): Snippet => {
   const snippetType = input.snippetType ?? 'text'
   const content = input.content ?? {}
+  const generated = input.generated ?? false
 
   return {
     id: generateId(),
@@ -132,7 +133,10 @@ const buildSnippet = (input: SnippetInput, userId: string, now: string): Snippet
     createdAt: now,
     updatedAt: now,
     snippetType,
-    ...(input.createdFrom && { createdFrom: input.createdFrom })
+    generated,
+    ...(input.createdFrom && { createdFrom: input.createdFrom }),
+    ...(input.generationId && { generationId: input.generationId }),
+    ...(input.generationCreatedAt && { generationCreatedAt: input.generationCreatedAt })
   }
 }
 
@@ -149,7 +153,10 @@ const createSnippetVersion = async (snippet: Snippet): Promise<void> => {
       userId: snippet.userId,
       position: snippet.position,
       tags: snippet.tags,
-      createdAt: getCurrentTimestamp()
+      createdAt: getCurrentTimestamp(),
+      generated: snippet.generated ?? false,
+      ...(snippet.generationId && { generationId: snippet.generationId }),
+      ...(snippet.generationCreatedAt && { generationCreatedAt: snippet.generationCreatedAt })
     }
   }
 
@@ -339,6 +346,9 @@ const buildSnippetUpdate = (
   assignField('content', mergedContent)
   assignField('position', updates.position)
   assignField('tags', updates.tags)
+  assignField('generated', updates.generated)
+  assignField('generationId', updates.generationId)
+  assignField('generationCreatedAt', updates.generationCreatedAt)
 
   const result = {
     updateExpressions,

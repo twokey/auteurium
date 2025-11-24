@@ -146,6 +146,12 @@ export type ConnectedContentItem =
     } | null
   }
 
+export type SnippetGenerationMeta = {
+  prompt?: string
+  generationId?: string | null
+  generationCreatedAt?: string | null
+}
+
 export interface SnippetNodeData {
   snippet: {
     id: string
@@ -168,7 +174,7 @@ export interface SnippetNodeData {
     } | null
     connectedContent?: ConnectedContentItem[]
     downstreamConnections?: { id: string; title?: string }[]
-    snippetType: 'text' | 'image' | 'video' | 'audio' | 'generic'
+    snippetType: 'text' | 'image' | 'video' | 'audio' | 'generic' | 'content'
     videoUrl?: string | null
     videoS3Key?: string | null
     videoMetadata?: {
@@ -188,10 +194,10 @@ export interface SnippetNodeData {
   onViewVersions: (snippetId: string) => void
   onUpdateContent: (snippetId: string, changes: Partial<Pick<Snippet, 'content' | 'title'>>) => Promise<void>
   onCombine: (snippetId: string) => Promise<void>
-  onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
-  onGenerateText: (snippetId: string, content: string) => Promise<void>
+  onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string, meta?: SnippetGenerationMeta) => void
+  onGenerateText: (snippetId: string, content: string, meta?: SnippetGenerationMeta) => Promise<void>
   onGenerateVideo: (snippetId: string, options: VideoGenerationInput) => Promise<void> | void
-  onGenerateVideoSnippetFromJson: (sourceSnippetId: string, data: GeneratedVideoSnippetData) => Promise<void>
+  onGenerateVideoSnippetFromJson: (sourceSnippetId: string, data: GeneratedVideoSnippetData, meta?: SnippetGenerationMeta) => Promise<void>
   onFocusSnippet: (snippetId: string) => void
   onCreateUpstreamSnippet: (snippetId: string) => Promise<void> | void
   isGeneratingImage: boolean

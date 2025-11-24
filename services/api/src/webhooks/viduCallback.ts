@@ -128,16 +128,32 @@ const buildQueryString = (
   return ''
 }
 
+const stripUndefined = <T extends { [key: string]: any }>(input: T): T => {
+  const cleaned: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(input)) {
+    if (value !== undefined) {
+      cleaned[key] = value
+    }
+  }
+  return cleaned as T
+}
+
 const buildVideoMetadata = (record: GenerationTaskRecord, fileSize: number): VideoMetadata => {
   const request = (record.videoRequest ?? {}) as Record<string, unknown>
 
-  const metadata: VideoMetadata = {
+  const metadata: VideoMetadata = stripUndefined({
     duration: typeof request.duration === 'number' ? request.duration : 4,
     resolution: typeof request.resolution === 'string' ? request.resolution : '720p',
     aspectRatio: typeof request.aspectRatio === 'string' ? request.aspectRatio : '16:9',
     format: 'mp4',
-    fileSize
-  }
+    fileSize,
+    taskId: record.taskId,
+    model: record.modelId,
+    bgm: typeof request.bgm === 'boolean' ? request.bgm : undefined,
+    credits: typeof request.credits === 'number' ? request.credits : undefined,
+    offPeak: typeof request.off_peak === 'boolean' ? request.off_peak : undefined,
+    createdAt: record.createdAt
+  })
 
   const optionalFields: Array<[keyof VideoMetadata, unknown]> = [
     ['style', typeof request.style === 'string' ? request.style : undefined],
@@ -151,7 +167,7 @@ const buildVideoMetadata = (record: GenerationTaskRecord, fileSize: number): Vid
     }
   }
 
-  return metadata
+  return stripUndefined(metadata)
 }
 
 const VIDEO_SNIPPET_HORIZONTAL_OFFSET = 950
@@ -288,7 +304,8 @@ const linkSnippets = async (
 
 const saveVideoResultToSnippet = async (
   record: GenerationTaskRecord,
-  attributes: { videoS3Key: string; videoMetadata: VideoMetadata }
+  attributes: { videoS3Key: string; videoMetadata: VideoMetadata },
+  targetSnippetId?: string
 ): Promise<void> => {
   const now = new Date().toISOString()
 
@@ -296,7 +313,7 @@ const saveVideoResultToSnippet = async (
     TableName: SNIPPETS_TABLE,
     Key: {
       projectId: record.projectId,
-      id: record.snippetId
+      id: targetSnippetId ?? record.snippetId
     },
     UpdateExpression: 'SET videoS3Key = :videoS3Key, videoMetadata = :videoMetadata, updatedAt = :updatedAt, #version = if_not_exists(#version, :baseVersion) + :incr',
     ExpressionAttributeNames: {
@@ -536,38 +553,61 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       const metadata = buildVideoMetadata(record, videoBuffer.length)
 
       let derivedSnippet: Snippet | null = null
-      try {
-        const sourceSnippet = await getSourceSnippet(record.projectId, record.snippetId)
-
-        if (sourceSnippet) {
-          derivedSnippet = await createDerivedVideoSnippet(record, sourceSnippet, s3Key, metadata)
+      const targetSnippetId = record.outputSnippetId
+      if (targetSnippetId) {
+        try {
+          await saveVideoResultToSnippet(record, { videoS3Key: s3Key, videoMetadata: metadata }, targetSnippetId)
           try {
-            await linkSnippets(record, sourceSnippet.id, derivedSnippet.id)
+            await linkSnippets(record, record.snippetId, targetSnippetId)
           } catch (linkError) {
             logger.warn('Failed to link generated video snippet to source', {
               taskId,
-              sourceSnippetId: sourceSnippet.id,
-              generatedSnippetId: derivedSnippet.id,
+              sourceSnippetId: record.snippetId,
+              generatedSnippetId: targetSnippetId,
               error: linkError instanceof Error ? linkError.message : String(linkError)
             })
           }
-        } else {
-          logger.warn('Source snippet not found for generated video', {
-            projectId: record.projectId,
-            snippetId: record.snippetId
+        } catch (updateError) {
+          logger.error('Failed to update output snippet for video generation', {
+            taskId,
+            targetSnippetId,
+            error: updateError instanceof Error ? updateError.message : String(updateError)
           })
         }
-      } catch (creationError) {
-        logger.error('Failed to create derived video snippet', {
-          taskId,
-          snippetId: record.snippetId,
-          error: creationError instanceof Error ? creationError.message : String(creationError)
-        })
+      } else {
+        try {
+          const sourceSnippet = await getSourceSnippet(record.projectId, record.snippetId)
+
+          if (sourceSnippet) {
+            derivedSnippet = await createDerivedVideoSnippet(record, sourceSnippet, s3Key, metadata)
+            try {
+              await linkSnippets(record, sourceSnippet.id, derivedSnippet.id)
+            } catch (linkError) {
+              logger.warn('Failed to link generated video snippet to source', {
+                taskId,
+                sourceSnippetId: sourceSnippet.id,
+                generatedSnippetId: derivedSnippet.id,
+                error: linkError instanceof Error ? linkError.message : String(linkError)
+              })
+            }
+          } else {
+            logger.warn('Source snippet not found for generated video', {
+              projectId: record.projectId,
+              snippetId: record.snippetId
+            })
+          }
+        } catch (creationError) {
+          logger.error('Failed to create derived video snippet', {
+            taskId,
+            snippetId: record.snippetId,
+            error: creationError instanceof Error ? creationError.message : String(creationError)
+          })
+        }
       }
 
       record.taskId = undefined
 
-      if (!derivedSnippet) {
+      if (!derivedSnippet && !targetSnippetId) {
         await saveVideoResultToSnippet(record, {
           videoS3Key: s3Key,
           videoMetadata: metadata

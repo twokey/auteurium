@@ -361,7 +361,8 @@ export const handler: AppSyncResolverHandler<CreateScenesArgs, CreateScenesResul
     const sourceColumn = getColumnIndex(sourceSnippet.position.x)
     const targetColumn = sourceColumn + 1
     const baseX = snapToColumn(getColumnXPosition(targetColumn))
-    const timestamp = getCurrentTimestamp()
+    const generationId = `${Date.now()}-${Math.random().toString(36).substring(7)}`
+    const generationCreatedAt = getCurrentTimestamp()
 
     // Create snippet records for all scenes
     const sceneSnippets: Snippet[] = scenesData.map((scene, index) => ({
@@ -370,6 +371,13 @@ export const handler: AppSyncResolverHandler<CreateScenesArgs, CreateScenesResul
       userId,
       title: scene.title,
       content: {
+        prompt: {
+          label: 'Prompt',
+          value: validatedInput.prompt,
+          type: 'longText',
+          isSystem: true,
+          order: 0
+        },
         mainText: {
           label: 'Main Text',
           value: scene.content,
@@ -384,10 +392,13 @@ export const handler: AppSyncResolverHandler<CreateScenesArgs, CreateScenesResul
       },
       tags: [], // No inheritance per requirements
       version: 1,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+      createdAt: generationCreatedAt,
+      updatedAt: generationCreatedAt,
       createdFrom: snippetId, // Link to source snippet
-      snippetType: 'text'
+      snippetType: 'text',
+      generated: true,
+      generationId,
+      generationCreatedAt
     } as Snippet))
 
     // Batch write snippets to DynamoDB
@@ -422,17 +433,15 @@ export const handler: AppSyncResolverHandler<CreateScenesArgs, CreateScenesResul
     await createSceneVersions(sceneSnippets)
 
     // Save generation record to DynamoDB
-    const generationId = `${Date.now()}-${Math.random().toString(36).substring(7)}`
-    const createdAt = getCurrentTimestamp()
     const generationTimeMs = Date.now() - startTime
 
     await dynamoClient.send(new PutCommand({
       TableName: GENERATIONS_TABLE,
       Item: {
         PK: `USER#${userId}`,
-        SK: `GENERATION#${createdAt}#${generationId}`,
+        SK: `GENERATION#${generationCreatedAt}#${generationId}`,
         id: generationId,
-        createdAt,
+        createdAt: generationCreatedAt,
         userId,
         snippetId,
         projectId,

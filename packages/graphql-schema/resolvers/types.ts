@@ -92,6 +92,9 @@ export type CreateScenesResult = {
 export type CreateSnippetInput = {
   content?: InputMaybe<Scalars['AWSJSON']['input']>;
   createdFrom?: InputMaybe<Scalars['ID']['input']>;
+  generated?: InputMaybe<Scalars['Boolean']['input']>;
+  generationCreatedAt?: InputMaybe<Scalars['String']['input']>;
+  generationId?: InputMaybe<Scalars['ID']['input']>;
   position: PositionInput;
   projectId: Scalars['ID']['input'];
   snippetType?: InputMaybe<Scalars['String']['input']>;
@@ -124,6 +127,7 @@ export type GenerationRecord = {
   id: Scalars['ID']['output'];
   modelId: Scalars['String']['output'];
   modelProvider: Scalars['String']['output'];
+  outputSnippetId?: Maybe<Scalars['ID']['output']>;
   projectId: Scalars['ID']['output'];
   prompt: Scalars['String']['output'];
   result: Scalars['String']['output'];
@@ -141,6 +145,8 @@ export type GenerationResult = {
   __typename?: 'GenerationResult';
   content: Scalars['String']['output'];
   cost: Scalars['Float']['output'];
+  generationCreatedAt?: Maybe<Scalars['String']['output']>;
+  generationId?: Maybe<Scalars['ID']['output']>;
   generationTimeMs: Scalars['Int']['output'];
   modelUsed: Scalars['String']['output'];
   tokensUsed: Scalars['Int']['output'];
@@ -468,10 +474,14 @@ export type Snippet = {
   content: Scalars['AWSJSON']['output'];
   createdAt: Scalars['String']['output'];
   createdFrom?: Maybe<Scalars['ID']['output']>;
+  generated?: Maybe<Scalars['Boolean']['output']>;
+  generationCreatedAt?: Maybe<Scalars['String']['output']>;
+  generationId?: Maybe<Scalars['ID']['output']>;
   id: Scalars['ID']['output'];
   imageMetadata?: Maybe<ImageMetadata>;
   imageS3Key?: Maybe<Scalars['String']['output']>;
   imageUrl?: Maybe<Scalars['String']['output']>;
+  outputSnippetId?: Maybe<Scalars['ID']['output']>;
   position: Position;
   projectId: Scalars['ID']['output'];
   snippetType: Scalars['String']['output'];
@@ -533,6 +543,9 @@ export type UpdateProjectInput = {
 
 export type UpdateSnippetInput = {
   content?: InputMaybe<Scalars['AWSJSON']['input']>;
+  generated?: InputMaybe<Scalars['Boolean']['input']>;
+  generationCreatedAt?: InputMaybe<Scalars['String']['input']>;
+  generationId?: InputMaybe<Scalars['ID']['input']>;
   position?: InputMaybe<PositionInput>;
   tags?: InputMaybe<Array<Scalars['String']['input']>>;
   title?: InputMaybe<Scalars['String']['input']>;
@@ -568,13 +581,19 @@ export enum VideoGenerationStatus {
 export type VideoMetadata = {
   __typename?: 'VideoMetadata';
   aspectRatio: Scalars['String']['output'];
+  bgm?: Maybe<Scalars['Boolean']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  credits?: Maybe<Scalars['Int']['output']>;
   duration: Scalars['Int']['output'];
   fileSize?: Maybe<Scalars['Int']['output']>;
   format: Scalars['String']['output'];
+  model?: Maybe<Scalars['String']['output']>;
   movementAmplitude?: Maybe<Scalars['String']['output']>;
+  offPeak?: Maybe<Scalars['Boolean']['output']>;
   resolution: Scalars['String']['output'];
   seed?: Maybe<Scalars['Int']['output']>;
   style?: Maybe<Scalars['String']['output']>;
+  taskId?: Maybe<Scalars['String']['output']>;
 };
 
 export type WithIndex<TObject> = TObject & Record<string, any>;
@@ -783,6 +802,7 @@ export type GenerationRecordResolvers<ContextType = GraphQLContext, ParentType e
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   modelId?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   modelProvider?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  outputSnippetId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   projectId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   prompt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   result?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
@@ -799,6 +819,8 @@ export type GenerationRecordResolvers<ContextType = GraphQLContext, ParentType e
 export type GenerationResultResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['GenerationResult'] = ResolversParentTypes['GenerationResult']> = ResolversObject<{
   content?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   cost?: Resolver<ResolversTypes['Float'], ParentType, ContextType>;
+  generationCreatedAt?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  generationId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   generationTimeMs?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   modelUsed?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   tokensUsed?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
@@ -904,10 +926,14 @@ export type SnippetResolvers<ContextType = GraphQLContext, ParentType extends Re
   content?: Resolver<ResolversTypes['AWSJSON'], ParentType, ContextType>;
   createdAt?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   createdFrom?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
+  generated?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType>;
+  generationCreatedAt?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  generationId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   imageMetadata?: Resolver<Maybe<ResolversTypes['ImageMetadata']>, ParentType, ContextType>;
   imageS3Key?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   imageUrl?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  outputSnippetId?: Resolver<Maybe<ResolversTypes['ID']>, ParentType, ContextType>;
   position?: Resolver<ResolversTypes['Position'], ParentType, ContextType>;
   projectId?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
   snippetType?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
@@ -960,13 +986,19 @@ export type UserResolvers<ContextType = GraphQLContext, ParentType extends Resol
 
 export type VideoMetadataResolvers<ContextType = GraphQLContext, ParentType extends ResolversParentTypes['VideoMetadata'] = ResolversParentTypes['VideoMetadata']> = ResolversObject<{
   aspectRatio?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  bgm?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType>;
+  createdAt?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  credits?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
   duration?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   fileSize?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
   format?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  model?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   movementAmplitude?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  offPeak?: Resolver<Maybe<ResolversTypes['Boolean']>, ParentType, ContextType>;
   resolution?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   seed?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
   style?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  taskId?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
 }>;
 
 export type Resolvers<ContextType = GraphQLContext> = ResolversObject<{

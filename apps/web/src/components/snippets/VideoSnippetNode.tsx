@@ -5,7 +5,7 @@ import { Accordion } from '../../components/ui/Accordion'
 import { VIDEO_GENERATION } from '../../constants'
 import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisticUpdatesStore'
 import { StarMenu } from '../../features/snippets/components/StarMenu'
-import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
+import { usePromptDesignerStore, type PromptDesignerGeneratePayload } from '../../features/canvas/store/promptDesignerStore'
 import { useVideoPromptStore } from '../../features/snippets/store/videoPromptStore'
 import { useToast } from '../../store/toastStore'
 import { buildDefaultVideoContent, extractVideoFormData, VideoSnippetFieldKey } from '../../utils/videoSnippetContent'
@@ -287,13 +287,16 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
         type: 'video',
         settings: modelSettings // Use current store settings as default
       },
-      onGenerate: async (finalPrompt, settings) => {
+      onGenerate: async (payload: PromptDesignerGeneratePayload) => {
+        const finalPrompt = payload.fullPrompt
         const storeSettings = useVideoPromptStore.getState().modelSettings
-        const latestSettings = settings?.type === 'video' ? settings.settings : storeSettings
+        const latestSettings = payload.settings?.type === 'video'
+          ? payload.settings.settings
+          : storeSettings
 
         // Sync back to store if settings changed in designer
-        if (settings?.type === 'video') {
-          useVideoPromptStore.getState().updateModelSettings(settings.settings)
+        if (payload.settings?.type === 'video') {
+          useVideoPromptStore.getState().updateModelSettings(payload.settings.settings)
         }
 
         const primaryField = getPrimaryFieldValue({ content: snippet.content })

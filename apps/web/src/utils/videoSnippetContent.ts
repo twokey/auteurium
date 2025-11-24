@@ -40,10 +40,20 @@ const normalizeMainText = (existing?: SnippetField, value?: string): SnippetFiel
 
 export const buildDefaultVideoContent = (
   values: VideoValues = {},
-  options?: { existing?: Record<string, SnippetField> }
+  options?: { existing?: Record<string, SnippetField>; prompt?: string }
 ): Record<string, SnippetField> => {
   const existing = options?.existing ?? {}
   const content: Record<string, SnippetField> = { ...existing }
+
+  if (options?.prompt) {
+    content.prompt = {
+      label: existing.prompt?.label ?? 'Prompt',
+      value: options.prompt,
+      type: existing.prompt?.type ?? 'longText',
+      isSystem: existing.prompt?.isSystem ?? true,
+      order: existing.prompt?.order ?? 0
+    }
+  }
 
   content.mainText = normalizeMainText(existing.mainText, values.mainText)
 

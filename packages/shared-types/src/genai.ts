@@ -42,6 +42,8 @@ export interface GenerationResponse {
   cost: number
   modelUsed: string
   generationTimeMs: number
+  generationId?: string
+  generationCreatedAt?: string
 }
 
 export interface MediaAsset {
@@ -56,6 +58,7 @@ export interface GenerationRecord {
   userId: string
   snippetId: string
   projectId: string
+  outputSnippetId?: string
   modelProvider: string
   modelId: string
   prompt: string
@@ -89,6 +92,12 @@ export interface VideoMetadata {
   format: string // e.g., "mp4"
   fileSize?: number // in bytes
   movementAmplitude?: string // e.g., "auto", "small", "medium", "large"
+  model?: string
+  taskId?: string
+  bgm?: boolean
+  credits?: number
+  offPeak?: boolean
+  createdAt?: string
 }
 
 export type VideoGenerationStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
@@ -125,4 +134,7 @@ export interface VideoGenerationResponse {
   generationTimeMs: number
   taskId?: string // For async tracking
   status?: VideoGenerationStatus
+  bgm?: boolean
+  credits?: number
+  offPeak?: boolean
 }

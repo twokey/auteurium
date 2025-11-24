@@ -58,12 +58,38 @@ type SnippetContentChanges = Partial<{
   content: Record<string, SnippetField | null>
 }>
 
-const buildDefaultContent = (text = ''): Record<string, SnippetField> => {
-  const hasText = typeof text === 'string' && text.trim() !== ''
-  if (!hasText) return {}
+type SnippetGenerationMeta = {
+  prompt?: string
+  generationId?: string | null
+  generationCreatedAt?: string | null
+}
 
-  return {
-    mainText: {
+const buildPromptOnlyContent = (prompt: string): Record<string, SnippetField> => ({
+  prompt: {
+    label: 'Prompt',
+    value: prompt,
+    type: 'longText',
+    isSystem: true,
+    order: 0
+  }
+})
+
+const buildDefaultContent = (text = '', options?: { prompt?: string }): Record<string, SnippetField> => {
+  const hasText = typeof text === 'string' && text.trim() !== ''
+  const content: Record<string, SnippetField> = {}
+
+  if (options?.prompt) {
+    content.prompt = {
+      label: 'Prompt',
+      value: options.prompt,
+      type: 'longText',
+      isSystem: true,
+      order: 0
+    }
+  }
+
+  if (hasText) {
+    content.mainText = {
       label: 'mainText',
       value: text,
       type: 'longText',
@@ -71,6 +97,8 @@ const buildDefaultContent = (text = ''): Record<string, SnippetField> => {
       order: 1
     }
   }
+
+  return content
 }
 
 const applyContentUpdates = (
@@ -144,7 +172,12 @@ export interface UseCanvasHandlersResult {
   handleViewVersions: (snippetId: string) => void
   handleUpdateSnippetContent: (snippetId: string, changes: SnippetContentChanges) => Promise<void>
   handleCombineSnippetContent: (snippetId: string) => Promise<void>
-  handleGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
+  handleGenerateImage: (
+    snippetId: string,
+    modelId?: string,
+    promptOverride?: string,
+    meta?: SnippetGenerationMeta
+  ) => void
   handleGenerateVideo: (snippetId: string, options: VideoGenerationInput) => Promise<void>
   handleFocusSnippet: (snippetId: string) => void
   handleCreateUpstreamSnippet: (targetSnippetId: string) => Promise<void>
@@ -162,8 +195,16 @@ export interface UseCanvasHandlersResult {
 
   // Generated Snippet Handlers
   handleCreateGeneratedSnippet: () => Promise<void>
-  handleGenerateTextSnippet: (sourceSnippetId: string, generatedContent: string) => Promise<void>
-  handleGenerateVideoSnippetFromJson: (sourceSnippetId: string, data: GeneratedVideoSnippetData) => Promise<void>
+  handleGenerateTextSnippet: (
+    sourceSnippetId: string,
+    generatedContent: string,
+    meta?: SnippetGenerationMeta
+  ) => Promise<void>
+  handleGenerateVideoSnippetFromJson: (
+    sourceSnippetId: string,
+    data: GeneratedVideoSnippetData,
+    meta?: SnippetGenerationMeta
+  ) => Promise<void>
 }
 
 export function useCanvasHandlers({
@@ -323,7 +364,8 @@ export function useCanvasHandlers({
       createdAt: now,
       updatedAt: now,
       version: 1,
-      isOptimistic: true
+      isOptimistic: true,
+      generated: false
     })
 
     try {
@@ -337,7 +379,8 @@ export function useCanvasHandlers({
                 title: 'New snippet',
                 content: buildDefaultContent(''),
                 position: targetPosition,
-                tags: []
+                tags: [],
+                generated: false
               }
             }
           }),
@@ -596,7 +639,12 @@ export function useCanvasHandlers({
     }
   }, [combineConnectionsMutation, projectId, setNodes])
 
-  const handleGenerateImage = useCallback((snippetId: string, modelId?: string, promptOverride?: string) => {
+  const handleGenerateImage = useCallback((
+    snippetId: string,
+    modelId?: string,
+    promptOverride?: string,
+    meta: SnippetGenerationMeta = {}
+  ) => {
     void (async () => {
       const snippet = snippetsRef.current.find(s => s.id === snippetId)
       if (!snippet) {
@@ -635,14 +683,19 @@ export function useCanvasHandlers({
         id: tempId,
         projectId,
         title: 'Generated image snippet',
-        content: buildDefaultContent(''),
+        content: buildPromptOnlyContent(meta.prompt ?? prompt),
         position: targetPosition,
         tags: [],
         connections: [],
         createdAt: now,
         updatedAt: now,
         version: 1,
-        isOptimistic: true
+        isOptimistic: true,
+        createdFrom: snippetId,
+        snippetType: 'content',
+        generated: true,
+        ...(meta.generationId ? { generationId: meta.generationId } : {}),
+        ...(meta.generationCreatedAt ? { generationCreatedAt: meta.generationCreatedAt } : {})
       })
 
       setGeneratingImage(tempId, true)
@@ -657,9 +710,14 @@ export function useCanvasHandlers({
                 input: {
                   projectId,
                   title: 'Generated image snippet',
-                  content: buildDefaultContent(prompt),
+                  content: buildPromptOnlyContent(meta.prompt ?? prompt),
                   position: targetPosition,
-                  tags: []
+                  tags: [],
+                  snippetType: 'content',
+                  createdFrom: snippetId,
+                  generated: true,
+                  ...(meta.generationId ? { generationId: meta.generationId } : {}),
+                  ...(meta.generationCreatedAt ? { generationCreatedAt: meta.generationCreatedAt } : {})
                 }
               }
             }),
@@ -675,7 +733,7 @@ export function useCanvasHandlers({
 
         replaceOptimisticSnippet(tempId, {
           ...newSnippet,
-          content: buildDefaultContent('')
+          content: buildDefaultContent('', { prompt: meta.prompt ?? prompt })
         })
         setGeneratingImage(tempId, false)
         setGeneratingImage(newSnippet.id, true)
@@ -738,7 +796,7 @@ export function useCanvasHandlers({
 
         const sanitizedSnippet: Snippet = {
           ...generatedSnippet,
-          content: buildDefaultContent('')
+          content: buildPromptOnlyContent(meta.prompt ?? prompt)
         }
 
         updateRealSnippet(sanitizedSnippet)
@@ -749,7 +807,7 @@ export function useCanvasHandlers({
               projectId,
               id: generatedSnippet.id,
               input: {
-                content: buildDefaultContent('')
+                content: buildPromptOnlyContent(meta.prompt ?? prompt)
               }
             }
           })
@@ -919,7 +977,8 @@ export function useCanvasHandlers({
       createdAt: now,
       updatedAt: now,
       version: 1,
-      isOptimistic: true
+      isOptimistic: true,
+      generated: false
     })
 
     try {
@@ -1071,7 +1130,8 @@ export function useCanvasHandlers({
       createdAt: now,
       updatedAt: now,
       version: 1,
-      isOptimistic: true
+      isOptimistic: true,
+      generated: false
     })
 
     // Scroll to the new snippet to ensure visibility
@@ -1086,7 +1146,8 @@ export function useCanvasHandlers({
         title: 'New snippet',
         content: buildDefaultContent(''),
         position: snappedPosition,
-        tags: []
+        tags: [],
+        generated: false
       }
     } as Record<string, unknown> & CreateSnippetVariables
 
@@ -1145,6 +1206,7 @@ export function useCanvasHandlers({
       updatedAt: now,
       version: 1,
       isOptimistic: true,
+      generated: false,
       snippetType: 'video'
     })
 
@@ -1155,6 +1217,7 @@ export function useCanvasHandlers({
         content: buildDefaultVideoContent(),
         position: snappedPosition,
         tags: [],
+        generated: false,
         snippetType: 'video'
       }
     } as Record<string, unknown> & CreateSnippetVariables
@@ -1224,14 +1287,17 @@ export function useCanvasHandlers({
       id: tempId,
       projectId,
       title: 'Generated snippet',
-      content: buildDefaultContent(generatedSnippetPreview.content),
+      content: buildPromptOnlyContent(generatedSnippetPreview.content),
       position: targetPosition,
       tags: [],
       connections: [],
       createdAt: now,
       updatedAt: now,
       version: 1,
-      isOptimistic: true
+      isOptimistic: true,
+      snippetType: 'content',
+      generated: true,
+      ...(sourceSnippetId ? { createdFrom: sourceSnippetId } : {})
     })
 
     // Close modals immediately for better UX
@@ -1248,9 +1314,12 @@ export function useCanvasHandlers({
               input: {
                 projectId,
                 title: 'Generated snippet',
-                content: buildDefaultContent(generatedSnippetPreview.content),
+                content: buildPromptOnlyContent(generatedSnippetPreview.content),
                 position: targetPosition,
-                tags: []
+                tags: [],
+                snippetType: 'content',
+                ...(sourceSnippetId ? { createdFrom: sourceSnippetId } : {}),
+                generated: true
               }
             }
           }),
@@ -1335,7 +1404,11 @@ export function useCanvasHandlers({
   ])
 
   // Handler for creating snippet from text generation
-  const handleGenerateTextSnippet = useCallback(async (sourceSnippetId: string, generatedContent: string) => {
+  const handleGenerateTextSnippet = useCallback(async (
+    sourceSnippetId: string,
+    generatedContent: string,
+    meta: SnippetGenerationMeta = {}
+  ) => {
     if (!projectId) {
       console.error('Cannot create generated text snippet: no project ID')
       return
@@ -1358,19 +1431,26 @@ export function useCanvasHandlers({
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
     const now = new Date().toISOString()
 
+    const promptValue = meta.prompt ?? generatedContent
+
     // Add optimistic snippet immediately
     addOptimisticSnippet({
       id: tempId,
       projectId,
       title: 'Generated text snippet',
-      content: buildDefaultContent(generatedContent),
+      content: buildPromptOnlyContent(promptValue),
       position: targetPosition,
       tags: [],
       connections: [],
       createdAt: now,
       updatedAt: now,
       version: 1,
-      isOptimistic: true
+      isOptimistic: true,
+      snippetType: 'content',
+      createdFrom: sourceSnippetId,
+      generated: true,
+      ...(meta.generationId ? { generationId: meta.generationId } : {}),
+      ...(meta.generationCreatedAt ? { generationCreatedAt: meta.generationCreatedAt } : {})
     })
 
     try {
@@ -1379,13 +1459,18 @@ export function useCanvasHandlers({
         () =>
           createSnippetMutation({
             variables: {
-              input: {
-                projectId,
-                title: 'Generated text snippet',
-                content: buildDefaultContent(generatedContent),
-                position: targetPosition,
-                tags: []
-              }
+                input: {
+                  projectId,
+                  title: 'Generated text snippet',
+                  content: buildPromptOnlyContent(promptValue),
+                  position: targetPosition,
+                  tags: [],
+                  snippetType: 'content',
+                  createdFrom: sourceSnippetId,
+                  generated: true,
+                  ...(meta.generationId ? { generationId: meta.generationId } : {}),
+                  ...(meta.generationCreatedAt ? { generationCreatedAt: meta.generationCreatedAt } : {})
+                }
             }
           }),
         ['ProjectWithSnippets']
@@ -1464,7 +1549,11 @@ export function useCanvasHandlers({
     reactFlowInstance
   ])
 
-  const handleGenerateVideoSnippetFromJson = useCallback(async (sourceSnippetId: string, generatedData: GeneratedVideoSnippetData) => {
+  const handleGenerateVideoSnippetFromJson = useCallback(async (
+    sourceSnippetId: string,
+    generatedData: GeneratedVideoSnippetData,
+    meta: SnippetGenerationMeta = {}
+  ) => {
     if (!projectId) {
       console.error('Cannot create generated video snippet: no project ID')
       return
@@ -1513,19 +1602,8 @@ export function useCanvasHandlers({
     }
 
     const combinedText = resolvedText || buildTextFromFields() || ''
-    const content = buildDefaultVideoContent({
-      subject: generatedData.subject?.trim() ?? '',
-      action: generatedData.action?.trim() ?? '',
-      cameraMotion: generatedData.cameraMotion?.trim() ?? '',
-      composition: generatedData.composition?.trim() ?? '',
-      focusLens: generatedData.focusLens?.trim() ?? '',
-      style: generatedData.style?.trim() ?? '',
-      ambiance: generatedData.ambiance?.trim() ?? '',
-      dialogue: generatedData.dialogue?.trim() ?? '',
-      soundEffects: generatedData.soundEffects?.trim() ?? '',
-      ambientNoise: generatedData.ambientNoise?.trim() ?? '',
-      mainText: combinedText
-    })
+    const promptValue = meta.prompt ?? (combinedText || 'Generated video prompt')
+    const content = buildPromptOnlyContent(promptValue)
 
     addOptimisticSnippet({
       id: tempId,
@@ -1539,7 +1617,11 @@ export function useCanvasHandlers({
       updatedAt: now,
       version: 1,
       isOptimistic: true,
-      snippetType: 'video'
+      snippetType: 'content',
+      createdFrom: sourceSnippetId,
+      generated: true,
+      ...(meta.generationId ? { generationId: meta.generationId } : {}),
+      ...(meta.generationCreatedAt ? { generationCreatedAt: meta.generationCreatedAt } : {})
     })
 
     try {
@@ -1547,15 +1629,18 @@ export function useCanvasHandlers({
         () =>
           createSnippetMutation({
             variables: {
-                input: {
-                  projectId,
-                  title: resolvedTitle,
-                  content,
-                  position: targetPosition,
-                  tags: resolvedTags,
-                  snippetType: 'video',
-                  createdFrom: sourceSnippetId
-                }
+              input: {
+                projectId,
+                title: resolvedTitle,
+                content,
+                position: targetPosition,
+                tags: resolvedTags,
+                snippetType: 'content',
+                createdFrom: sourceSnippetId,
+                generated: true,
+                ...(meta.generationId ? { generationId: meta.generationId } : {}),
+                ...(meta.generationCreatedAt ? { generationCreatedAt: meta.generationCreatedAt } : {})
+              }
             }
           }),
         ['ProjectWithSnippets']
@@ -1566,50 +1651,7 @@ export function useCanvasHandlers({
         throw new Error('Failed to create video snippet: missing ID in response')
       }
 
-      const newSnippetId = createdSnippet.id
       replaceOptimisticSnippet(tempId, createdSnippet)
-
-      const optimisticConnectionId = `temp-conn-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
-      const connectionTimestamp = new Date().toISOString()
-
-      addOptimisticConnection({
-        id: optimisticConnectionId,
-        projectId,
-        sourceSnippetId,
-        targetSnippetId: newSnippetId,
-        label: '',
-        createdAt: connectionTimestamp,
-        updatedAt: connectionTimestamp,
-        isOptimistic: true
-      })
-
-      try {
-        const connectionResult = await mutateWithInvalidate(
-          () =>
-            createConnectionMutation({
-              variables: {
-                input: {
-                  projectId,
-                  sourceSnippetId,
-                  targetSnippetId: newSnippetId,
-                  label: ''
-                }
-              }
-            }),
-          ['ProjectConnections']
-        )
-
-        const createdConnection = connectionResult?.createConnection
-        if (createdConnection) {
-          replaceOptimisticConnection(optimisticConnectionId, createdConnection)
-        } else {
-          console.warn('createConnection mutation returned no data; optimistic connection will remain until refresh')
-        }
-      } catch (connectionError) {
-        console.error('Failed to connect generated video snippet:', connectionError)
-        removeOptimisticConnection(optimisticConnectionId)
-        toast.error('Failed to connect new video snippet', connectionError instanceof Error ? connectionError.message : 'Unknown error')
-      }
 
       toast.success('Generated video snippet created successfully!')
     } catch (error) {
@@ -1620,13 +1662,9 @@ export function useCanvasHandlers({
   }, [
     projectId,
     createSnippetMutation,
-    createConnectionMutation,
     addOptimisticSnippet,
     replaceOptimisticSnippet,
     removeOptimisticSnippet,
-    addOptimisticConnection,
-    replaceOptimisticConnection,
-    removeOptimisticConnection,
     toast
   ])
 

@@ -97,7 +97,10 @@ const createSnippetSchema = z.object({
       zIndex: z.number().optional()
     }).optional().default({ x: 0, y: 0 }),
     tags: z.array(z.string()).optional().default([]),
-    snippetType: z.enum(['text', 'image', 'video', 'audio', 'generic']).optional().default('text')
+    generated: z.boolean().optional().default(false),
+    generationId: z.string().optional(),
+    generationCreatedAt: z.string().optional(),
+    snippetType: z.enum(['text', 'image', 'video', 'audio', 'generic', 'content']).optional().default('text')
   })
 })
 
@@ -107,12 +110,15 @@ const updateSnippetSchema = z.object({
     input: z.object({
       title: z.string().optional(),
       content: contentUpdateSchema,
-      position: z.object({
-        x: z.number(),
-        y: z.number(),
-        zIndex: z.number().optional()
-      }).optional(),
-    tags: z.array(z.string()).optional()
+    position: z.object({
+      x: z.number(),
+      y: z.number(),
+      zIndex: z.number().optional()
+    }).optional(),
+    tags: z.array(z.string()).optional(),
+    generated: z.boolean().optional(),
+    generationId: z.string().optional(),
+    generationCreatedAt: z.string().optional()
   })
 })
 

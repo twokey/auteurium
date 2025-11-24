@@ -253,7 +253,9 @@ export const handler: AppSyncResolverHandler<GenerateContentArgs, GenerationResp
 
     return {
       ...response,
-      content: fullContent || response.content
+      content: fullContent || response.content,
+      generationId,
+      generationCreatedAt: createdAt
     }
   } catch (error) {
     logger.error('Streaming content generation failed', {

@@ -49,6 +49,7 @@ export const GET_PROJECT = /* GraphQL */ `
         createdAt
         updatedAt
         imageS3Key
+        videoUrl
         imageMetadata {
           width
           height
@@ -65,6 +66,10 @@ export const GET_PROJECT = /* GraphQL */ `
           fileSize
           movementAmplitude
         }
+        generated
+        generationId
+        generationCreatedAt
+        createdFrom
         snippetType
       }
     }
@@ -95,6 +100,7 @@ export const GET_PROJECT_WITH_SNIPPETS = /* GraphQL */ `
         createdAt
         updatedAt
         imageS3Key
+        videoUrl
         imageMetadata {
           width
           height
@@ -111,6 +117,10 @@ export const GET_PROJECT_WITH_SNIPPETS = /* GraphQL */ `
           fileSize
           movementAmplitude
         }
+        generated
+        generationId
+        generationCreatedAt
+        createdFrom
         snippetType
       }
     }
@@ -150,6 +160,7 @@ export const GET_SNIPPET = /* GraphQL */ `
       createdAt
       updatedAt
       imageS3Key
+      videoUrl
       imageMetadata {
         width
         height
@@ -166,6 +177,10 @@ export const GET_SNIPPET = /* GraphQL */ `
         fileSize
         movementAmplitude
       }
+      generated
+      generationId
+      generationCreatedAt
+      createdFrom
       snippetType
       versions {
         id

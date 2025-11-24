@@ -9,6 +9,7 @@ import { createContext, type AppSyncEvent } from '../../middleware/auth'
 import { handleError } from '../../utils/errors'
 import { queryConnections } from '../../database/connections'
 import { batchGetSnippets } from '../../database/snippets'
+import { generateId, getCurrentTimestamp } from '../../database/client'
 
 import type { Snippet, ImageMetadata, VideoMetadata } from '@auteurium/shared-types'
 import type { AppSyncResolverHandler } from 'aws-lambda'
@@ -25,6 +26,7 @@ const SNIPPETS_TABLE = process.env.SNIPPETS_TABLE!
 const GENERATIONS_TABLE = process.env.GENERATIONS_TABLE!
 const MEDIA_BUCKET_NAME = process.env.MEDIA_BUCKET_NAME!
 const LLM_API_KEYS_SECRET_ARN = process.env.LLM_API_KEYS_SECRET_ARN!
+const VIDEO_SNIPPET_HORIZONTAL_OFFSET = 950
 
 interface GenerateVideoArgs {
   projectId: string
@@ -37,6 +39,16 @@ interface GenerateVideoArgs {
   seed?: number
   movementAmplitude?: string
 }
+
+const buildPromptContent = (prompt: string): Record<string, { label?: string; value: string; type?: string; isSystem?: boolean; order?: number }> => ({
+  prompt: {
+    label: 'Prompt',
+    value: prompt,
+    type: 'longText',
+    isSystem: true,
+    order: 0
+  }
+})
 
 interface SnippetRecord {
   id: string
@@ -307,6 +319,125 @@ export const handler: AppSyncResolverHandler<GenerateVideoArgs, Snippet> = async
       }
     }))
 
+    // Create output snippet immediately so callbacks can update it by task ID
+    const promptContent = buildPromptContent(prompt)
+    const targetPosition = {
+      x: (snippet.position?.x ?? 0) + VIDEO_SNIPPET_HORIZONTAL_OFFSET,
+      y: snippet.position?.y ?? 0
+    }
+
+    const outputSnippet: Snippet = {
+      id: generateId(),
+      projectId,
+      userId,
+      title: snippet.title ? `${snippet.title} (Generated Video)` : 'Generated video',
+      content: promptContent,
+      position: targetPosition,
+      tags: [],
+      snippetType: 'content',
+      createdFrom: snippetId,
+      generated: true,
+      generationId,
+      generationCreatedAt: createdAt,
+      version: 1,
+      createdAt,
+      updatedAt: createdAt
+    }
+
+    await dynamoClient.send(new UpdateCommand({
+      TableName: SNIPPETS_TABLE,
+      Key: {
+        projectId: outputSnippet.projectId,
+        id: outputSnippet.id
+      },
+      UpdateExpression: 'SET #title = :title, #content = :content, #position = :position, #tags = :tags, #snippetType = :snippetType, #createdFrom = :createdFrom, #generated = :generated, #generationId = :generationId, #generationCreatedAt = :generationCreatedAt, #version = :version, #createdAt = :createdAt, #updatedAt = :updatedAt, #userId = :userId',
+      ExpressionAttributeNames: {
+        '#title': 'title',
+        '#content': 'content',
+        '#position': 'position',
+        '#tags': 'tags',
+        '#snippetType': 'snippetType',
+        '#createdFrom': 'createdFrom',
+        '#generated': 'generated',
+        '#generationId': 'generationId',
+        '#generationCreatedAt': 'generationCreatedAt',
+        '#version': 'version',
+        '#createdAt': 'createdAt',
+        '#updatedAt': 'updatedAt',
+        '#userId': 'userId'
+      },
+      ExpressionAttributeValues: {
+        ':title': outputSnippet.title,
+        ':content': outputSnippet.content,
+        ':position': outputSnippet.position,
+        ':tags': outputSnippet.tags,
+        ':snippetType': outputSnippet.snippetType,
+        ':createdFrom': outputSnippet.createdFrom,
+        ':generated': outputSnippet.generated ?? false,
+        ':generationId': outputSnippet.generationId ?? null,
+        ':generationCreatedAt': outputSnippet.generationCreatedAt ?? null,
+        ':version': outputSnippet.version,
+        ':createdAt': outputSnippet.createdAt,
+        ':updatedAt': outputSnippet.updatedAt,
+        ':userId': outputSnippet.userId
+      },
+      ConditionExpression: 'attribute_not_exists(id)'
+    }))
+
+    const initialVideoMetadata: VideoMetadata = {
+      duration: duration ?? 4,
+      resolution: resolution ?? '720p',
+      aspectRatio: aspectRatio ?? '16:9',
+      format: 'mp4',
+      taskId: videoResponse.taskId,
+      model: modelId,
+      createdAt
+    }
+    if (style !== undefined && style !== null) {
+      initialVideoMetadata.style = style
+    }
+    if (seed !== undefined && seed !== null) {
+      initialVideoMetadata.seed = seed
+    }
+    if (movementAmplitude !== undefined && movementAmplitude !== null) {
+      initialVideoMetadata.movementAmplitude = movementAmplitude
+    }
+    if (typeof videoResponse.bgm === 'boolean') {
+      initialVideoMetadata.bgm = videoResponse.bgm
+    }
+    if (typeof videoResponse.credits === 'number') {
+      initialVideoMetadata.credits = videoResponse.credits
+    }
+    if (typeof videoResponse.offPeak === 'boolean') {
+      initialVideoMetadata.offPeak = videoResponse.offPeak
+    }
+
+    await dynamoClient.send(new UpdateCommand({
+      TableName: SNIPPETS_TABLE,
+      Key: {
+        projectId,
+        id: outputSnippet.id
+      },
+      UpdateExpression: 'SET videoMetadata = :videoMetadata, updatedAt = :updatedAt',
+      ExpressionAttributeValues: {
+        ':videoMetadata': initialVideoMetadata,
+        ':updatedAt': createdAt
+      }
+    }))
+
+    // Store output snippet reference on generation record for callback lookup
+    await dynamoClient.send(new UpdateCommand({
+      TableName: GENERATIONS_TABLE,
+      Key: {
+        PK: `USER#${userId}`,
+        SK: `GENERATION#${createdAt}#${generationId}`
+      },
+      UpdateExpression: 'SET outputSnippetId = :outputSnippetId',
+      ExpressionAttributeValues: {
+        ':outputSnippetId': outputSnippet.id
+      }
+    }))
+
     logger.info('Video generation task queued', {
       userId,
       snippetId,
@@ -336,11 +467,8 @@ export const handler: AppSyncResolverHandler<GenerateVideoArgs, Snippet> = async
     }
 
     const responseSnippet: Snippet = {
-      ...snippet,
-      title: snippet.title ?? 'Video Snippet',
-      snippetType: snippet.snippetType,
-      tags: snippet.tags ?? [],
-      imageS3Key: snippet.imageS3Key ?? undefined
+      ...outputSnippet,
+      videoUrl
     }
 
     if (videoUrl) {

@@ -19,7 +19,12 @@ interface OptimisticSnippet {
   updatedAt: string
   version: number
   isOptimistic: true
-  snippetType?: 'text' | 'image' | 'video' | 'audio' | 'generic'
+  snippetType?: 'text' | 'image' | 'video' | 'audio' | 'generic' | 'content'
+  createdFrom?: string
+  generated?: boolean
+  generationId?: string | null
+  generationCreatedAt?: string | null
+  videoUrl?: string | null
 }
 
 interface OptimisticConnection {

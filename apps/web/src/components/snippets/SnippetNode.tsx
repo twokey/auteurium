@@ -6,12 +6,20 @@ import { VideoSnippetNode } from './VideoSnippetNode'
 import { SnippetNodeContent } from '../../features/snippets/components/SnippetNodeContent'
 import { CANVAS_CONSTANTS, VIDEO_GENERATION } from '../../constants'
 import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisticUpdatesStore'
-import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
+import { usePromptDesignerStore, type PromptDesignerGeneratePayload } from '../../features/canvas/store/promptDesignerStore'
+import { useVideoPromptStore } from '../../features/snippets/store/videoPromptStore'
 import { useGenAI } from '../../hooks/useGenAI'
 import { useToast } from '../../store/toastStore'
 import { countWords, truncateToWords } from '../../utils/textUtils'
+import { VIDU_Q2_MODEL_CONFIG } from './videoPromptUtils'
 
 import type { AvailableModel, ConnectedContentItem, GeneratedVideoSnippetData, VideoGenerationInput } from '../../types'
+
+type SnippetGenerationMeta = {
+  prompt?: string
+  generationId?: string | null
+  generationCreatedAt?: string | null
+}
 
 interface SnippetNodeProps {
   id: string
@@ -36,6 +44,7 @@ interface SnippetNodeProps {
         aspectRatio: string
       } | null
       videoS3Key?: string | null
+      videoUrl?: string | null
       videoMetadata?: {
         duration: number
         resolution: string
@@ -56,10 +65,10 @@ interface SnippetNodeProps {
     onViewVersions: (snippetId: string) => void
     onUpdateContent: (snippetId: string, changes: Partial<{ title: string; content: Record<string, any> }>) => Promise<void>
     onCombine: (snippetId: string) => Promise<void>
-    onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
-    onGenerateText: (snippetId: string, content: string) => Promise<void>
+    onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string, meta?: SnippetGenerationMeta) => void
+    onGenerateText: (snippetId: string, content: string, meta?: SnippetGenerationMeta) => Promise<void>
     onGenerateVideo: (snippetId: string, options: VideoGenerationInput) => Promise<void> | void
-    onGenerateVideoSnippetFromJson: (snippetId: string, data: GeneratedVideoSnippetData) => Promise<void>
+    onGenerateVideoSnippetFromJson: (snippetId: string, data: GeneratedVideoSnippetData, meta?: SnippetGenerationMeta) => Promise<void>
     onFocusSnippet: (snippetId: string) => void
     onCreateUpstreamSnippet: (snippetId: string) => Promise<void> | void
     isGeneratingImage: boolean
@@ -669,8 +678,9 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
     [onCreateUpstreamSnippet, snippet.id]
   )
 
-  const runTextGeneration = useCallback(async (rawPrompt: string) => {
-    const trimmedPrompt = rawPrompt.trim()
+  const runTextGeneration = useCallback(async (payload: PromptDesignerGeneratePayload) => {
+    const trimmedPrompt = payload.fullPrompt.trim()
+    const userPrompt = (payload.userPrompt ?? '').trim()
 
     if (trimmedPrompt === '') {
       toast.warning('Please provide prompt content before generating')
@@ -701,7 +711,8 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
         projectId,
         snippet.id,
         selectedTextModel,
-        trimmedPrompt
+        trimmedPrompt,
+        payload.systemPrompt ? { systemPrompt: payload.systemPrompt } : undefined
       )
 
       if (!result?.content || result.content.trim() === '') {
@@ -715,7 +726,11 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
       }
 
       // Create new snippet with generated content
-      await onGenerateText(snippet.id, result.content)
+      await onGenerateText(snippet.id, result.content, {
+        prompt: userPrompt || trimmedPrompt,
+        generationId: result.generationId ?? undefined,
+        generationCreatedAt: result.generationCreatedAt ?? undefined
+      })
 
       if (fallbackReason) {
         toast.info('Generation completed with fallback', fallbackReason)
@@ -736,8 +751,8 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
     }
   }, [selectedTextModel, projectId, generateStream, snippet.id, onGenerateText, toast])
 
-  const runSceneGeneration = useCallback(async (prompt: string) => {
-    const trimmedPrompt = prompt.trim()
+  const runSceneGeneration = useCallback(async (payload: PromptDesignerGeneratePayload) => {
+    const trimmedPrompt = (payload.userPrompt || payload.fullPrompt).trim()
 
     if (trimmedPrompt === '') {
       toast.warning('Please provide prompt content before generating scenes')
@@ -799,8 +814,9 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
     }
   }, [selectedSceneModel, projectId, createScenes, snippet.id, toast])
 
-  const runVideoSnippetJsonGeneration = useCallback(async (rawPrompt: string) => {
-    const trimmedPrompt = rawPrompt.trim()
+  const runVideoSnippetJsonGeneration = useCallback(async (designerPayload: PromptDesignerGeneratePayload) => {
+    const trimmedPrompt = designerPayload.fullPrompt.trim()
+    const userPrompt = (designerPayload.userPrompt ?? '').trim()
 
     if (trimmedPrompt === '') {
       toast.warning('Please provide prompt content before generating a video snippet')
@@ -830,7 +846,8 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
         projectId,
         snippet.id,
         selectedVideoSnippetModel,
-        trimmedPrompt
+        trimmedPrompt,
+        designerPayload.systemPrompt ? { systemPrompt: designerPayload.systemPrompt } : undefined
       )
 
       if (!result?.content || result.content.trim() === '') {
@@ -861,7 +878,7 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
       }
 
       const parsedData = parseVideoSnippetContent(result.content)
-      const payload: GeneratedVideoSnippetData = {
+      const generatedPayload: GeneratedVideoSnippetData = {
         ...parsedData
       }
 
@@ -869,9 +886,13 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
         ...parsedData,
         mainText: parsedData.mainText ?? trimmedPrompt
       })
-      payload.mainText = composedText
+      generatedPayload.mainText = composedText
 
-      await onGenerateVideoSnippetFromJson(snippet.id, payload)
+      await onGenerateVideoSnippetFromJson(snippet.id, generatedPayload, {
+        prompt: userPrompt || trimmedPrompt,
+        generationId: result.generationId ?? undefined,
+        generationCreatedAt: result.generationCreatedAt ?? undefined
+      })
 
       if (fallbackReason) {
         toast.info('Generation completed with fallback', fallbackReason)
@@ -1096,14 +1117,27 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
         )}
 
         {/* Video Preview */}
-        {snippet.videoS3Key ? (
+        {snippet.videoUrl || snippet.videoS3Key ? (
           <div className="mt-2">
             <div className="text-xs font-semibold text-gray-600 mb-1">
               Video Preview
             </div>
-            <p className="mt-2 text-xs text-gray-500">
-              Video available. Preview not implemented for S3 keys yet.
-            </p>
+            {snippet.videoUrl ? (
+              <video
+                key={snippet.videoUrl}
+                className="w-full rounded-md border border-gray-200"
+                src={snippet.videoUrl}
+                controls
+                playsInline
+                muted
+              >
+                <track kind="captions" />
+              </video>
+            ) : (
+              <p className="mt-2 text-xs text-gray-500">
+                Video available but preview URL is not ready.
+              </p>
+            )}
             {snippet.videoMetadata && (
               <dl className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-gray-600">
                 <div>
@@ -1221,7 +1255,7 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
                         mode: 'text',
                         initialPrompt: mainText,
                         connectedContent: connectedContent,
-                        onGenerate: (nextPrompt) => runTextGeneration(nextPrompt)
+                        onGenerate: (payload) => runTextGeneration(payload)
                       })
                     }}
                     disabled={isGeneratingText || isLoadingTextModels || (!selectedTextModel && textModels.length > 0) || savingField !== null}
@@ -1290,7 +1324,7 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
                         mode: 'scenes',
                         initialPrompt: mainText,
                         connectedContent: connectedContent,
-                        onGenerate: (nextPrompt) => runSceneGeneration(nextPrompt)
+                        onGenerate: (payload) => runSceneGeneration(payload)
                       })
                     }}
                     disabled={isGeneratingScenes || isLoadingTextModels || (!selectedSceneModel && textModels.length > 0) || savingField !== null}
@@ -1357,8 +1391,8 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
                         mode: 'image',
                         initialPrompt: mainText,
                         connectedContent: connectedContent,
-                        onGenerate: (nextPrompt) => {
-                          const trimmedPrompt = nextPrompt.trim()
+                        onGenerate: (payload) => {
+                          const trimmedPrompt = payload.fullPrompt.trim()
                           if (trimmedPrompt === '') {
                             toast.warning('Please provide prompt content for image generation')
                             const handledError = new Error('Missing prompt content for image generation')
@@ -1373,7 +1407,9 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
                             throw handledError
                           }
 
-                          onGenerateImage(snippet.id, selectedImageModel, trimmedPrompt)
+                          onGenerateImage(snippet.id, selectedImageModel, trimmedPrompt, {
+                            prompt: payload.userPrompt?.trim() || trimmedPrompt
+                          })
                         }
                       })
                     }}
@@ -1447,7 +1483,17 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
                         mode: 'video',
                         initialPrompt: mainText,
                         connectedContent: connectedContent,
-                        onGenerate: async (finalPrompt) => {
+                        onGenerate: async (payload) => {
+                          const finalPrompt = payload.fullPrompt
+                          const storeSettings = useVideoPromptStore.getState().modelSettings
+                          const latestSettings = payload.settings?.type === 'video'
+                            ? payload.settings.settings
+                            : storeSettings
+
+                          if (payload.settings?.type === 'video') {
+                            useVideoPromptStore.getState().updateModelSettings(payload.settings.settings)
+                          }
+
                           const baseMainTextField = snippet.content?.mainText ?? {
                             label: 'mainText',
                             value: '',
@@ -1466,13 +1512,19 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
                               }
                             }
                           })
+                          const designerModel = latestSettings.model && VIDU_Q2_MODEL_CONFIG[latestSettings.model]
+                            ? latestSettings.model
+                            : undefined
+                          const resolvedModel = designerModel || targetModel
+
                           await onGenerateVideo(snippet.id, {
-                            modelId: targetModel,
-                            duration: VIDEO_GENERATION.DEFAULT_DURATION,
+                            modelId: resolvedModel,
+                            duration: latestSettings.duration ?? VIDEO_GENERATION.DEFAULT_DURATION,
                             aspectRatio: VIDEO_GENERATION.DEFAULT_ASPECT_RATIO,
-                            resolution: VIDEO_GENERATION.DEFAULT_RESOLUTION,
+                            resolution: latestSettings.resolution ?? VIDEO_GENERATION.DEFAULT_RESOLUTION,
                             style: VIDEO_GENERATION.DEFAULT_STYLE,
-                            movementAmplitude: VIDEO_GENERATION.DEFAULT_MOVEMENT_AMPLITUDE
+                            seed: latestSettings.seed,
+                            movementAmplitude: latestSettings.movementAmplitude ?? VIDEO_GENERATION.DEFAULT_MOVEMENT_AMPLITUDE
                           })
                         }
                       })

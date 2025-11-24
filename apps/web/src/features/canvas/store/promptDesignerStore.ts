@@ -11,6 +11,13 @@ export type PromptDesignerGenerationSettings =
     settings: VideoModelSettings
   }
 
+export interface PromptDesignerGeneratePayload {
+  fullPrompt: string
+  userPrompt: string
+  systemPrompt: string
+  settings?: PromptDesignerGenerationSettings | null
+}
+
 interface PromptDesignerOpenPayload {
   snippetId: string
   snippetTitle?: string | null
@@ -18,7 +25,7 @@ interface PromptDesignerOpenPayload {
   initialPrompt: string
   initialSystemPrompt?: string
   connectedContent?: ConnectedContentItem[]
-  onGenerate?: (prompt: string, settings?: PromptDesignerGenerationSettings | null) => Promise<void> | void
+  onGenerate?: (payload: PromptDesignerGeneratePayload) => Promise<void> | void
   generationSettings?: PromptDesignerGenerationSettings | null
 }
 
@@ -32,7 +39,7 @@ interface PromptDesignerState {
   systemPrompt: string
   connectedContent: ConnectedContentItem[]
   generationSettings: PromptDesignerGenerationSettings | null
-  onGenerate: ((prompt: string, settings?: PromptDesignerGenerationSettings | null) => Promise<void> | void) | null
+  onGenerate: ((payload: PromptDesignerGeneratePayload) => Promise<void> | void) | null
   open: (payload: PromptDesignerOpenPayload) => void
   close: () => void
   setPrompt: (prompt: string) => void

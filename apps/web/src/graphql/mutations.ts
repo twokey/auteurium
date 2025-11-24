@@ -48,6 +48,11 @@ export const CREATE_SNIPPET = /* GraphQL */ `
       version
       createdAt
       updatedAt
+      createdFrom
+      generated
+      generationId
+      generationCreatedAt
+      videoUrl
       snippetType
       videoS3Key
       videoMetadata {
@@ -80,6 +85,11 @@ export const UPDATE_SNIPPET = /* GraphQL */ `
       version
       createdAt
       updatedAt
+      createdFrom
+      generated
+      generationId
+      generationCreatedAt
+      videoUrl
       snippetType
       videoS3Key
       videoMetadata {
@@ -112,6 +122,11 @@ export const UPDATE_SNIPPET_POSITIONS = /* GraphQL */ `
       version
       createdAt
       updatedAt
+      createdFrom
+      generated
+      generationId
+      generationCreatedAt
+      videoUrl
       snippetType
       videoS3Key
       videoMetadata {
@@ -150,6 +165,11 @@ export const REVERT_SNIPPET = /* GraphQL */ `
       version
       createdAt
       updatedAt
+      createdFrom
+      generated
+      generationId
+      generationCreatedAt
+      videoUrl
       snippetType
       videoS3Key
       videoMetadata {
@@ -182,7 +202,12 @@ export const GENERATE_SNIPPET_IMAGE = /* GraphQL */ `
       version
       createdAt
       updatedAt
+      createdFrom
+      generated
+      generationId
+      generationCreatedAt
       imageS3Key
+      videoUrl
       imageMetadata {
         width
         height
@@ -239,6 +264,11 @@ export const GENERATE_SNIPPET_VIDEO = /* GraphQL */ `
       version
       createdAt
       updatedAt
+      createdFrom
+      generated
+      generationId
+      generationCreatedAt
+      videoUrl
       videoS3Key
       videoMetadata {
         duration
@@ -270,11 +300,27 @@ export const COMBINE_SNIPPET_CONNECTIONS = /* GraphQL */ `
       version
       createdAt
       updatedAt
+      createdFrom
+      generated
+      generationId
+      generationCreatedAt
       imageS3Key
       imageMetadata {
         width
         height
         aspectRatio
+      }
+      videoS3Key
+      videoUrl
+      videoMetadata {
+        duration
+        resolution
+        aspectRatio
+        style
+        seed
+        format
+        fileSize
+        movementAmplitude
       }
       snippetType
     }

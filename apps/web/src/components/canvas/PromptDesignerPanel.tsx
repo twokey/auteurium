@@ -219,7 +219,12 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
         settings: generationSettings
       })
 
-      await Promise.resolve(onGenerate(finalTextPrompt, generationSettings))
+      await Promise.resolve(onGenerate({
+        fullPrompt: finalTextPrompt,
+        userPrompt: promptPreview,
+        systemPrompt: systemPromptText,
+        settings: generationSettings
+      }))
       close()
     } catch (error) {
       console.error('Prompt designer generation failed:', error)

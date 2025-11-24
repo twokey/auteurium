@@ -112,7 +112,10 @@ export interface CreateSnippetInput {
   position?: Position
   tags?: string[]
   createdFrom?: string
-  snippetType?: 'text' | 'image' | 'video' | 'audio' | 'generic'
+  generated?: boolean
+  generationId?: string
+  generationCreatedAt?: string
+  snippetType?: 'text' | 'image' | 'video' | 'audio' | 'generic' | 'content'
 }
 
 export interface CreateSnippetVariables {
@@ -124,6 +127,9 @@ export interface UpdateSnippetInput {
   content?: Record<string, SnippetField | null>
   position?: Position
   tags?: string[]
+  generated?: boolean
+  generationId?: string
+  generationCreatedAt?: string
 }
 
 export interface UpdateSnippetVariables {
@@ -192,6 +198,7 @@ export interface DeleteConnectionVariables {
 export interface GenerateContentInput {
   modelId: string
   prompt: string
+  systemPrompt?: string
 }
 
 export interface GenerateContentVariables {

@@ -20,6 +20,8 @@ export const GENERATE_CONTENT = /* GraphQL */ `
       cost
       modelUsed
       generationTimeMs
+      generationId
+      generationCreatedAt
     }
   }
 `
@@ -31,6 +33,8 @@ export const GENERATE_CONTENT_STREAM = /* GraphQL */ `
       cost
       modelUsed
       generationTimeMs
+      generationId
+      generationCreatedAt
     }
   }
 `
@@ -65,6 +69,9 @@ export const CREATE_SCENES = /* GraphQL */ `
         createdAt
         updatedAt
         createdFrom
+        generated
+        generationId
+        generationCreatedAt
         snippetType
       }
       tokensUsed

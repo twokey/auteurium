@@ -125,7 +125,11 @@ export const handler: AppSyncResolverHandler<GenerateContentArgs, GenerationResp
       cost: response.cost
     })
 
-    return response
+    return {
+      ...response,
+      generationId,
+      generationCreatedAt: createdAt
+    }
   } catch (error) {
     logger.error('Content generation failed', {
       error: error instanceof Error ? error.message : String(error),

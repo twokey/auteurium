@@ -25,9 +25,10 @@ export interface Snippet {
   projectId: string // partition key
   id: string // sort key
   userId: string // for access control
+  generated?: boolean // true if created by AI generation
 
   // Classification
-  snippetType: 'text' | 'image' | 'video' | 'audio' | 'generic'
+  snippetType: 'text' | 'image' | 'video' | 'audio' | 'generic' | 'content'
   title: string
 
   // New dynamic content field (core of this refactor)
@@ -43,6 +44,8 @@ export interface Snippet {
   createdAt: string // ISO timestamp
   updatedAt: string // ISO timestamp
   createdFrom?: string // snippetId, optional
+  generationId?: string // links to Generations table
+  generationCreatedAt?: string // timestamp when generation record was created
   version: number
 
   // Media (optional)
@@ -74,7 +77,10 @@ export interface SnippetInput {
   position?: Position
   tags?: string[]
   createdFrom?: string
-  snippetType?: 'text' | 'image' | 'video' | 'audio' | 'generic'
+  generated?: boolean
+  generationId?: string
+  generationCreatedAt?: string
+  snippetType?: 'text' | 'image' | 'video' | 'audio' | 'generic' | 'content'
 }
 
 export interface UpdateSnippetInput {
@@ -82,6 +88,9 @@ export interface UpdateSnippetInput {
   content?: Record<string, SnippetField | null>
   position?: Position
   tags?: string[]
+  generated?: boolean
+  generationId?: string
+  generationCreatedAt?: string
 }
 
 // Legacy interfaces for backward compatibility

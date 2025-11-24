@@ -18,6 +18,8 @@ interface GenerateContentResult {
   cost: number
   modelUsed: string
   generationTimeMs: number
+  generationId?: string | null
+  generationCreatedAt?: string | null
 }
 
 interface CreateScenesResult {
@@ -34,6 +36,7 @@ interface GenerateContentVariables {
   input: {
     modelId: string
     prompt: string
+    systemPrompt?: string
   }
 }
 
@@ -187,14 +190,21 @@ export const useGenAI = (options: UseGenAIOptions = {}) => {
   >(CREATE_SCENES)
 
   const generate = useCallback(
-    async (projectId: string, snippetId: string, modelId: string, prompt: string) => {
+    async (
+      projectId: string,
+      snippetId: string,
+      modelId: string,
+      prompt: string,
+      options?: { systemPrompt?: string }
+    ) => {
       const result = await generateContentMutation({
         variables: {
           projectId,
           snippetId,
           input: {
             modelId,
-            prompt
+            prompt,
+            ...(options?.systemPrompt ? { systemPrompt: options.systemPrompt } : {})
           }
         }
       })
@@ -227,11 +237,12 @@ export const useGenAI = (options: UseGenAIOptions = {}) => {
     snippetId: string,
     modelId: string,
     prompt: string,
-    reason: string | null
+    reason: string | null,
+    options?: { systemPrompt?: string }
   ): Promise<GenerateStreamResponse> => {
     markStreamingUnsupported(reason)
 
-    const result = await generate(projectId, snippetId, modelId, prompt)
+    const result = await generate(projectId, snippetId, modelId, prompt, options)
 
     return {
       result: result ?? null,
@@ -241,9 +252,22 @@ export const useGenAI = (options: UseGenAIOptions = {}) => {
   }, [generate, markStreamingUnsupported])
 
   const generateStream = useCallback(
-    async (projectId: string, snippetId: string, modelId: string, prompt: string): Promise<GenerateStreamResponse> => {
+    async (
+      projectId: string,
+      snippetId: string,
+      modelId: string,
+      prompt: string,
+      options?: { systemPrompt?: string }
+    ): Promise<GenerateStreamResponse> => {
       if (!streamingSupportedRef.current) {
-        return runFallbackGeneration(projectId, snippetId, modelId, prompt, streamingFallbackReasonRef.current)
+        return runFallbackGeneration(
+          projectId,
+          snippetId,
+          modelId,
+          prompt,
+          streamingFallbackReasonRef.current,
+          options
+        )
       }
 
       try {
@@ -253,7 +277,8 @@ export const useGenAI = (options: UseGenAIOptions = {}) => {
             snippetId,
             input: {
               modelId,
-              prompt
+              prompt,
+              ...(options?.systemPrompt ? { systemPrompt: options.systemPrompt } : {})
             }
           }
         })
@@ -269,7 +294,7 @@ export const useGenAI = (options: UseGenAIOptions = {}) => {
         }
 
         const reason = extractStreamingFallbackReason(error)
-        return runFallbackGeneration(projectId, snippetId, modelId, prompt, reason)
+        return runFallbackGeneration(projectId, snippetId, modelId, prompt, reason, options)
       }
     },
     [generateContentStreamMutation, runFallbackGeneration]

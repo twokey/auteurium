@@ -38,6 +38,12 @@ export interface VideoMetadata {
   format?: string
   fileSize?: number
   movementAmplitude?: string
+  model?: string
+  taskId?: string
+  bgm?: boolean
+  credits?: number
+  offPeak?: boolean
+  createdAt?: string
 }
 
 export type VideoGenerationStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
@@ -79,8 +85,11 @@ export interface Snippet {
   imageUrl?: string | null
   videoUrl?: string | null
   createdFrom?: string | null
+  generated?: boolean
+  generationId?: string | null
+  generationCreatedAt?: string | null
   connections?: Connection[]
-  snippetType: 'text' | 'image' | 'video' | 'audio' | 'generic'
+  snippetType: 'text' | 'image' | 'video' | 'audio' | 'generic' | 'content'
 }
 
 export interface Project {
@@ -126,4 +135,6 @@ export interface GenerateContentResult {
   cost: number
   modelUsed: string
   generationTimeMs: number
+  generationId?: string | null
+  generationCreatedAt?: string | null
 }
