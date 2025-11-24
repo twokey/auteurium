@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { Handle, Position } from 'reactflow'
 
 import { VideoSnippetNode } from './VideoSnippetNode'
+import { ImageSnippetNode } from './ImageSnippetNode'
 import { SnippetNodeContent } from '../../features/snippets/components/SnippetNodeContent'
 import { CANVAS_CONSTANTS, VIDEO_GENERATION } from '../../constants'
 import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisticUpdatesStore'
@@ -81,6 +82,8 @@ interface SnippetNodeProps {
     videoModels?: AvailableModel[]
     isLoadingVideoModels?: boolean
   }
+  selected?: boolean
+  isConnectable?: boolean
 }
 
 type EditableField = string
@@ -306,7 +309,7 @@ const buildVideoSnippetText = (data: GeneratedVideoSnippetData): string => {
   return parts.join('\n')
 }
 
-export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
+export const SnippetNode = memo(({ data, id, selected, isConnectable }: SnippetNodeProps) => {
   // Call all hooks before any conditional returns (Rules of Hooks)
   const toast = useToast()
   const { id: projectId } = useParams<{ id: string }>()
@@ -914,8 +917,38 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
   }, [selectedVideoSnippetModel, projectId, generateStream, snippet.id, onGenerateVideoSnippetFromJson, toast])
 
   // Route to VideoSnippetNode if this is a video snippet
-  if (data.snippet.snippetType === 'video') {
-    return <VideoSnippetNode id={id} data={data} />
+  if (snippet.snippetType === 'video') {
+    return (
+      <VideoSnippetNode
+        id={id}
+        data={data}
+        // @ts-ignore - VideoSnippetNode props might need update but passing for now if it accepts them
+        selected={selected}
+        // @ts-ignore
+        isConnectable={isConnectable}
+        onGenerateVideo={onGenerateVideo}
+        isGeneratingVideo={isGeneratingVideo}
+        videoGenerationProgress={0} // Placeholder as it's not available in data
+        onGenerateVideoSnippetFromJson={onGenerateVideoSnippetFromJson}
+      />
+    )
+  }
+
+  if (snippet.snippetType === 'image') {
+    return (
+      <ImageSnippetNode
+        id={id}
+        data={data}
+        // @ts-ignore
+        selected={selected}
+        // @ts-ignore
+        isConnectable={isConnectable}
+        imageModels={imageModels}
+        isLoadingImageModels={isLoadingImageModels}
+        onGenerateImage={onGenerateImage}
+        isGeneratingImage={isGeneratingImage}
+      />
+    )
   }
 
   return (

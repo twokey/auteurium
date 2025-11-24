@@ -22,6 +22,7 @@ import { mutateWithInvalidate, mutateOptimisticOnly } from '../../../utils/cache
 import { getColumnIndex, getRelativeColumnX, snapToColumn } from '../../../utils/columnLayout'
 import { getPrimaryTextValue } from '../../../utils/snippetContent'
 import { buildDefaultVideoContent } from '../../../utils/videoSnippetContent'
+import { buildDefaultImageContent } from '../../../utils/imageSnippetContent'
 import { useCanvasStore } from '../store/canvasStore'
 import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
 
@@ -186,6 +187,7 @@ export interface UseCanvasHandlersResult {
   // Canvas Operations
   handleCreateSnippet: (position: { x: number; y: number }) => void
   handleCreateVideoSnippet: (position: { x: number; y: number }) => void
+  handleCreateImageSnippet: (position: { x: number; y: number }) => void
   handleSaveCanvas: () => void
 
   // Mutations
@@ -1459,18 +1461,18 @@ export function useCanvasHandlers({
         () =>
           createSnippetMutation({
             variables: {
-                input: {
-                  projectId,
-                  title: 'Generated text snippet',
-                  content: buildPromptOnlyContent(promptValue),
-                  position: targetPosition,
-                  tags: [],
-                  snippetType: 'content',
-                  createdFrom: sourceSnippetId,
-                  generated: true,
-                  ...(meta.generationId ? { generationId: meta.generationId } : {}),
-                  ...(meta.generationCreatedAt ? { generationCreatedAt: meta.generationCreatedAt } : {})
-                }
+              input: {
+                projectId,
+                title: 'Generated text snippet',
+                content: buildPromptOnlyContent(promptValue),
+                position: targetPosition,
+                tags: [],
+                snippetType: 'content',
+                createdFrom: sourceSnippetId,
+                generated: true,
+                ...(meta.generationId ? { generationId: meta.generationId } : {}),
+                ...(meta.generationCreatedAt ? { generationCreatedAt: meta.generationCreatedAt } : {})
+              }
             }
           }),
         ['ProjectWithSnippets']
@@ -1774,10 +1776,64 @@ export function useCanvasHandlers({
     if (!targetSnippetId) {
       return
     }
-
     // Navigate to the target snippet (focus handler now updates selection state)
     handleFocusSnippet(targetSnippetId)
-  }, [snippets, reactFlowInstance, handleFocusSnippet])
+  }, [handleFocusSnippet])
+
+  const handleCreateImageSnippet = useCallback((position: { x: number; y: number }) => {
+    if (!projectId) {
+      console.error('Cannot create image snippet: no project ID')
+      return
+    }
+
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+    const now = new Date().toISOString()
+
+    // Optimistic update
+    addOptimisticSnippet({
+      id: tempId,
+      projectId,
+      title: 'New Image Snippet',
+      content: buildDefaultImageContent(),
+      position,
+      tags: [],
+      connections: [],
+      createdAt: now,
+      updatedAt: now,
+      version: 1,
+      isOptimistic: true,
+      snippetType: 'image',
+      generated: false
+    })
+
+    // Mutation
+    void mutateWithInvalidate(
+      () =>
+        createSnippetMutation({
+          variables: {
+            input: {
+              projectId,
+              title: 'New Image Snippet',
+              content: buildDefaultImageContent(),
+              position,
+              tags: [],
+              snippetType: 'image',
+              generated: false
+            }
+          }
+        }),
+      ['ProjectWithSnippets']
+    ).then((result) => {
+      if (result?.createSnippet) {
+        replaceOptimisticSnippet(tempId, result.createSnippet)
+      } else {
+        removeOptimisticSnippet(tempId)
+      }
+    }).catch((error) => {
+      console.error('Failed to create image snippet:', error)
+      removeOptimisticSnippet(tempId)
+    })
+  }, [projectId, addOptimisticSnippet, createSnippetMutation, replaceOptimisticSnippet, removeOptimisticSnippet])
 
   return {
     // Snippet Handlers
@@ -1791,13 +1847,14 @@ export function useCanvasHandlers({
     handleCombineSnippetContent,
     handleGenerateImage,
     handleGenerateVideo,
-    handleCreateUpstreamSnippet,
     handleFocusSnippet,
+    handleCreateUpstreamSnippet,
     handleNumberKeyNavigation,
 
     // Canvas Operations
     handleCreateSnippet,
     handleCreateVideoSnippet,
+    handleCreateImageSnippet,
     handleSaveCanvas,
 
     // Mutations

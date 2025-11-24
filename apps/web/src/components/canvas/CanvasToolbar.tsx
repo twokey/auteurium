@@ -7,6 +7,7 @@ import type { ReactFlowInstance } from 'reactflow'
 interface CanvasToolbarProps {
   onCreateSnippet: (position: { x: number; y: number }) => void
   onCreateVideoSnippet: (position: { x: number; y: number }) => void
+  onCreateImageSnippet: (position: { x: number; y: number }) => void
   onSaveCanvas: () => void
   onZoomToFit: () => void
   isLoading?: boolean
@@ -16,6 +17,7 @@ interface CanvasToolbarProps {
 export const CanvasToolbar = ({
   onCreateSnippet,
   onCreateVideoSnippet,
+  onCreateImageSnippet,
   onSaveCanvas,
   onZoomToFit,
   isLoading = false,
@@ -23,6 +25,7 @@ export const CanvasToolbar = ({
 }: CanvasToolbarProps) => {
   const [isCreating, setIsCreating] = useState(false)
   const [isCreatingVideo, setIsCreatingVideo] = useState(false)
+  const [isCreatingImage, setIsCreatingImage] = useState(false)
 
   const getCenterPosition = (): { x: number; y: number } => {
     let centerPosition: { x: number; y: number } = { x: CANVAS_CONSTANTS.DEFAULT_NODE_POSITION.x, y: CANVAS_CONSTANTS.DEFAULT_NODE_POSITION.y }
@@ -52,6 +55,12 @@ export const CanvasToolbar = ({
     setIsCreatingVideo(true)
     onCreateVideoSnippet(getCenterPosition())
     setIsCreatingVideo(false)
+  }
+
+  const handleCreateImageSnippet = () => {
+    setIsCreatingImage(true)
+    onCreateImageSnippet(getCenterPosition())
+    setIsCreatingImage(false)
   }
 
   return (
@@ -86,6 +95,20 @@ export const CanvasToolbar = ({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
           </svg>
           {isCreatingVideo ? 'Creating...' : 'Video Snippet'}
+        </button>
+
+        {/* Create Image Snippet Button */}
+        <button
+          onClick={handleCreateImageSnippet}
+          disabled={isCreatingImage || isLoading}
+          className="flex items-center px-3 py-2 text-sm font-medium text-white bg-pink-600 hover:bg-pink-700 disabled:bg-pink-400 rounded-md transition-colors"
+          title="Create new image snippet"
+          data-testid="create-image-snippet"
+        >
+          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          {isCreatingImage ? 'Creating...' : 'Image Snippet'}
         </button>
 
         {/* Divider */}

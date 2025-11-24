@@ -5,10 +5,20 @@ import { DEFAULT_SETTINGS, type VideoModelSettings } from '../../snippets/store/
 
 type PromptDesignerMode = 'text' | 'image' | 'video' | 'scenes'
 
+export interface ImageModelSettings {
+  model: string
+  aspectRatio: string
+  numberOfImages: number
+}
+
 export type PromptDesignerGenerationSettings =
   | {
     type: 'video'
     settings: VideoModelSettings
+  }
+  | {
+    type: 'image'
+    settings: ImageModelSettings
   }
 
 export interface PromptDesignerGeneratePayload {
@@ -45,7 +55,7 @@ interface PromptDesignerState {
   setPrompt: (prompt: string) => void
   setSystemPrompt: (prompt: string) => void
   setGenerating: (isGenerating: boolean) => void
-  updateGenerationSettings: (settings: Partial<VideoModelSettings>) => void
+  updateGenerationSettings: (settings: Partial<VideoModelSettings> | Partial<ImageModelSettings>) => void
   lastOpenedAt: number | null
 }
 
@@ -122,20 +132,17 @@ export const usePromptDesignerStore = create<PromptDesignerState>((set, get) => 
   setGenerating: (isGenerating) => {
     set({ isGenerating })
   },
-  updateGenerationSettings: (settings) => {
+  updateGenerationSettings: (newSettings) =>
     set((state) => {
-      if (!state.generationSettings || state.generationSettings.type !== 'video') {
-        return state
-      }
+      if (!state.generationSettings) return {}
       return {
         generationSettings: {
           ...state.generationSettings,
           settings: {
             ...state.generationSettings.settings,
-            ...settings
+            ...newSettings
           }
-        }
+        } as PromptDesignerGenerationSettings
       }
     })
-  }
 }))
