@@ -1,20 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { EditableField } from '../../../types'
-
-interface DraftValues {
-  textField1: string
-}
+import type { EditableField, SnippetField } from '../../../types'
 
 export interface UseSnippetNodeEditingReturn {
   activeField: EditableField | null
-  draftValues: DraftValues
+  draftValues: Record<string, string>
   savingField: EditableField | null
-  textField1Ref: React.RefObject<HTMLTextAreaElement | null>
+  contentRef: React.RefObject<HTMLTextAreaElement | null>
   setActiveField: (field: EditableField | null) => void
   setDraftValue: (field: EditableField, value: string) => void
   setSavingField: (field: EditableField | null) => void
-  syncDraftFromSnippet: (snippet: { textField1: string }) => void
+  syncDraftFromSnippet: (snippet: { content: Record<string, SnippetField> }) => void
   focusField: () => void
 }
 
@@ -23,30 +19,29 @@ export interface UseSnippetNodeEditingReturn {
  * Handles: active field, draft values, saving state, ref management
  */
 export const useSnippetNodeEditing = (
-  initialSnippet: { textField1: string }
+  initialSnippet: { content: Record<string, SnippetField> }
 ): UseSnippetNodeEditingReturn => {
   const [activeField, setActiveField] = useState<EditableField | null>(null)
-  const [draftValues, setDraftValues] = useState<DraftValues>({
-    textField1: initialSnippet.textField1
-  })
+  const [draftValues, setDraftValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      Object.entries(initialSnippet.content ?? {}).map(([key, field]) => [key, field.value])
+    )
+  )
   const [savingField, setSavingField] = useState<EditableField | null>(null)
-  const textField1Ref = useRef<HTMLTextAreaElement | null>(null)
+  const contentRef = useRef<HTMLTextAreaElement | null>(null)
 
   // Sync draft values from snippet when not editing
   useEffect(() => {
-    if (activeField === 'textField1') return
+    if (activeField) return
 
     setDraftValues((prev) => {
-      if (prev.textField1 === initialSnippet.textField1) {
-        return prev
-      }
-
-      return {
-        ...prev,
-        textField1: initialSnippet.textField1
-      }
+      const next = { ...prev }
+      Object.entries(initialSnippet.content ?? {}).forEach(([key, field]) => {
+        next[key] = field.value
+      })
+      return next
     })
-  }, [initialSnippet.textField1, activeField])
+  }, [initialSnippet.content, activeField])
 
   // Set draft value
   const setDraftValue = useCallback((field: EditableField, value: string) => {
@@ -58,10 +53,10 @@ export const useSnippetNodeEditing = (
 
   // Sync draft from external snippet
   const syncDraftFromSnippet = useCallback(
-    (snippet: { textField1: string }) => {
-      setDraftValues({
-        textField1: snippet.textField1
-      })
+    (snippet: { content: Record<string, SnippetField> }) => {
+      setDraftValues(
+        Object.fromEntries(Object.entries(snippet.content ?? {}).map(([key, field]) => [key, field.value]))
+      )
     },
     []
   )
@@ -69,7 +64,7 @@ export const useSnippetNodeEditing = (
   // Focus field
   const focusField = useCallback(() => {
     setTimeout(() => {
-      textField1Ref.current?.focus()
+      contentRef.current?.focus()
     }, 0)
   }, [])
 
@@ -77,7 +72,7 @@ export const useSnippetNodeEditing = (
     activeField,
     draftValues,
     savingField,
-    textField1Ref,
+    contentRef,
     setActiveField,
     setDraftValue,
     setSavingField,
@@ -85,4 +80,3 @@ export const useSnippetNodeEditing = (
     focusField
   }
 }
-

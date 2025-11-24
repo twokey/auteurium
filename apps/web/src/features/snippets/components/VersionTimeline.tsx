@@ -1,6 +1,7 @@
 import { formatDistanceToNow } from 'date-fns'
 
 import type { SnippetVersion } from '../../../types'
+import { getPrimaryTextValue } from '../../../utils/snippetContent'
 
 interface VersionTimelineProps {
   versions: SnippetVersion[]
@@ -45,6 +46,8 @@ export const VersionTimeline = ({
       {sortedVersions.map((version, index) => {
         const isCurrent = version.version === currentVersion
         const nextVersion = index < sortedVersions.length - 1 ? sortedVersions[index + 1] : null
+        const primaryText = getPrimaryTextValue({ content: version.content }).trim()
+        const nextPrimaryText = nextVersion ? getPrimaryTextValue({ content: nextVersion.content }).trim() : null
 
         return (
           <div key={version.id} className="relative">
@@ -90,11 +93,11 @@ export const VersionTimeline = ({
 
                   {/* Content preview */}
                   <div className="mt-2 space-y-1">
-                    {version.textField1 && (
+                    {primaryText && (
                       <div className="text-xs bg-gray-100 p-2 rounded text-gray-700 max-h-20 overflow-hidden">
                         <p className="font-mono line-clamp-3">
-                          {version.textField1.substring(0, 100)}
-                          {version.textField1.length > 100 ? '...' : ''}
+                          {primaryText.substring(0, 100)}
+                          {primaryText.length > 100 ? '...' : ''}
                         </p>
                       </div>
                     )}
@@ -103,7 +106,7 @@ export const VersionTimeline = ({
                   {/* Diff indicator */}
                   {nextVersion && (
                     <div className="mt-2 text-xs text-amber-600">
-                      {version.textField1 !== nextVersion.textField1 && (
+                      {primaryText !== nextPrimaryText && (
                         <span className="inline-block px-1.5 py-0.5 bg-amber-50 rounded">
                           Content changed
                         </span>

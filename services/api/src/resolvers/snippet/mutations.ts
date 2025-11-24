@@ -1,4 +1,4 @@
-import { type Snippet } from '@auteurium/shared-types'
+import { type Snippet, type SnippetField, type SnippetInput, type UpdateSnippetInput } from '@auteurium/shared-types'
 import { z } from 'zod'
 
 import { getProjectById } from '../../database/projects'
@@ -16,33 +16,103 @@ import { withSignedImageUrl, withSignedImageUrls } from '../../utils/snippetImag
 import type { GraphQLContext } from '../../types/context'
 
 // Validation schemas
+const snippetFieldSchema = z.object({
+  label: z.string().optional(),
+  value: z.string(),
+  type: z.string().optional(),
+  isSystem: z.boolean().optional(),
+  order: z.number().optional()
+})
+
+const parseContentJson = <T>(
+  value: string,
+  ctx: z.RefinementCtx
+): Record<string, T> => {
+  try {
+    const parsed = JSON.parse(value)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, T>
+    }
+  } catch (error) {
+    // Fall through to issue
+  }
+
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    message: 'Content must be a valid JSON object'
+  })
+
+  return {}
+}
+
+const contentSchema = z.union([
+  z.record(snippetFieldSchema),
+  z.string().transform((value, ctx) => parseContentJson<z.infer<typeof snippetFieldSchema>>(value, ctx))
+]).pipe(z.record(snippetFieldSchema)).optional().default({})
+
+const contentUpdateSchema = z.union([
+  z.record(snippetFieldSchema.nullable()),
+  z.string().transform((value, ctx) => parseContentJson<z.infer<typeof snippetFieldSchema> | null>(value, ctx))
+]).pipe(z.record(snippetFieldSchema.nullable())).optional()
+
+const parseJsonObject = (value: string): Record<string, unknown> | null => {
+  try {
+    const parsed = JSON.parse(value)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>
+    }
+  } catch (error) {
+    // Keep parsing failures non-fatal; validation has already run
+    console.warn('Failed to parse JSON content string', { error })
+  }
+
+  return null
+}
+
+const normalizeContent = <T extends SnippetField | null>(content: unknown): Record<string, T> | undefined => {
+  if (content === undefined || content === null) {
+    return undefined
+  }
+
+  if (typeof content === 'string') {
+    const parsed = parseJsonObject(content)
+    return parsed ? parsed as Record<string, T> : undefined
+  }
+
+  if (typeof content === 'object' && !Array.isArray(content)) {
+    return content as Record<string, T>
+  }
+
+  return undefined
+}
+
 const createSnippetSchema = z.object({
   input: z.object({
     projectId: z.string(),
     title: z.string().optional().default('New snippet'),
-    textField1: z.string().optional().default(''),
+    content: contentSchema,
     position: z.object({
       x: z.number(),
-      y: z.number()
+      y: z.number(),
+      zIndex: z.number().optional()
     }).optional().default({ x: 0, y: 0 }),
     tags: z.array(z.string()).optional().default([]),
-    categories: z.array(z.string()).optional().default([]),
-    snippetType: z.enum(['text', 'video']).optional().default('text')
+    snippetType: z.enum(['text', 'image', 'video', 'audio', 'generic']).optional().default('text')
   })
 })
 
 const updateSnippetSchema = z.object({
   projectId: z.string(),
-  id: z.string(),
-  input: z.object({
-    title: z.string().optional(),
-    textField1: z.string().optional(),
-    position: z.object({
-      x: z.number(),
-      y: z.number()
-    }).optional(),
-    tags: z.array(z.string()).optional(),
-    categories: z.array(z.string()).optional()
+    id: z.string(),
+    input: z.object({
+      title: z.string().optional(),
+      content: contentUpdateSchema,
+      position: z.object({
+        x: z.number(),
+        y: z.number(),
+        zIndex: z.number().optional()
+      }).optional(),
+    tags: z.array(z.string()).optional()
   })
 })
 
@@ -86,7 +156,12 @@ export const snippetMutations = {
     // Ensure project ownership
     requireOwnership(user, project.userId, 'project')
 
-    const createdSnippet = await createSnippet(input, user.id)
+    const normalizedInput: SnippetInput = {
+      ...input,
+      content: normalizeContent<SnippetField>(input.content) ?? {}
+    }
+
+    const createdSnippet = await createSnippet(normalizedInput, user.id)
     return await withSignedImageUrl(createdSnippet, context.logger)
   },
 
@@ -116,11 +191,17 @@ export const snippetMutations = {
     })
 
     // The updateSnippet function will verify ownership
-    const updatedSnippet = await updateSnippet(projectId, snippetId, input, user.id)
+    const { content, ...restInput } = input
+    const normalizedContent = normalizeContent<SnippetField | null>(content)
+    const normalizedUpdate: UpdateSnippetInput = {
+      ...restInput,
+      ...(normalizedContent ? { content: normalizedContent } : {})
+    }
+
+    const updatedSnippet = await updateSnippet(projectId, snippetId, normalizedUpdate, user.id)
 
     console.log('[Resolver] Update completed, returning snippet:', {
       id: updatedSnippet.id,
-      textField1: updatedSnippet.textField1,
       version: updatedSnippet.version
     })
 
@@ -187,7 +268,8 @@ export const snippetMutations = {
         snippetId: z.string(),
         position: z.object({
           x: z.number(),
-          y: z.number()
+          y: z.number(),
+          zIndex: z.number().optional()
         })
       }))
     })
@@ -256,8 +338,7 @@ export const snippetMutations = {
     context.logger.info('Snippet connections combined successfully', {
       projectId,
       snippetId,
-      userId: user.id,
-      newTextLength: updatedSnippet.textField1.length
+      userId: user.id
     })
 
     return await withSignedImageUrl(updatedSnippet, context.logger)

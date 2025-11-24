@@ -37,24 +37,23 @@ export const GET_PROJECT = /* GraphQL */ `
       lastModified
       snippets {
         id
-        textField1
+        title
+        content
         position {
           x
           y
+          zIndex
         }
         tags
-        categories
         version
         createdAt
         updatedAt
-        imageUrl
         imageS3Key
         imageMetadata {
           width
           height
           aspectRatio
         }
-        videoUrl
         videoS3Key
         videoMetadata {
           duration
@@ -66,9 +65,7 @@ export const GET_PROJECT = /* GraphQL */ `
           fileSize
           movementAmplitude
         }
-        videoGenerationStatus
-        videoGenerationTaskId
-        videoGenerationError
+        snippetType
       }
     }
   }
@@ -87,24 +84,22 @@ export const GET_PROJECT_WITH_SNIPPETS = /* GraphQL */ `
         id
         projectId
         title
-        textField1
+        content
         position {
           x
           y
+          zIndex
         }
         tags
-        categories
         version
         createdAt
         updatedAt
-        imageUrl
         imageS3Key
         imageMetadata {
           width
           height
           aspectRatio
         }
-        videoUrl
         videoS3Key
         videoMetadata {
           duration
@@ -116,9 +111,6 @@ export const GET_PROJECT_WITH_SNIPPETS = /* GraphQL */ `
           fileSize
           movementAmplitude
         }
-        videoGenerationStatus
-        videoGenerationTaskId
-        videoGenerationError
         snippetType
       }
     }
@@ -146,24 +138,23 @@ export const GET_SNIPPET = /* GraphQL */ `
     snippet(id: $id) {
       id
       projectId
-      textField1
+      title
+      content
       position {
         x
         y
+        zIndex
       }
       tags
-      categories
       version
       createdAt
       updatedAt
-      imageUrl
       imageS3Key
       imageMetadata {
         width
         height
         aspectRatio
       }
-      videoUrl
       videoS3Key
       videoMetadata {
         duration
@@ -175,13 +166,18 @@ export const GET_SNIPPET = /* GraphQL */ `
         fileSize
         movementAmplitude
       }
-      videoGenerationStatus
-      videoGenerationTaskId
-      videoGenerationError
+      snippetType
       versions {
         id
         version
-        textField1
+        title
+        content
+        position {
+          x
+          y
+          zIndex
+        }
+        tags
         createdAt
       }
     }
@@ -193,7 +189,14 @@ export const GET_SNIPPET_VERSIONS = /* GraphQL */ `
     snippetVersions(snippetId: $snippetId) {
       id
       version
-      textField1
+      title
+      content
+      position {
+        x
+        y
+        zIndex
+      }
+      tags
       createdAt
     }
   }

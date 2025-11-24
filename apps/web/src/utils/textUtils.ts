@@ -3,7 +3,8 @@
  * Common text operations used across components
  */
 
-export const countWords = (text: string): number => {
+export const countWords = (text?: string | null): number => {
+  if (typeof text !== 'string') return 0
   return text.trim().split(/\s+/).filter(word => word.length > 0).length
 }
 
@@ -33,6 +34,5 @@ export const getInitials = (name: string): string => {
 export const sanitizeText = (text: string): string => {
   return text.trim().replace(/\s+/g, ' ')
 }
-
 
 

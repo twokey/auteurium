@@ -27,7 +27,7 @@ export const useSnippetVersions = (snippetId: string): UseSnippetVersionsReturn 
       snippetVersions(snippetId: $snippetId) {
         id
         version
-        textField1
+        content
         createdAt
       }
     }`,

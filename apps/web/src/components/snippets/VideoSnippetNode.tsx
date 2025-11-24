@@ -11,25 +11,26 @@ import { useToast } from '../../store/toastStore'
 
 import { VIDU_Q2_MODEL_CONFIG } from './videoPromptUtils'
 
-import type { AvailableModel, ConnectedContentItem, VideoGenerationInput, VideoMetadata, VideoGenerationStatus } from '../../types'
+import type { AvailableModel, ConnectedContentItem, VideoGenerationInput, VideoMetadata, SnippetField } from '../../types'
+import { getPrimaryFieldValue, getPrimaryTextValue } from '../../utils/snippetContent'
 
 interface VideoSnippetNodeProps {
   id: string
   data: {
     snippet: {
       id: string
-      title?: string
-      textField1?: string
+      title: string
+      content: Record<string, SnippetField>
       connectedContent?: ConnectedContentItem[]
       videoS3Key?: string | null
       videoUrl?: string | null
       videoMetadata?: VideoMetadata | null
-      videoGenerationStatus?: VideoGenerationStatus | null
-      videoGenerationTaskId?: string | null
-      videoGenerationError?: string | null
     }
     onFocusSnippet: (snippetId: string) => void
-    onUpdateContent: (snippetId: string, changes: Partial<Record<'textField1' | 'title', string>>) => Promise<void>
+    onUpdateContent: (
+      snippetId: string,
+      changes: Partial<{ title: string; content: Record<string, SnippetField | null> }>
+    ) => Promise<void>
     videoModels?: AvailableModel[]
     isLoadingVideoModels?: boolean
     onGenerateVideo: (snippetId: string, options: VideoGenerationInput) => Promise<void> | void
@@ -179,14 +180,14 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
 
   // Editable title state
   const [isEditingTitle, setIsEditingTitle] = useState(false)
-  const [draftTitle, setDraftTitle] = useState(snippet.title ?? '')
+  const [draftTitle, setDraftTitle] = useState(snippet.title)
   const [isSavingTitle, setIsSavingTitle] = useState(false)
   const titleInputRef = useRef<HTMLInputElement | null>(null)
 
   // Pre-fill form fields from snippet text (if labeled) to show generated values
   useEffect(() => {
     if (isHydratedFromSnippet) return
-    const sourceText = snippet.textField1?.trim() ?? ''
+    const sourceText = getPrimaryTextValue({ content: snippet.content }).trim()
     if (!sourceText) return
 
     const nextData: Partial<VideoFormData> = {}
@@ -211,7 +212,7 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
       setFormData((prev) => ({ ...prev, ...nextData }))
       setIsHydratedFromSnippet(true)
     }
-  }, [isHydratedFromSnippet, snippet.textField1])
+  }, [isHydratedFromSnippet, snippet.content])
 
   const connectedContent = snippet.connectedContent ?? []
   const connectedImageReferences = connectedContent.filter((item) => item.type === 'image')
@@ -222,7 +223,7 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
   // Sync draft title when snippet.title changes (if not editing)
   useEffect(() => {
     if (!isEditingTitle) {
-      setDraftTitle(snippet.title ?? '')
+      setDraftTitle(snippet.title)
     }
   }, [snippet.title, isEditingTitle])
 
@@ -306,7 +307,24 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
           useVideoPromptStore.getState().updateModelSettings(settings.settings)
         }
 
-        await onUpdateContent(snippet.id, { textField1: finalPrompt })
+        const primaryField = getPrimaryFieldValue({ content: snippet.content })
+        const targetKey = primaryField?.key ?? 'mainText'
+        const targetField = primaryField?.field ?? {
+          label: 'mainText',
+          value: '',
+          type: 'longText',
+          isSystem: true,
+          order: 1
+        }
+
+        await onUpdateContent(snippet.id, {
+          content: {
+            [targetKey]: {
+              ...targetField,
+              value: finalPrompt
+            }
+          }
+        })
 
         const fallbackModel = videoModels[0]?.id ?? VIDEO_GENERATION.DEFAULT_MODEL
         const targetModel = latestSettings.model && VIDU_Q2_MODEL_CONFIG[latestSettings.model]
@@ -326,7 +344,7 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
         await onGenerateVideo(snippet.id, designerRequest)
       }
     })
-  }, [snippet.id, snippet.title, combineFormFieldsToPrompt, referenceImages, openPromptDesigner, modelSettings, onUpdateContent, onGenerateVideo, videoModels])
+  }, [snippet.content, snippet.id, snippet.title, combineFormFieldsToPrompt, referenceImages, openPromptDesigner, modelSettings, onUpdateContent, onGenerateVideo, videoModels])
 
   const handleTitleActivate = useCallback((event?: React.MouseEvent) => {
     // Don't activate if Cmd/Ctrl is held (user is multi-selecting)

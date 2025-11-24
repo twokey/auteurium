@@ -35,10 +35,9 @@ interface SnippetRecord {
   id: string
   projectId: string
   userId: string
-  textField1: string
+  content: Record<string, any>
   title?: string
   tags?: string[]
-  categories?: string[]
   version: number
   position: { x: number; y: number }
   createdAt: string
@@ -57,7 +56,7 @@ const extractTimestampFromS3Key = (s3Key: string): number => {
 
 /**
  * Mutation resolver: generateSnippetImage
- * Generates an image using specified model based on snippet's textField1
+ * Generates an image using specified model based on snippet's primary text content
  * For Gemini Flash Image model, also uses images from connected snippets (up to 3)
  */
 export const handler: AppSyncResolverHandler<GenerateImageArgs, Snippet> = async (event) => {
@@ -94,9 +93,12 @@ export const handler: AppSyncResolverHandler<GenerateImageArgs, Snippet> = async
       throw new Error('Snippet not found or access denied')
     }
 
-    // Validate textField1 has content
-    if (!snippet.textField1 || snippet.textField1.trim() === '') {
-      throw new Error('Text Field 1 must have content for image generation')
+    // Validate content
+    const prompt = snippet.content?.mainText?.value ||
+      (snippet.content ? Object.values(snippet.content)[0]?.value : undefined)
+
+    if (!prompt || prompt.trim() === '') {
+      throw new Error('Snippet must have text content for image generation')
     }
 
     // Get connected snippet images if using multimodal model
@@ -196,14 +198,14 @@ export const handler: AppSyncResolverHandler<GenerateImageArgs, Snippet> = async
     logger.info('Calling image generation API', {
       snippetId,
       modelId,
-      promptLength: snippet.textField1.length,
+      promptLength: prompt.length,
       inputImagesCount: inputImages.length
     })
 
     const imageResponse = await orchestrator.generateImage(
       {
         modelId,
-        prompt: snippet.textField1,
+        prompt,
         inputImages: inputImages.length > 0 ? inputImages : undefined
       } as any, // Type assertion needed for extended image generation parameters
       {
@@ -330,7 +332,7 @@ export const handler: AppSyncResolverHandler<GenerateImageArgs, Snippet> = async
         ':projectId': projectId,
         ':modelProvider': 'gemini',
         ':modelId': modelId, // Use the actual modelId from arguments
-        ':prompt': snippet.textField1,
+        ':prompt': prompt,
         ':result': s3Key, // Store S3 key instead of URL
         ':tokensUsed': imageResponse.tokensUsed,
         ':cost': imageResponse.cost,

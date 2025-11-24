@@ -54,17 +54,18 @@ export const CREATE_SCENES = /* GraphQL */ `
         projectId
         userId
         title
-        textField1
+        content
         position {
           x
           y
+          zIndex
         }
         tags
-        categories
         version
         createdAt
         updatedAt
         createdFrom
+        snippetType
       }
       tokensUsed
       cost
@@ -73,4 +74,3 @@ export const CREATE_SCENES = /* GraphQL */ `
     }
   }
 `
-

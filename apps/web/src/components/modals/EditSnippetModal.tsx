@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 
 import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisticUpdatesStore'
+import { SnippetNodeContent } from '../../features/snippets/components/SnippetNodeContent'
 import { COMBINE_SNIPPET_CONNECTIONS, DELETE_SNIPPET, GENERATE_SNIPPET_IMAGE, UPDATE_SNIPPET } from '../../graphql/mutations'
 import { useGenAI } from '../../hooks/useGenAI'
 import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
 import { useToast } from '../../store/toastStore'
+import { type SnippetField } from '../../types/domain'
 
-type EditableField = 'textField1'
+type EditableField = string
 
 interface EditSnippetModalProps {
   isOpen: boolean
@@ -16,10 +18,10 @@ interface EditSnippetModalProps {
     id: string
     projectId: string
     title?: string
-    textField1: string
+    content: Record<string, SnippetField>
     tags?: string[]
-    categories?: string[]
     imageUrl?: string | null
+    videoUrl?: string | null
     imageS3Key?: string | null
     imageMetadata?: {
       width: number
@@ -33,11 +35,18 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
   const toast = useToast()
   const normalisedTitle = snippet.title && snippet.title.trim() !== '' ? snippet.title : 'New snippet'
   const [title, setTitle] = useState(normalisedTitle)
-  const [textField1, setTextField1] = useState(snippet.textField1 ?? '')
+
+  // Initialize draft values from content map
+  const [draftValues, setDraftValues] = useState<Record<string, string>>(() => {
+    const values: Record<string, string> = {}
+    Object.entries(snippet.content).forEach(([key, field]) => {
+      values[key] = field.value
+    })
+    return values
+  })
+
   const [tags, setTags] = useState<string[]>(snippet.tags ?? [])
-  const [categories, setCategories] = useState<string[]>(snippet.categories ?? [])
   const [tagInput, setTagInput] = useState('')
-  const [categoryInput, setCategoryInput] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [selectedModelPrimary, setSelectedModelPrimary] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
@@ -61,20 +70,24 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
 
   const streamSubscriptionRef = useRef<{ unsubscribe: () => void } | null>(null)
   const assistantContentRef = useRef<string>('')
-  const textField1Ref = useRef<HTMLTextAreaElement | null>(null)
-  const lastSavedValuesRef = useRef({
-    textField1: snippet.textField1 ?? ''
-  })
+
+  // Store last saved values for comparison
+  const lastSavedValuesRef = useRef<Record<string, string>>({})
 
   // Reset form when snippet changes
   useEffect(() => {
     const nextTitle = snippet.title && snippet.title.trim() !== '' ? snippet.title : 'New snippet'
     setTitle(nextTitle)
-    setTextField1(snippet.textField1 ?? '')
+
+    const values: Record<string, string> = {}
+    Object.entries(snippet.content).forEach(([key, field]) => {
+      values[key] = field.value
+    })
+    setDraftValues(values)
+    lastSavedValuesRef.current = { ...values }
+
     setTags(snippet.tags ?? [])
-    setCategories(snippet.categories ?? [])
     setTagInput('')
-    setCategoryInput('')
     setSelectedModelPrimary('')
     setIsDeleting(false)
     setStreamError(null)
@@ -82,15 +95,12 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
     setIsGeneratingPrimary(false)
     setActiveField(null)
     setSavingField(null)
-    lastSavedValuesRef.current = {
-      textField1: snippet.textField1 ?? ''
-    }
 
     if (streamSubscriptionRef.current) {
       streamSubscriptionRef.current.unsubscribe()
       streamSubscriptionRef.current = null
     }
-    assistantContentRef.current = snippet.textField1 ?? ''
+    assistantContentRef.current = values.mainText ?? ''
   }, [snippet])
 
   useEffect(() => {
@@ -116,16 +126,7 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
     }
   }, [])
 
-  useEffect(() => {
-    if (activeField === 'textField1') {
-      const target = textField1Ref.current
-      if (target) {
-        const length = target.value.length
-        target.focus()
-        target.setSelectionRange(length, length)
-      }
-    }
-  }, [activeField])
+
 
   const { mutate: updateSnippetMutation } = useGraphQLMutation(UPDATE_SNIPPET)
 
@@ -157,15 +158,25 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
     try {
       const trimmedTitle = title.trim()
 
+      // Construct content object from draftValues
+      const updatedContent: Record<string, SnippetField> = {}
+      Object.entries(draftValues).forEach(([key, value]) => {
+        if (snippet.content[key]) {
+          updatedContent[key] = { ...snippet.content[key], value }
+        } else {
+          // Should not happen if draftValues are in sync, but handle new fields if any
+          updatedContent[key] = { value }
+        }
+      })
+
       await updateSnippetMutation({
         variables: {
           projectId: snippet.projectId,
           id: snippet.id,
           input: {
             title: trimmedTitle === '' ? undefined : trimmedTitle,
-            textField1,
-            tags,
-            categories
+            content: updatedContent,
+            tags
           }
         }
       })
@@ -182,7 +193,7 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
     } finally {
       setIsSaving(false)
     }
-  }, [snippet.id, snippet.projectId, title, textField1, tags, categories, updateSnippetMutation, onSave, onClose, toast])
+  }, [snippet.id, snippet.projectId, snippet.content, title, draftValues, tags, updateSnippetMutation, onSave, onClose, toast])
 
   const handleAddTag = useCallback(() => {
     const trimmedTag = tagInput.trim()
@@ -196,31 +207,12 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
     setTags(tags.filter(tag => tag !== tagToRemove))
   }, [tags])
 
-  const handleAddCategory = useCallback(() => {
-    const trimmedCategory = categoryInput.trim()
-    if (trimmedCategory && !categories.includes(trimmedCategory)) {
-      setCategories([...categories, trimmedCategory])
-      setCategoryInput('')
-    }
-  }, [categoryInput, categories])
-
-  const handleRemoveCategory = useCallback((categoryToRemove: string) => {
-    setCategories(categories.filter(cat => cat !== categoryToRemove))
-  }, [categories])
-
   const handleTagKeyPress = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault()
       handleAddTag()
     }
   }, [handleAddTag])
-
-  const handleCategoryKeyPress = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      handleAddCategory()
-    }
-  }, [handleAddCategory])
 
   const isPrimaryBusy = isGeneratingPrimary || isStreaming
 
@@ -230,8 +222,11 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
       return
     }
 
-    if (textField1.trim() === '') {
-      toast.warning('Please provide input in Text Field 1 to send to the model')
+    // Use mainText or the first available field
+    const sourceText = draftValues.mainText || Object.values(draftValues)[0] || ''
+
+    if (sourceText.trim() === '') {
+      toast.warning('Please provide input to send to the model')
       return
     }
 
@@ -256,18 +251,25 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
 
             if (event.snippetId !== snippet.id) return
 
-          if (event.content) {
-            assistantContentRef.current += event.content
-            setTextField1(assistantContentRef.current)
-          }
-
-          if (event.isComplete) {
-            setTextField1(assistantContentRef.current)
-            setIsStreaming(false)
-            if (streamSubscriptionRef.current) {
-              streamSubscriptionRef.current.unsubscribe()
-              streamSubscriptionRef.current = null
+            if (event.content) {
+              assistantContentRef.current += event.content
+              // Update mainText or the active field
+              setDraftValues(prev => ({
+                ...prev,
+                mainText: assistantContentRef.current
+              }))
             }
+
+            if (event.isComplete) {
+              setDraftValues(prev => ({
+                ...prev,
+                mainText: assistantContentRef.current
+              }))
+              setIsStreaming(false)
+              if (streamSubscriptionRef.current) {
+                streamSubscriptionRef.current.unsubscribe()
+                streamSubscriptionRef.current = null
+              }
             }
           },
           onError: (error) => {
@@ -299,7 +301,7 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
         snippet.projectId,
         snippet.id,
         selectedModelPrimary,
-        textField1
+        sourceText
       )
 
       if (!generation || generation.content.trim() === '') {
@@ -313,7 +315,10 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
       }
 
       assistantContentRef.current = generation.content
-      setTextField1(generation.content)
+      setDraftValues(prev => ({
+        ...prev,
+        mainText: generation.content
+      }))
     } catch (error) {
       console.error('Failed to generate content:', error)
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -335,7 +340,7 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
     snippet.projectId,
     streamingFallbackReason,
     subscribeToGenerationStream,
-    textField1,
+    draftValues,
     toast
   ])
 
@@ -391,8 +396,12 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
         throw new Error('No data returned from combine operation')
       }
 
-      // Update local state with new text content
-      setTextField1(updatedSnippet.textField1)
+      // Update local state with new content
+      const values: Record<string, string> = {}
+      Object.entries(updatedSnippet.content).forEach(([key, field]) => {
+        values[key] = field.value
+      })
+      setDraftValues(values)
 
       toast.success('Successfully combined connected snippets!')
     } catch (error) {
@@ -404,8 +413,9 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
   }, [combineConnectionsMutation, snippet.projectId, snippet.id, toast])
 
   const handleGenerateImage = useCallback(async () => {
-    if (!textField1.trim()) {
-      toast.warning('Please provide input in Text Field 1 for image generation')
+    const sourceText = draftValues.mainText || Object.values(draftValues)[0] || ''
+    if (!sourceText.trim()) {
+      toast.warning('Please provide input for image generation')
       return
     }
 
@@ -421,25 +431,25 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
     } finally {
       setIsGeneratingImage(false)
     }
-  }, [generateImageMutation, snippet.projectId, snippet.id, textField1, toast])
+  }, [generateImageMutation, snippet.projectId, snippet.id, draftValues, toast])
 
   const handleFieldActivate = useCallback((field: EditableField) => {
     if (isSaving || isDeleting) {
       return
     }
 
-    if (field === 'textField1' && (isPrimaryBusy || savingField === 'textField1')) {
+    if (field === activeField && (isPrimaryBusy || savingField === field)) {
       return
     }
 
     setActiveField(field)
-  }, [isSaving, isDeleting, isPrimaryBusy, savingField])
+  }, [isSaving, isDeleting, isPrimaryBusy, savingField, activeField])
 
   const handleFieldBlur = useCallback(async (field: EditableField) => {
     setActiveField((current) => (current === field ? null : current))
 
-    const currentValue = textField1
-    const lastSavedValue = lastSavedValuesRef.current.textField1
+    const currentValue = draftValues[field]
+    const lastSavedValue = lastSavedValuesRef.current[field]
 
     if (currentValue === lastSavedValue) {
       return
@@ -448,30 +458,100 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
     setSavingField(field)
 
     try {
+      // We need to send the full content object or at least the updated field
+      // But updateSnippet expects the full content map or partial?
+      // The mutation expects `content: Record<string, SnippetField>`
+      // So we should construct the updated content map
+
+      const updatedContent: Record<string, SnippetField> = { ...snippet.content }
+      if (updatedContent[field]) {
+        updatedContent[field] = { ...updatedContent[field], value: currentValue }
+      } else {
+        // Handle case where field might not exist in original content (e.g. added locally but not saved yet?)
+        // But here we are blurring, so it should exist in draftValues
+        updatedContent[field] = { value: currentValue }
+      }
+
       await updateSnippetMutation({
         variables: {
           projectId: snippet.projectId,
           id: snippet.id,
           input: {
-            textField1: currentValue
+            content: updatedContent
           }
         }
       })
 
       lastSavedValuesRef.current = {
         ...lastSavedValuesRef.current,
-        textField1: currentValue
+        [field]: currentValue
       }
     } catch (error) {
       console.error('Failed to save snippet field:', error)
       toast.error('Failed to save changes', 'Please try again')
 
-      const previousValue = lastSavedValuesRef.current.textField1
-      setTextField1(previousValue)
+      const previousValue = lastSavedValuesRef.current[field]
+      setDraftValues(prev => ({ ...prev, [field]: previousValue }))
     } finally {
       setSavingField(null)
     }
-  }, [snippet.projectId, snippet.id, textField1, updateSnippetMutation, toast])
+  }, [snippet.projectId, snippet.id, snippet.content, draftValues, updateSnippetMutation, toast])
+
+  const handleFieldChange = useCallback((field: string, value: string) => {
+    setDraftValues((prev) => ({
+      ...prev,
+      [field]: value
+    }))
+  }, [])
+
+  const handleAddField = useCallback((key: string, value: string) => {
+    // This needs to update the content map via mutation
+    // For now, we can just update draftValues and trigger a save?
+    // Or we should trigger a save immediately to add the field structure
+
+    const newField: SnippetField = {
+      label: key,
+      value,
+      isSystem: false
+    }
+
+    const updatedContent = { ...snippet.content, [key]: newField }
+
+    // Optimistic update
+    setDraftValues(prev => ({ ...prev, [key]: value }))
+
+    void updateSnippetMutation({
+      variables: {
+        projectId: snippet.projectId,
+        id: snippet.id,
+        input: {
+          content: updatedContent
+        }
+      }
+    })
+  }, [snippet.content, snippet.projectId, snippet.id, updateSnippetMutation])
+
+  const handleDeleteField = useCallback((key: string) => {
+    const updatedContent = { ...snippet.content }
+    delete updatedContent[key]
+
+    // Optimistic update
+    setDraftValues(prev => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+
+    void updateSnippetMutation({
+      variables: {
+        projectId: snippet.projectId,
+        id: snippet.id,
+        input: {
+          content: updatedContent
+        }
+      }
+    })
+  }, [snippet.content, snippet.projectId, snippet.id, updateSnippetMutation])
 
   if (!isOpen) return null
 
@@ -516,35 +596,20 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
               />
             </div>
 
-            {/* Text Field 1 */}
-            <div>
-              <label htmlFor="textField1" className="block text-sm font-medium text-gray-700 mb-1">
-                Text Field 1
-              </label>
-              <textarea
-                id="textField1"
-                ref={textField1Ref}
-                value={textField1}
-                onChange={(e) => setTextField1(e.target.value)}
-                onClick={() => {
-                  handleFieldActivate('textField1')
-                }}
-                onFocus={() => {
-                  handleFieldActivate('textField1')
-                }}
-                onBlur={() => {
-                  void handleFieldBlur('textField1')
-                }}
-                readOnly={activeField !== 'textField1'}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y overflow-auto ${
-                  activeField === 'textField1' ? '' : 'cursor-text'
-                }`}
-                rows={6}
-                placeholder="Enter text for field 1..."
+            {/* Content Fields */}
+            <div className="border border-gray-200 rounded-md p-4 bg-gray-50">
+              <SnippetNodeContent
+                content={snippet.content}
+                activeField={activeField}
+                draftValues={draftValues}
+                savingField={savingField}
+                onFieldChange={handleFieldChange}
+                onFieldActivate={handleFieldActivate}
+                onFieldBlur={handleFieldBlur}
+                onAddField={handleAddField}
+                onDeleteField={handleDeleteField}
+                isDisabled={isSaving || isDeleting}
               />
-              {savingField === 'textField1' && (
-                <p className="text-xs text-gray-500 mt-1">Saving changes…</p>
-              )}
             </div>
 
             {/* LLM Model Selector */}
@@ -580,7 +645,6 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
                   isPrimaryBusy ||
                   isDeleting ||
                   !selectedModelPrimary ||
-                  textField1.trim() === '' ||
                   isLoadingModels
                 }
               >
@@ -612,7 +676,7 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
                   void handleGenerateImage()
                 }}
                 className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors disabled:bg-purple-400 flex items-center gap-2"
-                disabled={isSaving || isDeleting || isGeneratingImage || !textField1.trim()}
+                disabled={isSaving || isDeleting || isGeneratingImage}
               >
                 {isGeneratingImage && (
                   <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -705,52 +769,7 @@ export const EditSnippetModal = ({ isOpen, onClose, onSave, snippet }: EditSnipp
               </div>
             )}
 
-            {/* Categories */}
-            <div>
-              <label htmlFor="categories" className="block text-sm font-medium text-gray-700 mb-1">
-                Categories
-              </label>
-              <div className="flex gap-2 mb-2">
-                <input
-                  id="categories"
-                  type="text"
-                  value={categoryInput}
-                  onChange={(e) => setCategoryInput(e.target.value)}
-                  onKeyPress={handleCategoryKeyPress}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Add a category..."
-                  disabled={isSaving || isDeleting}
-                />
-                <button
-                  onClick={handleAddCategory}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors disabled:bg-purple-400"
-                  disabled={isSaving || isDeleting || !categoryInput.trim()}
-                >
-                  Add
-                </button>
-              </div>
-              {categories.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {categories.map((category, index) => (
-                    <span
-                      key={`category-${index}`}
-                      className="px-2 py-1 bg-purple-100 text-purple-800 text-sm rounded flex items-center gap-1"
-                    >
-                      {category}
-                      <button
-                        onClick={() => handleRemoveCategory(category)}
-                        className="text-purple-600 hover:text-purple-800"
-                        disabled={isSaving || isDeleting}
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
+
           </div>
         </div>
 

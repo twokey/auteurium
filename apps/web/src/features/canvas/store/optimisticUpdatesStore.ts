@@ -5,22 +5,21 @@
 
 import { create } from 'zustand'
 
-import type { Connection, Snippet } from '../../../types'
+import type { Connection, Snippet, SnippetField } from '../../../types'
 
 interface OptimisticSnippet {
   id: string
   projectId: string
   title: string
-  textField1: string
+  content: Record<string, SnippetField>
   position: { x: number; y: number }
   tags: string[]
-  categories: string[]
   connections: []
   createdAt: string
   updatedAt: string
   version: number
   isOptimistic: true
-  snippetType?: 'text' | 'video'
+  snippetType?: 'text' | 'image' | 'video' | 'audio' | 'generic'
 }
 
 interface OptimisticConnection {

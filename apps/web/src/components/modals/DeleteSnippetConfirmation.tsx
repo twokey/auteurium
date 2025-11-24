@@ -4,6 +4,8 @@ import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisti
 import { DELETE_SNIPPET } from '../../graphql/mutations'
 import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
 import { useToast } from '../../store/toastStore'
+import { getPrimaryTextValue } from '../../utils/snippetContent'
+import type { SnippetField } from '../../types'
 
 interface DeleteSnippetConfirmationProps {
   isOpen: boolean
@@ -11,7 +13,7 @@ interface DeleteSnippetConfirmationProps {
   snippet: {
     id: string
     projectId: string
-    textField1: string
+    content: Record<string, SnippetField>
   }
   onDeleted?: () => void
 }
@@ -64,7 +66,7 @@ export const DeleteSnippetConfirmation = ({ isOpen, onClose, snippet, onDeleted 
 
   if (!isOpen) return null
 
-  const snippetPreviewSource = snippet.textField1?.trim()
+  const snippetPreviewSource = getPrimaryTextValue({ content: snippet.content }).trim()
   const snippetPreview = snippetPreviewSource && snippetPreviewSource !== ''
     ? snippetPreviewSource
     : 'Untitled snippet'

@@ -153,7 +153,7 @@ const getAllRequiredSnippetIds = (branches: Branch[]): string[] => {
  * 4. For each incoming connection, traverse to find root and build path
  * 5. Batch fetch all required snippets
  * 6. Sort branches by root creation time (oldest first)
- * 7. Concatenate all ancestor textField1 values in order, then append current textField1
+ * 7. Concatenate text content from ancestors in order, then append current snippet text
  * 8. Update current snippet with combined text
  */
 export const combineSnippetConnectionsLogic = async (
@@ -268,19 +268,35 @@ export const combineSnippetConnectionsLogic = async (
   // Step 8: Build combined text
   const textParts: string[] = []
 
+  const getSnippetText = (s: Snippet): string => {
+    if (s.content.mainText?.value) {
+      return s.content.mainText.value
+    }
+    // Fallback to first field
+    const firstKey = Object.keys(s.content)[0]
+    if (firstKey && s.content[firstKey]?.value) {
+      return s.content[firstKey].value
+    }
+    return ''
+  }
+
   for (const branch of branchesWithCreatedAt) {
     // Add all snippets in the path (root → ... → last before current)
     for (const branchSnippetId of branch.path) {
       const snippet = snippetMap.get(branchSnippetId)
-      if (snippet && snippet.textField1.trim() !== '') {
-        textParts.push(snippet.textField1.trim())
+      if (snippet) {
+        const text = getSnippetText(snippet)
+        if (text.trim() !== '') {
+          textParts.push(text.trim())
+        }
       }
     }
   }
 
-  // Append current snippet's textField1 at the end
-  if (currentSnippet.textField1.trim() !== '') {
-    textParts.push(currentSnippet.textField1.trim())
+  // Append current snippet's text at the end
+  const currentText = getSnippetText(currentSnippet)
+  if (currentText.trim() !== '') {
+    textParts.push(currentText.trim())
   }
 
   const combinedText = textParts.join('\n\n')
@@ -292,10 +308,24 @@ export const combineSnippetConnectionsLogic = async (
   })
 
   // Step 9: Update snippet with combined text
+  // We'll update 'mainText' field, creating it if it doesn't exist
+  const updatedContent = {
+    ...currentSnippet.content,
+    mainText: {
+      ...(currentSnippet.content.mainText || {
+        label: 'Main Text',
+        type: 'longText',
+        isSystem: true,
+        order: 1
+      }),
+      value: combinedText
+    }
+  }
+
   const updatedSnippet = await updateSnippet(
     projectId,
     snippetId,
-    { textField1: combinedText },
+    { content: updatedContent },
     userId
   )
 

@@ -16,7 +16,8 @@ import type {
   Snippet,
   SnippetInput,
   SnippetVersion,
-  UpdateSnippetInput
+  UpdateSnippetInput,
+  SnippetField
 } from '@auteurium/shared-types'
 
 const logger = new Logger({ serviceName: 'snippets-db' })
@@ -53,8 +54,15 @@ const toPosition = (value: unknown): Position | undefined => {
 
   const candidate = value as Record<string, unknown>
   return typeof candidate.x === 'number' && typeof candidate.y === 'number'
-    ? { x: candidate.x, y: candidate.y }
+    ? { x: candidate.x, y: candidate.y, zIndex: typeof candidate.zIndex === 'number' ? candidate.zIndex : undefined }
     : undefined
+}
+
+const toContent = (value: unknown): Record<string, SnippetField> | undefined => {
+  if (typeof value !== 'object' || value === null) {
+    return undefined
+  }
+  return value as Record<string, SnippetField>
 }
 
 const runQuery = async (
@@ -103,26 +111,30 @@ const deleteSnippetMedia = async (snippet: Snippet | undefined): Promise<void> =
   }
 
   await Promise.all([
-    deleteKey(snippet.imageS3Key, 'image'),
-    deleteKey(snippet.videoS3Key, 'video')
+    deleteKey(snippet.imageS3Key || undefined, 'image'),
+    deleteKey(snippet.videoS3Key || undefined, 'video')
   ])
 }
 
-const buildSnippet = (input: SnippetInput, userId: string, now: string): Snippet => ({
-  id: generateId(),
-  projectId: input.projectId,
-  userId,
-  title: input.title ?? 'New snippet',
-  textField1: input.textField1 ?? '',
-  position: input.position ?? { x: 0, y: 0 },
-  tags: input.tags ?? [],
-  categories: input.categories ?? [],
-  version: 1,
-  createdAt: now,
-  updatedAt: now,
-  snippetType: input.snippetType ?? 'text',
-  ...(input.createdFrom && { createdFrom: input.createdFrom })
-})
+const buildSnippet = (input: SnippetInput, userId: string, now: string): Snippet => {
+  const snippetType = input.snippetType ?? 'text'
+  const content = input.content ?? {}
+
+  return {
+    id: generateId(),
+    projectId: input.projectId,
+    userId,
+    title: input.title ?? 'New snippet',
+    content,
+    position: input.position ?? { x: 0, y: 0 },
+    tags: input.tags ?? [],
+    version: 1,
+    createdAt: now,
+    updatedAt: now,
+    snippetType,
+    ...(input.createdFrom && { createdFrom: input.createdFrom })
+  }
+}
 
 const createSnippetVersion = async (snippet: Snippet): Promise<void> => {
   const params: Parameters<DocumentClientType['put']>[0] = {
@@ -133,11 +145,10 @@ const createSnippetVersion = async (snippet: Snippet): Promise<void> => {
       projectId: snippet.projectId,
       version: snippet.version,
       title: snippet.title,
-      textField1: snippet.textField1,
+      content: snippet.content,
       userId: snippet.userId,
       position: snippet.position,
       tags: snippet.tags,
-      categories: snippet.categories,
       createdAt: getCurrentTimestamp()
     }
   }
@@ -274,8 +285,7 @@ const buildSnippetUpdate = (
 ) => {
   console.log('[buildSnippetUpdate] Called with:', {
     updates,
-    currentSnippetId: currentSnippet.id,
-    currentTextField1: currentSnippet.textField1
+    currentSnippetId: currentSnippet.id
   })
 
   const updateExpressions: string[] = [
@@ -296,39 +306,45 @@ const buildSnippetUpdate = (
     key: K,
     value: Snippet[K] | undefined
   ) => {
-    console.log('[buildSnippetUpdate] assignField called:', {
-      key,
-      value,
-      valueType: typeof value,
-      isUndefined: value === undefined,
-      hasProperty: Object.prototype.hasOwnProperty.call(updates, key)
-    })
-
     if (value !== undefined) {
       const placeholder = `#${key as string}`
       const valuePlaceholder = `:${key as string}`
       updateExpressions.push(`${placeholder} = ${valuePlaceholder}`)
       expressionAttributeNames[placeholder] = key as string
       expressionAttributeValues[valuePlaceholder] = value
-      console.log('[buildSnippetUpdate] Field added to update:', { key, value })
-    } else {
-      console.log('[buildSnippetUpdate] Field skipped (undefined):', { key })
     }
   }
 
   assignField('title', updates.title)
-  assignField('textField1', updates.textField1)
+
+  const mergedContent = updates.content
+    ? Object.entries(updates.content).reduce<Record<string, SnippetField>>((acc, [key, value]) => {
+      if (value === null) {
+        const next = { ...acc }
+        delete next[key]
+        return next
+      }
+
+      const existing = acc[key]
+      return {
+        ...acc,
+        [key]: {
+          ...(existing ?? {}),
+          ...value
+        }
+      }
+    }, { ...currentSnippet.content })
+    : undefined
+
+  assignField('content', mergedContent)
   assignField('position', updates.position)
   assignField('tags', updates.tags)
-  assignField('categories', updates.categories)
 
   const result = {
     updateExpressions,
     expressionAttributeNames,
     expressionAttributeValues
   }
-
-  console.log('[buildSnippetUpdate] Final result:', result)
 
   return result
 }
@@ -475,19 +491,17 @@ export const revertSnippetToVersion = async (
   }
 
   const version = rawVersion as Record<string, unknown>
-  const textField1 = typeof version.textField1 === 'string' ? version.textField1 : ''
+  const content = toContent(version.content) ?? {}
   const position = toPosition(version.position)
   const tags = toStringArray(version.tags)
-  const categories = toStringArray(version.categories)
 
   return updateSnippet(
     projectId,
     snippetId,
     {
-      textField1,
+      content,
       position,
-      tags,
-      categories
+      tags
     },
     userId
   )

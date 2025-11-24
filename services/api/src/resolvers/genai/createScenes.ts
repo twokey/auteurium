@@ -54,7 +54,7 @@ interface SnippetRecord {
   id: string
   projectId: string
   userId: string
-  textField1: string
+  content: Record<string, any>
   position: { x: number; y: number }
 }
 
@@ -225,11 +225,10 @@ const createSceneVersions = async (snippets: Snippet[]): Promise<void> => {
         projectId: snippet.projectId,
         version: snippet.version,
         title: snippet.title,
-        textField1: snippet.textField1,
+        content: snippet.content,
         userId: snippet.userId,
         position: snippet.position,
         tags: snippet.tags,
-        categories: snippet.categories,
         createdAt: timestamp
       }
     }
@@ -293,7 +292,10 @@ export const handler: AppSyncResolverHandler<CreateScenesArgs, CreateScenesResul
       throw new Error('Snippet not found')
     }
 
-    if (!sourceSnippet.textField1 || sourceSnippet.textField1.trim() === '') {
+    const mainText = sourceSnippet.content?.mainText?.value ||
+      (sourceSnippet.content ? Object.values(sourceSnippet.content)[0]?.value : undefined)
+
+    if (!mainText || mainText.trim() === '') {
       throw new GraphQLError('Source snippet has no text content', {
         extensions: { code: 'EMPTY_SOURCE_SNIPPET' }
       })
@@ -367,17 +369,25 @@ export const handler: AppSyncResolverHandler<CreateScenesArgs, CreateScenesResul
       projectId,
       userId,
       title: scene.title,
-      textField1: scene.content,
+      content: {
+        mainText: {
+          label: 'Main Text',
+          value: scene.content,
+          type: 'longText',
+          isSystem: true,
+          order: 1
+        }
+      },
       position: {
         x: baseX,
         y: sourceSnippet.position.y + (index * (ESTIMATED_SNIPPET_HEIGHT + SCENE_VERTICAL_SPACING))
       },
       tags: [], // No inheritance per requirements
-      categories: [], // No inheritance per requirements
       version: 1,
       createdAt: timestamp,
       updatedAt: timestamp,
-      createdFrom: snippetId // Link to source snippet
+      createdFrom: snippetId, // Link to source snippet
+      snippetType: 'text'
     } as Snippet))
 
     // Batch write snippets to DynamoDB

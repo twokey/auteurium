@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { Handle, Position } from 'reactflow'
 
 import { VideoSnippetNode } from './VideoSnippetNode'
+import { SnippetNodeContent } from '../../features/snippets/components/SnippetNodeContent'
 import { CANVAS_CONSTANTS, VIDEO_GENERATION } from '../../constants'
 import { useOptimisticUpdatesStore } from '../../features/canvas/store/optimisticUpdatesStore'
 import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
@@ -17,10 +18,15 @@ interface SnippetNodeProps {
   data: {
     snippet: {
       id: string
-      title?: string
-      textField1: string
+      title: string
+      content: Record<string, {
+        label?: string
+        value: string
+        type?: string
+        isSystem?: boolean
+        order?: number
+      }>
       tags?: string[]
-      categories?: string[]
       connectionCount: number
       imageUrl?: string | null
       imageS3Key?: string | null
@@ -29,7 +35,6 @@ interface SnippetNodeProps {
         height: number
         aspectRatio: string
       } | null
-      videoUrl?: string | null
       videoS3Key?: string | null
       videoMetadata?: {
         duration: number
@@ -43,13 +48,13 @@ interface SnippetNodeProps {
       } | null
       connectedContent?: ConnectedContentItem[]
       downstreamConnections?: { id: string; title?: string }[]
-      snippetType?: 'text' | 'video'
+      snippetType?: 'text' | 'image' | 'video' | 'audio' | 'generic'
     }
     onEdit: (snippetId: string) => void
     onDelete: (snippetId: string) => void
     onManageConnections: (snippetId: string) => void
     onViewVersions: (snippetId: string) => void
-    onUpdateContent: (snippetId: string, changes: Partial<Record<'textField1' | 'title', string>>) => Promise<void>
+    onUpdateContent: (snippetId: string, changes: Partial<{ title: string; content: Record<string, any> }>) => Promise<void>
     onCombine: (snippetId: string) => Promise<void>
     onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
     onGenerateText: (snippetId: string, content: string) => Promise<void>
@@ -69,7 +74,7 @@ interface SnippetNodeProps {
   }
 }
 
-type EditableField = 'textField1' | 'title'
+type EditableField = string
 
 // Extract inline styles outside component to prevent object recreation on every render
 // This is a critical performance fix for preventing unnecessary React Flow node updates
@@ -232,7 +237,7 @@ const parseVideoSnippetContent = (content: string): GeneratedVideoSnippetData =>
     }
   }
 
-  const combinedContent = safeString(payload.content) ?? sceneContent ?? safeString(payload.textField1 ?? payload.prompt ?? payload.description)
+  const combinedContent = safeString(payload.content) ?? sceneContent ?? safeString(payload.prompt ?? payload.description)
 
   const parsedSubject = parseLabeledValue(combinedContent ?? '', ['Subject'])
   const parsedAction = parseLabeledValue(combinedContent ?? '', ['Action'])
@@ -246,15 +251,13 @@ const parseVideoSnippetContent = (content: string): GeneratedVideoSnippetData =>
   const parsedAmbientNoise = parseLabeledValue(combinedContent ?? '', ['Ambient Noise'])
 
   const title = safeString(payload.title ?? payload.name ?? sceneTitle)
-  const textField1 = combinedContent
+  const mainText = combinedContent
   const tags = safeStringArray(payload.tags)
-  const categories = safeStringArray(payload.categories)
 
   return {
     ...(title ? { title } : {}),
-    ...(textField1 ? { textField1 } : {}),
+    ...(mainText ? { mainText } : {}),
     ...(tags ? { tags } : {}),
-    ...(categories ? { categories } : {}),
     subject: directSubject ?? parsedSubject ?? undefined,
     action: directAction ?? parsedAction ?? undefined,
     style: directStyle ?? parsedStyle ?? undefined,
@@ -285,11 +288,11 @@ const buildVideoSnippetText = (data: GeneratedVideoSnippetData): string => {
   push('Dialogue', data.dialogue)
   push('Sound Effects', data.soundEffects)
   push('Ambient Noise', data.ambientNoise)
-  if (parts.length === 0 && data.textField1) {
-    return data.textField1
+  if (parts.length === 0 && data.mainText) {
+    return data.mainText
   }
-  if (data.textField1 && parts.length > 0) {
-    parts.push(`Notes: ${data.textField1}`)
+  if (data.mainText && parts.length > 0) {
+    parts.push(`Notes: ${data.mainText}`)
   }
   return parts.join('\n')
 }
@@ -326,19 +329,26 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
   const hasImageAsset = Boolean(snippet.imageUrl ?? snippet.imageS3Key)
   const isTextFieldLocked = hasImageAsset
   const hasIncomingConnections = connectedSnippets.length > 0
-  const trimmedTextField1 = snippet.textField1.trim()
-  const isTextFieldEmpty = trimmedTextField1 === ''
-  const hideTextFieldDueToConnections = hasIncomingConnections && isTextFieldEmpty
-  const isTextFieldReadOnlyDueToConnections = hasIncomingConnections && !isTextFieldEmpty
+  const mainText = snippet.content?.mainText?.value ?? Object.values(snippet.content ?? {})[0]?.value ?? ''
+  const isContentEmpty = mainText.trim() === ''
+  const hideTextFieldDueToConnections = hasIncomingConnections && isContentEmpty
+  const isTextFieldReadOnlyDueToConnections = hasIncomingConnections && !isContentEmpty
   const isTextFieldEditable = !isTextFieldLocked && !isTextFieldReadOnlyDueToConnections
 
   const [activeField, setActiveField] = useState<EditableField | null>(null)
-  const [draftValues, setDraftValues] = useState({
-    textField1: snippet.textField1,
-    title: snippet.title ?? ''
+
+  // Initialize draft values from content map + title
+  const [draftValues, setDraftValues] = useState<Record<string, string>>(() => {
+    const values: Record<string, string> = {
+      title: snippet.title ?? ''
+    }
+    Object.entries(snippet.content ?? {}).forEach(([key, field]) => {
+      values[key] = field?.value ?? ''
+    })
+    return values
   })
+
   const [savingField, setSavingField] = useState<EditableField | null>(null)
-  const textField1Ref = useRef<HTMLTextAreaElement | null>(null)
   const titleRef = useRef<HTMLInputElement | null>(null)
   const [isImageLoading, setIsImageLoading] = useState(true)
   const [selectedTextModel, setSelectedTextModel] = useState<string>('')
@@ -355,35 +365,26 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
   const videoReferenceLimit = getVideoReferenceLimit(selectedVideoModel || videoModels[0]?.id || '')
   const hasTooManyVideoReferences = connectedImageReferences.length > videoReferenceLimit
 
+  // Sync draft values when snippet updates
   useEffect(() => {
-    if (activeField === 'textField1') return
+    setDraftValues(prev => {
+      const next = { ...prev }
 
-    setDraftValues((prev) => {
-      if (prev.textField1 === snippet.textField1) {
-        return prev
+      // Update title if not editing it
+      if (activeField !== 'title' && snippet.title !== prev.title) {
+        next.title = snippet.title ?? ''
       }
 
-      return {
-        ...prev,
-        textField1: snippet.textField1
-      }
+      // Update content fields if not editing them
+      Object.entries(snippet.content).forEach(([key, field]) => {
+        if (activeField !== key && field.value !== prev[key]) {
+          next[key] = field.value
+        }
+      })
+
+      return next
     })
-  }, [snippet.textField1, activeField])
-
-  useEffect(() => {
-    if (activeField === 'title') return
-
-    setDraftValues((prev) => {
-      if (prev.title === (snippet.title ?? '')) {
-        return prev
-      }
-
-      return {
-        ...prev,
-        title: snippet.title ?? ''
-      }
-    })
-  }, [snippet.title, activeField])
+  }, [snippet.title, snippet.content, activeField])
 
   // Auto-select first text model when models load
   useEffect(() => {
@@ -413,12 +414,7 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
   }, [videoModels, selectedVideoModel])
 
   useEffect(() => {
-    if (activeField === 'textField1') {
-      const target = textField1Ref.current
-      target?.focus()
-      const length = target?.value.length ?? 0
-      target?.setSelectionRange(length, length)
-    } else if (activeField === 'title') {
+    if (activeField === 'title') {
       const target = titleRef.current
       target?.focus()
       target?.select()
@@ -426,45 +422,17 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
   }, [activeField])
 
   useEffect(() => {
-    if (!isTextFieldEditable && activeField === 'textField1') {
+    // If we were editing a field that no longer exists in content (and isn't title), clear active field
+    if (activeField && activeField !== 'title' && !snippet.content[activeField]) {
       setActiveField(null)
     }
-  }, [isTextFieldEditable, activeField])
+  }, [snippet.content, activeField])
 
   const commitField = useCallback(async (field: EditableField) => {
-    if (field === 'textField1') {
-      const newValue = draftValues.textField1
-      const currentValue = snippet.textField1
+    const newValue = draftValues[field]
 
-      if (newValue === currentValue) {
-        clearSnippetDirty(snippet.id)
-        setActiveField(null)
-        return
-      }
-
-      setSavingField('textField1')
-      markSnippetSaving(snippet.id)
-
-      try {
-        await onUpdateContent(snippet.id, { textField1: newValue })
-        clearSnippetDirty(snippet.id)
-        setActiveField(null)
-      } catch (error) {
-        console.error('Failed to update snippet content:', error)
-        toast.error('Failed to save snippet changes', 'Please try again')
-        setDraftValues((prev) => ({
-          ...prev,
-          textField1: currentValue
-        }))
-        setActiveField(null)
-      } finally {
-        setSavingField(null)
-        clearSnippetSaving(snippet.id)
-      }
-    } else if (field === 'title') {
-      const newValue = draftValues.title
+    if (field === 'title') {
       const currentValue = snippet.title ?? ''
-
       if (newValue === currentValue) {
         clearSnippetDirty(snippet.id)
         setActiveField(null)
@@ -481,64 +449,81 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
       } catch (error) {
         console.error('Failed to update snippet title:', error)
         toast.error('Failed to save title changes', 'Please try again')
-        setDraftValues((prev) => ({
-          ...prev,
-          title: currentValue
-        }))
+        setDraftValues((prev) => ({ ...prev, title: currentValue }))
+        setActiveField(null)
+      } finally {
+        setSavingField(null)
+        clearSnippetSaving(snippet.id)
+      }
+    } else {
+      // Content field
+      const currentField = snippet.content[field]
+      if (!currentField) return // Field might have been deleted
+
+      if (newValue === currentField.value) {
+        clearSnippetDirty(snippet.id)
+        setActiveField(null)
+        return
+      }
+
+      setSavingField(field)
+      markSnippetSaving(snippet.id)
+
+      try {
+        const updatedContent = {
+          ...snippet.content,
+          [field]: { ...currentField, value: newValue }
+        }
+        await onUpdateContent(snippet.id, { content: updatedContent })
+        clearSnippetDirty(snippet.id)
+        setActiveField(null)
+      } catch (error) {
+        console.error('Failed to update snippet content:', error)
+        toast.error('Failed to save snippet changes', 'Please try again')
+        setDraftValues((prev) => ({ ...prev, [field]: currentField.value }))
         setActiveField(null)
       } finally {
         setSavingField(null)
         clearSnippetSaving(snippet.id)
       }
     }
-  }, [draftValues, onUpdateContent, snippet.id, snippet.textField1, snippet.title, toast, markSnippetSaving, clearSnippetSaving, clearSnippetDirty])
+  }, [draftValues, onUpdateContent, snippet.id, snippet.content, snippet.title, toast, markSnippetSaving, clearSnippetSaving, clearSnippetDirty])
 
-  const handleFieldActivate = useCallback(
-    (field: EditableField) =>
-      (event?: React.MouseEvent) => {
-        // Don't activate fields if Cmd/Ctrl is held (user is multi-selecting)
-        if (event && (event.metaKey || event.ctrlKey)) {
-          event.preventDefault()
-          return
-        }
+  const handleFieldActivate = useCallback((field: EditableField, event?: React.MouseEvent) => {
+    if (event && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault()
+      return
+    }
 
-        // Don't stop propagation - allow selection to work
-        // The field will still activate, but the snippet will also be selected
+    if (field !== 'title' && !isTextFieldEditable) {
+      return
+    }
 
-        if (field === 'textField1' && !isTextFieldEditable) {
-          return
-        }
+    if (activeField && activeField !== field) {
+      void commitField(activeField)
+    }
 
-        if (activeField && activeField !== field) {
-          void commitField(activeField)
-        }
+    setActiveField(field)
+    markSnippetDirty(snippet.id)
 
-        setActiveField(field)
-        markSnippetDirty(snippet.id)
-        if (field === 'textField1') {
-          setDraftValues((prev) => ({
-            ...prev,
-            textField1: snippet.textField1
-          }))
-        } else if (field === 'title') {
-          setDraftValues((prev) => ({
-            ...prev,
-            title: snippet.title ?? ''
-          }))
-        }
-      },
-    [activeField, commitField, snippet.id, snippet.textField1, snippet.title, isTextFieldEditable, markSnippetDirty]
-  )
+    // Reset draft value to current value when activating
+    if (field === 'title') {
+      setDraftValues(prev => ({ ...prev, title: snippet.title ?? '' }))
+    } else {
+      const contentField = snippet.content[field]
+      if (contentField) {
+        setDraftValues(prev => ({ ...prev, [field]: contentField.value }))
+      }
+    }
+  }, [activeField, commitField, isTextFieldEditable, markSnippetDirty, snippet.content, snippet.id, snippet.title])
 
   const handleDraftChange = useCallback(
-    (field: EditableField) =>
-      (event: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => {
-        const { value } = event.target
-        setDraftValues((prev) => ({
-          ...prev,
-          [field]: value
-        }))
-      },
+    (field: EditableField, value: string) => {
+      setDraftValues((prev) => ({
+        ...prev,
+        [field]: value
+      }))
+    },
     []
   )
 
@@ -549,26 +534,35 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
     [commitField]
   )
 
-  const handleTextareaKeyDown = useCallback(
-    (field: EditableField) =>
-      (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (event.key === 'Escape') {
-          event.preventDefault()
-          setDraftValues((prev) => ({
-            ...prev,
-            textField1: snippet.textField1
-          }))
-          setActiveField(null)
-          return
+  const handleAddField = useCallback(async (key: string, value: string) => {
+    try {
+      const updatedContent = {
+        ...snippet.content,
+        [key]: {
+          label: key,
+          value,
+          type: 'text',
+          isSystem: false,
+          order: 999
         }
+      }
+      await onUpdateContent(snippet.id, { content: updatedContent })
+    } catch (error) {
+      console.error('Failed to add field:', error)
+      toast.error('Failed to add field')
+    }
+  }, [snippet.content, snippet.id, onUpdateContent, toast])
 
-        if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-          event.preventDefault()
-          void commitField(field)
-        }
-      },
-    [commitField, snippet.textField1]
-  )
+  const handleDeleteField = useCallback(async (key: string) => {
+    try {
+      const updatedContent = { ...snippet.content }
+      delete updatedContent[key]
+      await onUpdateContent(snippet.id, { content: updatedContent })
+    } catch (error) {
+      console.error('Failed to delete field:', error)
+      toast.error('Failed to delete field')
+    }
+  }, [snippet.content, snippet.id, onUpdateContent, toast])
 
   const handleInputKeyDown = useCallback(
     (field: EditableField) =>
@@ -596,12 +590,13 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
   const hasMultimodalSupport = selectedImageModel === 'gemini-2.5-flash-image'
   const tooManyImages = hasMultimodalSupport && connectedImagesCount > 3
 
-  const wordCount = countWords(snippet.textField1)
+  const wordCount = Object.values(snippet.content ?? {}).reduce((acc, field) => acc + countWords(field?.value), 0)
   const isLarge = !isTextFieldLocked && wordCount > CANVAS_CONSTANTS.WORD_LIMIT
 
+
   const displayText1 = isLarge
-    ? truncateToWords(snippet.textField1, CANVAS_CONSTANTS.WORD_LIMIT)
-    : snippet.textField1
+    ? truncateToWords(mainText, CANVAS_CONSTANTS.WORD_LIMIT)
+    : mainText
 
   const displayTitle = snippet.title && snippet.title.trim() !== ''
     ? snippet.title
@@ -859,7 +854,7 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
       console.info('[VideoSnippetGeneration] Raw model response', debugPayload)
       if (typeof window !== 'undefined') {
         // Helpful for inspection if console output is filtered/minified
-        ;(window as unknown as { __AUTEURIUM_LAST_VIDEO_SNIPPET_RESPONSE?: unknown }).__AUTEURIUM_LAST_VIDEO_SNIPPET_RESPONSE = {
+        ; (window as unknown as { __AUTEURIUM_LAST_VIDEO_SNIPPET_RESPONSE?: unknown }).__AUTEURIUM_LAST_VIDEO_SNIPPET_RESPONSE = {
           ...debugPayload,
           fullContent: result.content
         }
@@ -872,9 +867,9 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
 
       const composedText = buildVideoSnippetText({
         ...parsedData,
-        textField1: parsedData.textField1 ?? trimmedPrompt
+        mainText: parsedData.mainText ?? trimmedPrompt
       })
-      payload.textField1 = composedText
+      payload.mainText = composedText
 
       await onGenerateVideoSnippetFromJson(snippet.id, payload)
 
@@ -921,7 +916,7 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
               type="text"
               className="flex-1 text-sm font-bold tracking-wide text-gray-900 uppercase bg-white border border-blue-200 rounded-sm px-1 py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-300 mr-2"
               value={draftValues.title}
-              onChange={handleDraftChange('title')}
+              onChange={(e) => handleDraftChange('title', e.target.value)}
               onBlur={handleBlur('title')}
               onKeyDown={handleInputKeyDown('title')}
               onClick={(event) => event.stopPropagation()}
@@ -933,7 +928,7 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
             <button
               type="button"
               className="tracking-wide text-left cursor-text bg-transparent border-none p-0 focus-visible:outline-none hover:text-gray-800 transition-colors uppercase"
-              onClick={handleFieldActivate('title')}
+              onClick={(event) => handleFieldActivate('title', event)}
               style={POINTER_EVENTS_STYLES.interactive}
             >
               {displayTitle}
@@ -950,7 +945,7 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
           </button>
         </div>
 
-        {/* Text Field 1 */}
+        {/* Content Fields */}
         {!isTextFieldLocked && !hideTextFieldDueToConnections && (
           <div className="mb-2">
             {isTextFieldReadOnlyDueToConnections ? (
@@ -959,29 +954,19 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
               >
                 {displayText1}
               </div>
-            ) : activeField === 'textField1' ? (
-              <textarea
-                ref={textField1Ref}
-                className="w-full text-sm font-medium text-gray-900 bg-white border border-blue-200 rounded-sm p-1 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
-                value={draftValues.textField1}
-                onChange={handleDraftChange('textField1')}
-                onBlur={handleBlur('textField1')}
-                onKeyDown={handleTextareaKeyDown('textField1')}
-                onClick={(event) => event.stopPropagation()}
-                onMouseDown={(event) => event.stopPropagation()}
-                rows={Math.min(6, Math.max(2, draftValues.textField1.split('\n').length))}
-                placeholder="Input..."
-                style={POINTER_EVENTS_STYLES.interactive}
-              />
             ) : (
-              <button
-                type="button"
-                className="w-full text-left font-medium text-sm text-gray-900 break-words cursor-text bg-transparent border-none p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-1 focus-visible:ring-offset-white rounded-sm"
-                onClick={handleFieldActivate('textField1')}
-                style={POINTER_EVENTS_STYLES.interactive}
-              >
-                {(displayText1 && displayText1.trim() !== '') ? displayText1 : 'Input...'}
-              </button>
+              <SnippetNodeContent
+                content={snippet.content}
+                activeField={activeField}
+                draftValues={draftValues}
+                savingField={savingField}
+                onFieldChange={handleDraftChange}
+                onFieldActivate={(field) => handleFieldActivate(field)}
+                onFieldBlur={(field) => handleBlur(field as EditableField)()}
+                onAddField={handleAddField}
+                onDeleteField={handleDeleteField}
+                isDisabled={false}
+              />
             )}
 
             {/* Large snippet indicator and expand button */}
@@ -1111,22 +1096,14 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
         )}
 
         {/* Video Preview */}
-        {snippet.videoUrl ? (
+        {snippet.videoS3Key ? (
           <div className="mt-2">
             <div className="text-xs font-semibold text-gray-600 mb-1">
               Video Preview
             </div>
-            <video
-              key={snippet.videoUrl}
-              className="w-full rounded-md border border-gray-200"
-              src={snippet.videoUrl}
-              controls
-              playsInline
-              muted
-              aria-label="Snippet video preview"
-            >
-              <track kind="captions" />
-            </video>
+            <p className="mt-2 text-xs text-gray-500">
+              Video available. Preview not implemented for S3 keys yet.
+            </p>
             {snippet.videoMetadata && (
               <dl className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-gray-600">
                 <div>
@@ -1150,10 +1127,6 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
               </dl>
             )}
           </div>
-        ) : snippet.videoS3Key ? (
-          <p className="mt-2 text-xs text-gray-500">
-            Video available but preview expired. Generate again or request a new link to view it.
-          </p>
         ) : null}
 
         {/* Downstream connections section */}
@@ -1182,459 +1155,476 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
 
         {/* Expandable Generation Section */}
         {connectedContent.length > 0 && (
-        <div className="mt-2">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              // Don't toggle if Cmd/Ctrl is held (user is multi-selecting)
-              if (e.metaKey || e.ctrlKey) {
-                e.preventDefault()
-                return
-              }
-              setIsGenerateExpanded(!isGenerateExpanded)
-            }}
-            className="w-full flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700 transition-colors py-1"
-            style={POINTER_EVENTS_STYLES.interactive}
-          >
-            <span>Generate</span>
-            <svg
-              className={`w-3 h-3 transition-transform duration-200 ${isGenerateExpanded ? 'rotate-90' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                // Don't toggle if Cmd/Ctrl is held (user is multi-selecting)
+                if (e.metaKey || e.ctrlKey) {
+                  e.preventDefault()
+                  return
+                }
+                setIsGenerateExpanded(!isGenerateExpanded)
+              }}
+              className="w-full flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700 transition-colors py-1"
+              style={POINTER_EVENTS_STYLES.interactive}
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
+              <span>Generate</span>
+              <svg
+                className={`w-3 h-3 transition-transform duration-200 ${isGenerateExpanded ? 'rotate-90' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
 
-          {isGenerateExpanded && (
-            <div className="mt-2 space-y-1.5">
-              {/* Text Generation Row */}
-              <div className="flex gap-2">
-                <select
-                  value={selectedTextModel}
-                  onChange={(e) => {
-                    e.stopPropagation()
-                    setSelectedTextModel(e.target.value)
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex-1 text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
-                  disabled={savingField !== null}
-                  style={POINTER_EVENTS_STYLES.interactive}
-                >
-                  <option value="" disabled>
-                    {isLoadingTextModels ? 'Loading text models...' : 'Select text model...'}
-                  </option>
-                  {textModels.map((model) => (
-                    <option key={model.id} value={model.id} title={model.description ?? undefined}>
-                      {model.displayName}
+            {isGenerateExpanded && (
+              <div className="mt-2 space-y-1.5">
+                {/* Text Generation Row */}
+                <div className="flex gap-2">
+                  <select
+                    value={selectedTextModel}
+                    onChange={(e) => {
+                      e.stopPropagation()
+                      setSelectedTextModel(e.target.value)
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-1 text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    disabled={savingField !== null}
+                    style={POINTER_EVENTS_STYLES.interactive}
+                  >
+                    <option value="" disabled>
+                      {isLoadingTextModels ? 'Loading text models...' : 'Select text model...'}
                     </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center p-2 text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    // Don't open prompt designer if Cmd/Ctrl is held (user is multi-selecting)
-                    if (event.metaKey || event.ctrlKey) {
-                      event.preventDefault()
-                      return
-                    }
-                    openPromptDesigner({
-                      snippetId: snippet.id,
-                      snippetTitle: displayTitle,
-                      mode: 'text',
-                      initialPrompt: snippet.textField1,
-                      connectedContent: connectedContent,
-                      onGenerate: (nextPrompt) => runTextGeneration(nextPrompt)
-                    })
-                  }}
-                  disabled={isGeneratingText || isLoadingTextModels || (!selectedTextModel && textModels.length > 0) || savingField !== null}
-                  style={POINTER_EVENTS_STYLES.interactive}
-                  aria-label="Generate text content"
-                  title={
-                    isLoadingTextModels
-                      ? 'Loading models...'
-                      : !selectedTextModel
-                        ? 'Please select a text model first'
-                        : 'Generate text content for this snippet'
-                  }
-                >
-                  {isGeneratingText ? (
-                    <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                  ) : (
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-
-              {/* Scene Generation Row */}
-              <div className="flex gap-2">
-                <select
-                  value={selectedSceneModel}
-                  onChange={(e) => {
-                    e.stopPropagation()
-                    setSelectedSceneModel(e.target.value)
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex-1 text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  disabled={savingField !== null}
-                  style={POINTER_EVENTS_STYLES.interactive}
-                >
-                  <option value="" disabled>
-                    {isLoadingTextModels ? 'Loading scene models...' : 'Select scene model...'}
-                  </option>
-                  {textModels.map((model) => (
-                    <option key={model.id} value={model.id} title={model.description ?? undefined}>
-                      {model.displayName}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center px-3 py-1 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed rounded transition-colors"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    // Don't open prompt designer if Cmd/Ctrl is held (user is multi-selecting)
-                    if (event.metaKey || event.ctrlKey) {
-                      event.preventDefault()
-                      return
-                    }
-                    openPromptDesigner({
-                      snippetId: snippet.id,
-                      snippetTitle: displayTitle,
-                      mode: 'scenes',
-                      initialPrompt: snippet.textField1,
-                      connectedContent: connectedContent,
-                      onGenerate: (nextPrompt) => runSceneGeneration(nextPrompt)
-                    })
-                  }}
-                  disabled={isGeneratingScenes || isLoadingTextModels || (!selectedSceneModel && textModels.length > 0) || savingField !== null}
-                  style={POINTER_EVENTS_STYLES.interactive}
-                  aria-label="Generate scenes from story"
-                  title={
-                    isLoadingTextModels
-                      ? 'Loading models...'
-                      : !selectedSceneModel
-                        ? 'Please select a scene model first'
-                        : 'Generate scenes from story'
-                  }
-                >
-                  {isGeneratingScenes ? (
-                    <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                  ) : (
-                    'S'
-                  )}
-                </button>
-              </div>
-
-              {/* Image Generation Row */}
-              <div className="flex gap-2">
-                <select
-                  value={selectedImageModel}
-                  onChange={(e) => {
-                    e.stopPropagation()
-                    setSelectedImageModel(e.target.value)
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex-1 text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
-                  disabled={isGeneratingImage || savingField !== null}
-                  style={POINTER_EVENTS_STYLES.interactive}
-                >
-                  <option value="" disabled>
-                    {isLoadingImageModels ? 'Loading image models...' : 'Select image model...'}
-                  </option>
-                  {imageModels.map((model) => (
-                    <option key={model.id} value={model.id} title={model.description ?? undefined}>
-                      {model.displayName}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center p-2 text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    // Don't open prompt designer if Cmd/Ctrl is held (user is multi-selecting)
-                    if (event.metaKey || event.ctrlKey) {
-                      event.preventDefault()
-                      return
-                    }
-                    openPromptDesigner({
-                      snippetId: snippet.id,
-                      snippetTitle: displayTitle,
-                      mode: 'image',
-                      initialPrompt: snippet.textField1,
-                      connectedContent: connectedContent,
-                      onGenerate: (nextPrompt) => {
-                        const trimmedPrompt = nextPrompt.trim()
-                        if (trimmedPrompt === '') {
-                          toast.warning('Please provide prompt content for image generation')
-                          const handledError = new Error('Missing prompt content for image generation')
-                          Object.assign(handledError, { handled: true })
-                          throw handledError
-                        }
-
-                        if (!selectedImageModel || selectedImageModel === '') {
-                          toast.warning('Please select an image model')
-                          const handledError = new Error('Missing image model selection')
-                          Object.assign(handledError, { handled: true })
-                          throw handledError
-                        }
-
-                        onGenerateImage(snippet.id, selectedImageModel, trimmedPrompt)
+                    {textModels.map((model) => (
+                      <option key={model.id} value={model.id} title={model.description ?? undefined}>
+                        {model.displayName}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center p-2 text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      // Don't open prompt designer if Cmd/Ctrl is held (user is multi-selecting)
+                      if (event.metaKey || event.ctrlKey) {
+                        event.preventDefault()
+                        return
                       }
-                    })
-                  }}
-                  disabled={isGeneratingImage || isLoadingImageModels || (!selectedImageModel && imageModels.length > 0) || tooManyImages || savingField !== null}
-                  style={POINTER_EVENTS_STYLES.interactive}
-                  aria-label="Generate image content"
-                  title={
-                    isLoadingImageModels
-                      ? 'Loading models...'
-                      : !selectedImageModel
-                        ? 'Please select an image model first'
-                        : tooManyImages
-                          ? `Too many connected images (${connectedImagesCount}). Remove connections to use ≤3.`
-                          : 'Generate image for this snippet'
-                  }
-                >
-                  {isGeneratingImage ? (
-                    <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                  ) : (
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-
-              {/* Video Generation Row */}
-              <div className="flex gap-2">
-                <select
-                  value={selectedVideoModel}
-                  onChange={(e) => {
-                    e.stopPropagation()
-                    setSelectedVideoModel(e.target.value)
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex-1 text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
-                  disabled={savingField !== null || isLoadingVideoModels}
-                  style={POINTER_EVENTS_STYLES.interactive}
-                >
-                  <option value="" disabled>
-                    {isLoadingVideoModels ? 'Loading video models...' : 'Select video model...'}
-                  </option>
-                  {videoModels.map((model) => (
-                    <option key={model.id} value={model.id} title={model.description ?? undefined}>
-                      {model.displayName}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center p-2 text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    // Don't open prompt designer if Cmd/Ctrl is held (user is multi-selecting)
-                    if (event.metaKey || event.ctrlKey) {
-                      event.preventDefault()
-                      return
-                    }
-                    const targetModel = selectedVideoModel || videoModels[0]?.id || VIDEO_GENERATION.DEFAULT_MODEL
-
-                    openPromptDesigner({
-                      snippetId: snippet.id,
-                      snippetTitle: displayTitle,
-                      mode: 'video',
-                      initialPrompt: snippet.textField1,
-                      connectedContent: connectedContent,
-                      onGenerate: async (finalPrompt) => {
-                        await onUpdateContent(snippet.id, { textField1: finalPrompt })
-                        await onGenerateVideo(snippet.id, {
-                          modelId: targetModel,
-                          duration: VIDEO_GENERATION.DEFAULT_DURATION,
-                          aspectRatio: VIDEO_GENERATION.DEFAULT_ASPECT_RATIO,
-                          resolution: VIDEO_GENERATION.DEFAULT_RESOLUTION,
-                          style: VIDEO_GENERATION.DEFAULT_STYLE,
-                          movementAmplitude: VIDEO_GENERATION.DEFAULT_MOVEMENT_AMPLITUDE
-                        })
-                      }
-                    })
-                  }}
-                  disabled={
-                    isGeneratingVideo ||
-                    isLoadingVideoModels ||
-                    (!selectedVideoModel && videoModels.length > 0) ||
-                    hasTooManyVideoReferences
-                  }
-                  style={POINTER_EVENTS_STYLES.interactive}
-                  aria-label="Generate video content"
-                  title={
-                    isGeneratingVideo
-                      ? 'Video generation in progress...'
-                      : isLoadingVideoModels
-                        ? 'Loading video models...'
-                        : !selectedVideoModel
-                          ? 'Please select a video model first'
-                          : hasTooManyVideoReferences
-                            ? `Too many reference images (${connectedImageReferences.length}/${videoReferenceLimit}). Remove connections before generating.`
-                            : 'Generate video content for this snippet'
-                  }
-                >
-                  {isGeneratingVideo ? (
-                    <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                  ) : (
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-
-              {/* Video Snippet Generation Row */}
-              <div className="flex gap-2">
-                <select
-                  value={selectedVideoSnippetModel}
-                  onChange={(e) => {
-                    e.stopPropagation()
-                    setSelectedVideoSnippetModel(e.target.value)
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex-1 text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
-                  disabled={savingField !== null}
-                  style={POINTER_EVENTS_STYLES.interactive}
-                >
-                  <option value="" disabled>
-                    {isLoadingTextModels ? 'Loading models...' : 'Select model...'}
-                  </option>
-                  {textModels.map((model) => (
-                    <option key={model.id} value={model.id} title={model.description ?? undefined}>
-                      {model.displayName}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center p-2 text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    if (event.metaKey || event.ctrlKey) {
-                      event.preventDefault()
-                      return
-                    }
-
-                    openPromptDesigner({
-                      snippetId: snippet.id,
-                      snippetTitle: displayTitle,
-                      mode: 'video',
-                      initialPrompt: snippet.textField1,
-                      connectedContent,
-                      onGenerate: async (finalPrompt) => {
-                        await runVideoSnippetJsonGeneration(finalPrompt)
-                      }
-                    })
-                  }}
-                  disabled={
-                    isGeneratingVideoSnippet ||
-                    isLoadingTextModels ||
-                    (!selectedVideoSnippetModel && textModels.length > 0) ||
-                    savingField !== null
-                  }
-                  style={POINTER_EVENTS_STYLES.interactive}
-                  aria-label="Generate video snippet from model"
-                  title={
-                    isGeneratingVideoSnippet
-                      ? 'Video snippet generation in progress...'
-                      : isLoadingTextModels
+                      openPromptDesigner({
+                        snippetId: snippet.id,
+                        snippetTitle: displayTitle,
+                        mode: 'text',
+                        initialPrompt: mainText,
+                        connectedContent: connectedContent,
+                        onGenerate: (nextPrompt) => runTextGeneration(nextPrompt)
+                      })
+                    }}
+                    disabled={isGeneratingText || isLoadingTextModels || (!selectedTextModel && textModels.length > 0) || savingField !== null}
+                    style={POINTER_EVENTS_STYLES.interactive}
+                    aria-label="Generate text content"
+                    title={
+                      isLoadingTextModels
                         ? 'Loading models...'
-                        : !selectedVideoSnippetModel
-                          ? 'Please select a model first'
-                          : 'Generate a new video snippet from model JSON'
-                  }
-                >
-                  {isGeneratingVideoSnippet ? (
-                    <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
+                        : !selectedTextModel
+                          ? 'Please select a text model first'
+                          : 'Generate text content for this snippet'
+                    }
+                  >
+                    {isGeneratingText ? (
+                      <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+
+                {/* Scene Generation Row */}
+                <div className="flex gap-2">
+                  <select
+                    value={selectedSceneModel}
+                    onChange={(e) => {
+                      e.stopPropagation()
+                      setSelectedSceneModel(e.target.value)
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-1 text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    disabled={savingField !== null}
+                    style={POINTER_EVENTS_STYLES.interactive}
+                  >
+                    <option value="" disabled>
+                      {isLoadingTextModels ? 'Loading scene models...' : 'Select scene model...'}
+                    </option>
+                    {textModels.map((model) => (
+                      <option key={model.id} value={model.id} title={model.description ?? undefined}>
+                        {model.displayName}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center px-3 py-1 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed rounded transition-colors"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      // Don't open prompt designer if Cmd/Ctrl is held (user is multi-selecting)
+                      if (event.metaKey || event.ctrlKey) {
+                        event.preventDefault()
+                        return
+                      }
+                      openPromptDesigner({
+                        snippetId: snippet.id,
+                        snippetTitle: displayTitle,
+                        mode: 'scenes',
+                        initialPrompt: mainText,
+                        connectedContent: connectedContent,
+                        onGenerate: (nextPrompt) => runSceneGeneration(nextPrompt)
+                      })
+                    }}
+                    disabled={isGeneratingScenes || isLoadingTextModels || (!selectedSceneModel && textModels.length > 0) || savingField !== null}
+                    style={POINTER_EVENTS_STYLES.interactive}
+                    aria-label="Generate scenes from story"
+                    title={
+                      isLoadingTextModels
+                        ? 'Loading models...'
+                        : !selectedSceneModel
+                          ? 'Please select a scene model first'
+                          : 'Generate scenes from story'
+                    }
+                  >
+                    {isGeneratingScenes ? (
+                      <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                    ) : (
+                      'S'
+                    )}
+                  </button>
+                </div>
+
+                {/* Image Generation Row */}
+                <div className="flex gap-2">
+                  <select
+                    value={selectedImageModel}
+                    onChange={(e) => {
+                      e.stopPropagation()
+                      setSelectedImageModel(e.target.value)
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-1 text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    disabled={isGeneratingImage || savingField !== null}
+                    style={POINTER_EVENTS_STYLES.interactive}
+                  >
+                    <option value="" disabled>
+                      {isLoadingImageModels ? 'Loading image models...' : 'Select image model...'}
+                    </option>
+                    {imageModels.map((model) => (
+                      <option key={model.id} value={model.id} title={model.description ?? undefined}>
+                        {model.displayName}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center p-2 text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      // Don't open prompt designer if Cmd/Ctrl is held (user is multi-selecting)
+                      if (event.metaKey || event.ctrlKey) {
+                        event.preventDefault()
+                        return
+                      }
+                      openPromptDesigner({
+                        snippetId: snippet.id,
+                        snippetTitle: displayTitle,
+                        mode: 'image',
+                        initialPrompt: mainText,
+                        connectedContent: connectedContent,
+                        onGenerate: (nextPrompt) => {
+                          const trimmedPrompt = nextPrompt.trim()
+                          if (trimmedPrompt === '') {
+                            toast.warning('Please provide prompt content for image generation')
+                            const handledError = new Error('Missing prompt content for image generation')
+                            Object.assign(handledError, { handled: true })
+                            throw handledError
+                          }
+
+                          if (!selectedImageModel || selectedImageModel === '') {
+                            toast.warning('Please select an image model')
+                            const handledError = new Error('Missing image model selection')
+                            Object.assign(handledError, { handled: true })
+                            throw handledError
+                          }
+
+                          onGenerateImage(snippet.id, selectedImageModel, trimmedPrompt)
+                        }
+                      })
+                    }}
+                    disabled={isGeneratingImage || isLoadingImageModels || (!selectedImageModel && imageModels.length > 0) || tooManyImages || savingField !== null}
+                    style={POINTER_EVENTS_STYLES.interactive}
+                    aria-label="Generate image content"
+                    title={
+                      isLoadingImageModels
+                        ? 'Loading models...'
+                        : !selectedImageModel
+                          ? 'Please select an image model first'
+                          : tooManyImages
+                            ? `Too many connected images (${connectedImagesCount}). Remove connections to use ≤3.`
+                            : 'Generate image for this snippet'
+                    }
+                  >
+                    {isGeneratingImage ? (
+                      <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+
+                {/* Video Generation Row */}
+                <div className="flex gap-2">
+                  <select
+                    value={selectedVideoModel}
+                    onChange={(e) => {
+                      e.stopPropagation()
+                      setSelectedVideoModel(e.target.value)
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-1 text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    disabled={savingField !== null || isLoadingVideoModels}
+                    style={POINTER_EVENTS_STYLES.interactive}
+                  >
+                    <option value="" disabled>
+                      {isLoadingVideoModels ? 'Loading video models...' : 'Select video model...'}
+                    </option>
+                    {videoModels.map((model) => (
+                      <option key={model.id} value={model.id} title={model.description ?? undefined}>
+                        {model.displayName}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center p-2 text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      // Don't open prompt designer if Cmd/Ctrl is held (user is multi-selecting)
+                      if (event.metaKey || event.ctrlKey) {
+                        event.preventDefault()
+                        return
+                      }
+                      const targetModel = selectedVideoModel || videoModels[0]?.id || VIDEO_GENERATION.DEFAULT_MODEL
+
+                      openPromptDesigner({
+                        snippetId: snippet.id,
+                        snippetTitle: displayTitle,
+                        mode: 'video',
+                        initialPrompt: mainText,
+                        connectedContent: connectedContent,
+                        onGenerate: async (finalPrompt) => {
+                          const baseMainTextField = snippet.content?.mainText ?? {
+                            label: 'mainText',
+                            value: '',
+                            type: 'longText',
+                            isSystem: true,
+                            order: 1
+                          }
+
+                          await onUpdateContent(snippet.id, {
+                            content: {
+                              ...snippet.content,
+                              mainText: {
+                                ...baseMainTextField,
+                                value: finalPrompt,
+                                label: baseMainTextField.label ?? 'mainText' // Ensure label exists
+                              }
+                            }
+                          })
+                          await onGenerateVideo(snippet.id, {
+                            modelId: targetModel,
+                            duration: VIDEO_GENERATION.DEFAULT_DURATION,
+                            aspectRatio: VIDEO_GENERATION.DEFAULT_ASPECT_RATIO,
+                            resolution: VIDEO_GENERATION.DEFAULT_RESOLUTION,
+                            style: VIDEO_GENERATION.DEFAULT_STYLE,
+                            movementAmplitude: VIDEO_GENERATION.DEFAULT_MOVEMENT_AMPLITUDE
+                          })
+                        }
+                      })
+                    }}
+                    disabled={
+                      isGeneratingVideo ||
+                      isLoadingVideoModels ||
+                      (!selectedVideoModel && videoModels.length > 0) ||
+                      hasTooManyVideoReferences
+                    }
+                    style={POINTER_EVENTS_STYLES.interactive}
+                    aria-label="Generate video content"
+                    title={
+                      isGeneratingVideo
+                        ? 'Video generation in progress...'
+                        : isLoadingVideoModels
+                          ? 'Loading video models...'
+                          : !selectedVideoModel
+                            ? 'Please select a video model first'
+                            : hasTooManyVideoReferences
+                              ? `Too many reference images (${connectedImageReferences.length}/${videoReferenceLimit}). Remove connections before generating.`
+                              : 'Generate video content for this snippet'
+                    }
+                  >
+                    {isGeneratingVideo ? (
+                      <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+
+                {/* Video Snippet Generation Row */}
+                <div className="flex gap-2">
+                  <select
+                    value={selectedVideoSnippetModel}
+                    onChange={(e) => {
+                      e.stopPropagation()
+                      setSelectedVideoSnippetModel(e.target.value)
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-1 text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    disabled={savingField !== null}
+                    style={POINTER_EVENTS_STYLES.interactive}
+                  >
+                    <option value="" disabled>
+                      {isLoadingTextModels ? 'Loading models...' : 'Select model...'}
+                    </option>
+                    {textModels.map((model) => (
+                      <option key={model.id} value={model.id} title={model.description ?? undefined}>
+                        {model.displayName}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center p-2 text-white bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 disabled:cursor-not-allowed rounded transition-colors"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      if (event.metaKey || event.ctrlKey) {
+                        event.preventDefault()
+                        return
+                      }
+
+                      openPromptDesigner({
+                        snippetId: snippet.id,
+                        snippetTitle: displayTitle,
+                        mode: 'video',
+                        initialPrompt: mainText,
+                        connectedContent,
+                        onGenerate: async (finalPrompt) => {
+                          await runVideoSnippetJsonGeneration(finalPrompt)
+                        }
+                      })
+                    }}
+                    disabled={
+                      isGeneratingVideoSnippet ||
+                      isLoadingTextModels ||
+                      (!selectedVideoSnippetModel && textModels.length > 0) ||
+                      savingField !== null
+                    }
+                    style={POINTER_EVENTS_STYLES.interactive}
+                    aria-label="Generate video snippet from model"
+                    title={
+                      isGeneratingVideoSnippet
+                        ? 'Video snippet generation in progress...'
+                        : isLoadingTextModels
+                          ? 'Loading models...'
+                          : !selectedVideoSnippetModel
+                            ? 'Please select a model first'
+                            : 'Generate a new video snippet from model JSON'
+                    }
+                  >
+                    {isGeneratingVideoSnippet ? (
+                      <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+
+                {/* Warning for too many images */}
+                {tooManyImages && (
+                  <div className="text-[10px] text-red-600 flex items-start gap-1" style={POINTER_EVENTS_STYLES.interactive}>
+                    <svg className="w-3 h-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                     </svg>
-                  ) : (
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    <span>Too many images ({connectedImagesCount}). Remove connections to use ≤3.</span>
+                  </div>
+                )}
+
+                {hasTooManyVideoReferences && (
+                  <div className="text-[10px] text-red-600 flex items-start gap-1" style={POINTER_EVENTS_STYLES.interactive}>
+                    <svg className="w-3 h-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                     </svg>
-                  )}
-                </button>
+                    <span>
+                      Too many reference images for this model ({connectedImageReferences.length}/{videoReferenceLimit}). Remove connections before generating.
+                    </span>
+                  </div>
+                )}
+
+                {/* Info about multimodal support */}
+                {hasMultimodalSupport && connectedImagesCount > 0 && !tooManyImages && (
+                  <div className="text-[10px] text-gray-500 flex items-start gap-1" style={POINTER_EVENTS_STYLES.interactive}>
+                    <svg className="w-3 h-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                    <span>Using {connectedImagesCount} connected image{connectedImagesCount > 1 ? 's' : ''}</span>
+                  </div>
+                )}
               </div>
-
-              {/* Warning for too many images */}
-              {tooManyImages && (
-                <div className="text-[10px] text-red-600 flex items-start gap-1" style={POINTER_EVENTS_STYLES.interactive}>
-                  <svg className="w-3 h-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                  <span>Too many images ({connectedImagesCount}). Remove connections to use ≤3.</span>
-                </div>
-              )}
-
-              {hasTooManyVideoReferences && (
-                <div className="text-[10px] text-red-600 flex items-start gap-1" style={POINTER_EVENTS_STYLES.interactive}>
-                  <svg className="w-3 h-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                  <span>
-                    Too many reference images for this model ({connectedImageReferences.length}/{videoReferenceLimit}). Remove connections before generating.
-                  </span>
-                </div>
-              )}
-
-              {/* Info about multimodal support */}
-              {hasMultimodalSupport && connectedImagesCount > 0 && !tooManyImages && (
-                <div className="text-[10px] text-gray-500 flex items-start gap-1" style={POINTER_EVENTS_STYLES.interactive}>
-                  <svg className="w-3 h-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                  <span>Using {connectedImagesCount} connected image{connectedImagesCount > 1 ? 's' : ''}</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+            )}
+          </div>
         )}
 
         {savingField !== null && (
@@ -1657,25 +1647,6 @@ export const SnippetNode = memo(({ data, id }: SnippetNodeProps) => {
             {snippet.tags.length > 3 && (
               <span className="text-xs text-gray-500 px-1.5 py-0.5">
                 +{snippet.tags.length - 3}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Categories */}
-        {snippet.categories && snippet.categories.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1">
-            {snippet.categories.slice(0, 2).map((category, index) => (
-              <span
-                key={`${snippet.id}-cat-${index}`}
-                className="px-1.5 py-0.5 bg-purple-100 text-purple-800 text-xs rounded"
-              >
-                {category}
-              </span>
-            ))}
-            {snippet.categories.length > 2 && (
-              <span className="text-xs text-gray-500 px-1.5 py-0.5">
-                +{snippet.categories.length - 2}
               </span>
             )}
           </div>

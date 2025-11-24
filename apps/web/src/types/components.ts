@@ -3,7 +3,7 @@
  * Props, state, and component-related types
  */
 
-import type { Snippet, Project, User, VideoGenerationStatus } from './domain'
+import type { Snippet, Project, User } from './domain'
 
 export interface VideoGenerationInput {
   modelId: string
@@ -94,9 +94,8 @@ export interface CanvasInfoPanelProps {
 
 export interface GeneratedVideoSnippetData {
   title?: string
-  textField1?: string
+  mainText?: string
   tags?: string[]
-  categories?: string[]
   subject?: string
   action?: string
   cameraMotion?: string
@@ -110,50 +109,55 @@ export interface GeneratedVideoSnippetData {
 }
 
 // Snippet Node Types
-export type EditableField = 'textField1'
+export type EditableField = string
 
 export type ConnectedContentItem =
   | {
-      snippetId: string
-      snippetTitle?: string | null
-      type: 'text'
-      value: string
-    }
+    snippetId: string
+    snippetTitle?: string | null
+    type: 'text'
+    value: string
+  }
   | {
-      snippetId: string
-      snippetTitle?: string | null
-      type: 'image'
-      value: string
-      imageMetadata?: {
-        width: number
-        height: number
-        aspectRatio: string
-      } | null
-    }
+    snippetId: string
+    snippetTitle?: string | null
+    type: 'image'
+    value: string
+    imageMetadata?: {
+      width: number
+      height: number
+      aspectRatio: string
+    } | null
+  }
   | {
-      snippetId: string
-      snippetTitle?: string | null
-      type: 'video'
-      value: string
-      videoMetadata?: {
-        duration?: number
-        resolution?: string
-        aspectRatio?: string
-        format?: string
-        seed?: number
-        fileSize?: number
-        style?: string
-        movementAmplitude?: string
-      } | null
-    }
+    snippetId: string
+    snippetTitle?: string | null
+    type: 'video'
+    value: string
+    videoMetadata?: {
+      duration?: number
+      resolution?: string
+      aspectRatio?: string
+      format?: string
+      seed?: number
+      fileSize?: number
+      style?: string
+      movementAmplitude?: string
+    } | null
+  }
 
 export interface SnippetNodeData {
   snippet: {
     id: string
-    title?: string
-    textField1: string
-    tags?: string[]
-    categories?: string[]
+    title: string
+    content: Record<string, {
+      label?: string
+      value: string
+      type?: string
+      isSystem?: boolean
+      order?: number
+    }>
+    tags: string[]
     connectionCount: number
     imageUrl?: string | null
     imageS3Key?: string | null
@@ -164,7 +168,7 @@ export interface SnippetNodeData {
     } | null
     connectedContent?: ConnectedContentItem[]
     downstreamConnections?: { id: string; title?: string }[]
-    snippetType?: 'text' | 'video'
+    snippetType: 'text' | 'image' | 'video' | 'audio' | 'generic'
     videoUrl?: string | null
     videoS3Key?: string | null
     videoMetadata?: {
@@ -177,15 +181,12 @@ export interface SnippetNodeData {
       fileSize?: number
       movementAmplitude?: string
     } | null
-    videoGenerationStatus?: VideoGenerationStatus | null
-    videoGenerationTaskId?: string | null
-    videoGenerationError?: string | null
   }
   onEdit: (snippetId: string) => void
   onDelete: (snippetId: string) => void
   onManageConnections: (snippetId: string) => void
   onViewVersions: (snippetId: string) => void
-  onUpdateContent: (snippetId: string, changes: Partial<Pick<Snippet, 'textField1' | 'title'>>) => Promise<void>
+  onUpdateContent: (snippetId: string, changes: Partial<Pick<Snippet, 'content' | 'title'>>) => Promise<void>
   onCombine: (snippetId: string) => Promise<void>
   onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
   onGenerateText: (snippetId: string, content: string) => Promise<void>

@@ -11,7 +11,8 @@ import type {
   Position,
   SnippetVersion,
   AvailableModel,
-  GenerateContentResult
+  GenerateContentResult,
+  SnippetField
 } from './domain'
 
 // Query Variables
@@ -107,12 +108,11 @@ export interface DeleteProjectVariables {
 export interface CreateSnippetInput {
   projectId: string
   title?: string
-  textField1: string
+  content?: Record<string, SnippetField>
   position?: Position
   tags?: string[]
-  categories?: string[]
   createdFrom?: string
-  snippetType?: 'text' | 'video'
+  snippetType?: 'text' | 'image' | 'video' | 'audio' | 'generic'
 }
 
 export interface CreateSnippetVariables {
@@ -121,10 +121,9 @@ export interface CreateSnippetVariables {
 
 export interface UpdateSnippetInput {
   title?: string
-  textField1?: string
+  content?: Record<string, SnippetField | null>
   position?: Position
   tags?: string[]
-  categories?: string[]
 }
 
 export interface UpdateSnippetVariables {

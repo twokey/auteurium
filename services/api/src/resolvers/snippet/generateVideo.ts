@@ -10,7 +10,7 @@ import { handleError } from '../../utils/errors'
 import { queryConnections } from '../../database/connections'
 import { batchGetSnippets } from '../../database/snippets'
 
-import type { Snippet, ImageMetadata, VideoMetadata, VideoGenerationStatus } from '@auteurium/shared-types'
+import type { Snippet, ImageMetadata, VideoMetadata } from '@auteurium/shared-types'
 import type { AppSyncResolverHandler } from 'aws-lambda'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { generateVideoInputSchema } from '@auteurium/validation'
@@ -42,10 +42,9 @@ interface SnippetRecord {
   id: string
   projectId: string
   userId: string
-  textField1: string
+  content: Record<string, any>
   title?: string
   tags?: string[]
-  categories?: string[]
   version: number
   position: { x: number; y: number }
   createdAt: string
@@ -54,9 +53,7 @@ interface SnippetRecord {
   imageMetadata?: ImageMetadata | null
   videoS3Key?: string | null
   videoMetadata?: VideoMetadata | null
-  videoGenerationStatus?: VideoGenerationStatus | null
-  videoGenerationTaskId?: string | null
-  videoGenerationError?: string | null
+  snippetType: 'text' | 'image' | 'video' | 'audio' | 'generic'
 }
 
 /**
@@ -77,7 +74,7 @@ const getReferenceImageLimit = (modelId: string): number => {
 
 /**
  * Mutation resolver: generateSnippetVideo
- * Generates a video using Vidu model based on snippet's textField1
+ * Generates a video using Vidu model based on snippet's primary text content
  * Supports image-to-video with connected snippets' images (up to 3-7 depending on model)
  */
 export const handler: AppSyncResolverHandler<GenerateVideoArgs, Snippet> = async (event) => {
@@ -133,9 +130,12 @@ export const handler: AppSyncResolverHandler<GenerateVideoArgs, Snippet> = async
       throw new Error('Snippet not found or access denied')
     }
 
-    // Validate textField1 has content
-    if (!snippet.textField1 || snippet.textField1.trim() === '') {
-      throw new Error('Text Field 1 must have content for video generation')
+    // Validate content
+    const prompt = snippet.content?.mainText?.value ||
+      (snippet.content ? Object.values(snippet.content)[0]?.value : undefined)
+
+    if (!prompt || prompt.trim() === '') {
+      throw new Error('Snippet must have text content for video generation')
     }
 
     // Get connected snippet images for image-to-video generation
@@ -234,7 +234,7 @@ export const handler: AppSyncResolverHandler<GenerateVideoArgs, Snippet> = async
     logger.info('Calling video generation API', {
       snippetId,
       modelId,
-      promptLength: snippet.textField1.length,
+      promptLength: prompt.length,
       inputImagesCount: inputImageUrls.length,
       duration,
       aspectRatio,
@@ -244,7 +244,7 @@ export const handler: AppSyncResolverHandler<GenerateVideoArgs, Snippet> = async
     const videoResponse = await orchestrator.generateVideo(
       {
         modelId,
-        prompt: snippet.textField1,
+        prompt,
         duration: duration ?? undefined,
         aspectRatio: aspectRatio ?? undefined,
         resolution: resolution ?? undefined,
@@ -263,8 +263,6 @@ export const handler: AppSyncResolverHandler<GenerateVideoArgs, Snippet> = async
       throw new Error('Vidu did not return a task ID for tracking')
     }
 
-    const pendingStatus: VideoGenerationStatus = 'PENDING'
-    const updatedAt = new Date().toISOString()
     const requestMetadata = {
       ...(duration !== undefined && { duration }),
       ...(aspectRatio !== undefined && { aspectRatio }),
@@ -274,21 +272,7 @@ export const handler: AppSyncResolverHandler<GenerateVideoArgs, Snippet> = async
       ...(movementAmplitude !== undefined && { movementAmplitude }),
       inputImagesCount: inputImageUrls.length
     }
-
-    await dynamoClient.send(new UpdateCommand({
-      TableName: SNIPPETS_TABLE,
-      Key: {
-        projectId,
-        id: snippetId
-      },
-      UpdateExpression: 'SET videoGenerationStatus = :videoGenerationStatus, videoGenerationTaskId = :videoGenerationTaskId, videoGenerationError = :videoGenerationError, updatedAt = :updatedAt',
-      ExpressionAttributeValues: {
-        ':videoGenerationStatus': pendingStatus,
-        ':videoGenerationTaskId': videoResponse.taskId,
-        ':videoGenerationError': null,
-        ':updatedAt': updatedAt
-      }
-    }))
+    const pendingStatus = 'PENDING'
 
     const generationId = `${Date.now()}-${Math.random().toString(36).substring(7)}`
     const createdAt = new Date().toISOString()
@@ -311,7 +295,7 @@ export const handler: AppSyncResolverHandler<GenerateVideoArgs, Snippet> = async
         ':projectId': projectId,
         ':modelProvider': 'vidu',
         ':modelId': modelId,
-        ':prompt': snippet.textField1,
+        ':prompt': prompt,
         ':result': snippet.videoS3Key ?? 'pending',
         ':tokensUsed': videoResponse.tokensUsed || 0,
         ':cost': videoResponse.cost,
@@ -351,13 +335,13 @@ export const handler: AppSyncResolverHandler<GenerateVideoArgs, Snippet> = async
       }
     }
 
-    const responseSnippet = {
+    const responseSnippet: Snippet = {
       ...snippet,
-      updatedAt,
-      videoGenerationStatus: pendingStatus,
-      videoGenerationTaskId: videoResponse.taskId,
-      videoGenerationError: undefined
-    } as Snippet
+      title: snippet.title ?? 'Video Snippet',
+      snippetType: snippet.snippetType,
+      tags: snippet.tags ?? [],
+      imageS3Key: snippet.imageS3Key ?? undefined
+    }
 
     if (videoUrl) {
       responseSnippet.videoUrl = videoUrl

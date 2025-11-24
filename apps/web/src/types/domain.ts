@@ -20,6 +20,7 @@ export interface User {
 export interface Position {
   x: number
   y: number
+  zIndex?: number
 }
 
 export interface ImageMetadata {
@@ -39,7 +40,7 @@ export interface VideoMetadata {
   movementAmplitude?: string
 }
 
-export type VideoGenerationStatus = 'PENDING' | 'PROCESSING' | 'COMPLETE' | 'FAILED'
+export type VideoGenerationStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
 
 export interface Connection {
   id: string
@@ -52,29 +53,34 @@ export interface Connection {
   updatedAt: string
 }
 
+export interface SnippetField {
+  label?: string
+  value: string
+  type?: string // 'shortText' | 'longText' | 'tagList' | etc.
+  isSystem?: boolean // true = system-defined
+  order?: number // optional for display ordering
+}
+
 export interface Snippet {
   id: string
   projectId: string
-  title?: string
-  textField1: string
-  position?: Position | null
-  tags?: string[]
-  categories?: string[]
+  userId?: string
+  title: string
+  content: Record<string, SnippetField>
+  position: Position
+  tags: string[]
   version: number
   createdAt: string
   updatedAt: string
-  imageUrl?: string | null
   imageS3Key?: string | null
   imageMetadata?: ImageMetadata | null
-  videoUrl?: string | null
   videoS3Key?: string | null
   videoMetadata?: VideoMetadata | null
-  videoGenerationStatus?: VideoGenerationStatus | null
-  videoGenerationTaskId?: string | null
-  videoGenerationError?: string | null
+  imageUrl?: string | null
+  videoUrl?: string | null
   createdFrom?: string | null
   connections?: Connection[]
-  snippetType?: 'text' | 'video'
+  snippetType: 'text' | 'image' | 'video' | 'audio' | 'generic'
 }
 
 export interface Project {
@@ -90,7 +96,10 @@ export interface Project {
 export interface SnippetVersion {
   id: string
   version: number
-  textField1: string
+  title: string
+  content: Record<string, SnippetField>
+  position?: Position
+  tags?: string[]
   createdAt: string
 }
 

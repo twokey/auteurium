@@ -63,7 +63,11 @@ export async function mutateWithInvalidate<T>(
  * // Update snippet content - optimistic update already shows changes
  * await mutateOptimisticOnly(
  *   () => updateSnippetMutation({
- *     variables: { projectId, id, input: { textField1: newValue } }
+ *     variables: {
+ *       projectId,
+ *       id,
+ *       input: { content: { mainText: { value: newValue } } }
+ *     }
  *   })
  * )
  *

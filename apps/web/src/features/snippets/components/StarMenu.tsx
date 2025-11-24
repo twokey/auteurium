@@ -8,6 +8,7 @@ import { useParams } from 'react-router-dom'
 
 import { GET_PROJECT_WITH_SNIPPETS } from '../../../graphql/queries'
 import { useGraphQLQueryWithCache } from '../../../hooks/useGraphQLQueryWithCache'
+import { getPrimaryTextValue } from '../../../utils/snippetContent'
 
 import type { ProjectWithSnippetsQueryData, Snippet } from '../../../types'
 
@@ -58,7 +59,7 @@ export const StarMenu = ({ fieldType, onSelect }: StarMenuProps) => {
   }, [isOpen])
 
   const handleSnippetSelect = (snippet: Snippet) => {
-    const content = snippet.textField1 || ''
+    const content = getPrimaryTextValue(snippet)
     onSelect(content)
     setIsOpen(false)
   }

@@ -11,9 +11,11 @@ import { snapToColumn } from '../../../utils/columnLayout'
 import { CANVAS_CONSTANTS } from '../../../constants'
 import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
 import { usePendingPositionsStore } from '../store/pendingPositionsStore'
+import { getPrimaryTextValue } from '../../../utils/snippetContent'
 
 import type {
   Snippet,
+  SnippetField,
   Project,
   ProjectWithSnippetsQueryData,
   ProjectWithSnippetsQueryVariables,
@@ -202,7 +204,7 @@ const analyzeSnippetConnections = (
     for (const sourceId of sourceIds) {
       const sourceContent = computeConnectedContent(sourceId)
       const sourceSnippet = snippetMap.get(sourceId)
-      const trimmedText = sourceSnippet?.textField1?.trim() ?? ''
+      const trimmedText = sourceSnippet ? getPrimaryTextValue(sourceSnippet).trim() : ''
       const imageUrl = sourceSnippet?.imageUrl ?? null
       const hasText = trimmedText !== ''
       const hasImage = Boolean(imageUrl)
@@ -295,6 +297,28 @@ const analyzeSnippetConnections = (
   }
 }
 
+const normalizeSnippetContent = (snippet: Snippet): Snippet => {
+  const rawContent = (snippet as unknown as { content?: unknown }).content
+
+  if (typeof rawContent === 'string') {
+    try {
+      const parsed = JSON.parse(rawContent)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return { ...snippet, content: parsed as Record<string, SnippetField> }
+      }
+    } catch (error) {
+      console.warn('Failed to parse snippet content JSON', { snippetId: snippet.id, error })
+    }
+    return { ...snippet, content: {} }
+  }
+
+  if (rawContent && typeof rawContent === 'object' && !Array.isArray(rawContent)) {
+    return { ...snippet, content: rawContent as Record<string, SnippetField> }
+  }
+
+  return { ...snippet, content: {} }
+}
+
 // Helper to compare snippets for deep equality
 const areSnippetsEqual = (a: Snippet[], b: Snippet[]): boolean => {
   if (a.length !== b.length) return false
@@ -303,10 +327,14 @@ const areSnippetsEqual = (a: Snippet[], b: Snippet[]): boolean => {
     const snippetA = a[i]
     const snippetB = b[i]
 
+    const contentA = JSON.stringify(snippetA.content)
+    const contentB = JSON.stringify(snippetB.content)
+
     if (
       snippetA.id !== snippetB.id ||
-      (snippetA.title ?? '') !== (snippetB.title ?? '') ||
-      snippetA.textField1 !== snippetB.textField1 ||
+      snippetA.title !== snippetB.title ||
+      contentA !== contentB ||
+      (snippetA.tags ?? []).join('|') !== (snippetB.tags ?? []).join('|') ||
       snippetA.version !== snippetB.version ||
       snippetA.snippetType !== snippetB.snippetType ||
       snippetA.imageUrl !== snippetB.imageUrl ||
@@ -315,9 +343,6 @@ const areSnippetsEqual = (a: Snippet[], b: Snippet[]): boolean => {
       snippetA.videoS3Key !== snippetB.videoS3Key ||
       snippetA.position?.x !== snippetB.position?.x ||
       snippetA.position?.y !== snippetB.position?.y ||
-      snippetA.videoGenerationStatus !== snippetB.videoGenerationStatus ||
-      (snippetA.videoGenerationTaskId ?? null) !== (snippetB.videoGenerationTaskId ?? null) ||
-      (snippetA.videoGenerationError ?? '') !== (snippetB.videoGenerationError ?? '') ||
       !areVideoMetadataEqual(snippetA.videoMetadata, snippetB.videoMetadata) ||
       !areConnectionsEqual(snippetA.connections, snippetB.connections)
     ) {
@@ -508,7 +533,7 @@ export function useCanvasData(projectId: string | undefined): UseCanvasDataResul
 
   // Memoize snippets to prevent unnecessary re-renders
   const snippets = useMemo<Snippet[]>(() => {
-    const baseSnippets = rawSnippets ?? EMPTY_SNIPPET_LIST
+    const baseSnippets = (rawSnippets ?? EMPTY_SNIPPET_LIST).map(normalizeSnippetContent)
 
     // Filter out snippets that are being deleted OR already confirmed deleted
     const filteredSnippets = baseSnippets.filter(
@@ -532,25 +557,20 @@ export function useCanvasData(projectId: string | undefined): UseCanvasDataResul
     const optimisticSnippetsArray = (Object.values(optimisticSnippets) as Snippet[]).filter(
       snippet => !deletingSnippets.has(snippet.id) && !deletedSnippets.has(snippet.id)
     )
-    const combinedSnippets = [...snippetsWithRealOnes, ...newRealSnippets, ...optimisticSnippetsArray]
+    const combinedSnippets = [...snippetsWithRealOnes, ...newRealSnippets, ...optimisticSnippetsArray].map(normalizeSnippetContent)
 
     const enrichedSnippets = combinedSnippets.map((snippet) => {
-      const hasImageAsset = Boolean(snippet.imageUrl ?? snippet.imageS3Key)
-      const sanitizedSnippet =
-        hasImageAsset && snippet.textField1 !== ''
-          ? { ...snippet, textField1: '' }
-          : snippet
       const connectionsForSnippet = connectionsBySource.get(snippet.id) ?? EMPTY_CONNECTION_LIST
 
       if (connectionsForSnippet === EMPTY_CONNECTION_LIST) {
         return {
-          ...sanitizedSnippet,
+          ...snippet,
           connections: EMPTY_CONNECTION_LIST
         }
       }
 
       return {
-        ...sanitizedSnippet,
+        ...snippet,
         connections: connectionsForSnippet
       }
     })
@@ -609,7 +629,10 @@ export function useFlowNodes(
     onDelete: (snippetId: string) => void
     onManageConnections: (snippetId: string) => void
     onViewVersions: (snippetId: string) => void
-    onUpdateContent: (snippetId: string, changes: Partial<Pick<Snippet, 'textField1' | 'title'>>) => Promise<void>
+    onUpdateContent: (
+      snippetId: string,
+      changes: Partial<{ title: string; content: Record<string, SnippetField | null> }>
+    ) => Promise<void>
     onCombine: (snippetId: string) => Promise<void>
     onGenerateImage: (snippetId: string, modelId?: string, promptOverride?: string) => void
     onGenerateText: (snippetId: string, content: string) => Promise<void>
@@ -756,10 +779,9 @@ export function useFlowNodes(
         data: {
           snippet: {
             id: snippet.id,
-            title: snippet.title,
-            textField1: snippet.textField1,
-            tags: snippet.tags,
-            categories: snippet.categories,
+            title: snippet.title ?? 'Snippet',
+            content: snippet.content,
+            tags: snippet.tags ?? [],
             connectionCount: snippet.connections?.length ?? 0,
             imageUrl: snippet.imageUrl,
             imageS3Key: snippet.imageS3Key,
@@ -769,10 +791,7 @@ export function useFlowNodes(
             snippetType: snippet.snippetType,
             videoUrl: snippet.videoUrl,
             videoS3Key: snippet.videoS3Key,
-            videoMetadata: snippet.videoMetadata,
-            videoGenerationStatus: snippet.videoGenerationStatus,
-            videoGenerationTaskId: snippet.videoGenerationTaskId,
-            videoGenerationError: snippet.videoGenerationError
+            videoMetadata: snippet.videoMetadata
           },
           ...handlers,
           onGenerateVideo: handlers.onGenerateVideo,

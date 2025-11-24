@@ -9,7 +9,7 @@ import { randomUUID } from 'crypto'
 import { verifyViduSignature } from '../utils/viduSignature'
 
 import type { APIGatewayProxyHandlerV2 } from 'aws-lambda'
-import type { VideoGenerationStatus, VideoMetadata, GenerationRecord, Snippet } from '@auteurium/shared-types'
+import type { VideoMetadata, GenerationRecord, Snippet } from '@auteurium/shared-types'
 import { ConnectionType } from '@auteurium/shared-types'
 
 const logger = new Logger({ serviceName: 'vidu-webhook-handler' })
@@ -198,11 +198,10 @@ const saveSnippetVersion = async (snippet: Snippet): Promise<void> => {
       projectId: snippet.projectId,
       version: snippet.version,
       title: snippet.title,
-      textField1: snippet.textField1,
+      content: snippet.content,
       userId: snippet.userId,
       position: snippet.position,
       tags: snippet.tags,
-      categories: snippet.categories,
       createdAt: new Date().toISOString()
     }
   }))
@@ -222,21 +221,27 @@ const createDerivedVideoSnippet = async (
     projectId: record.projectId,
     userId: sourceSnippet.userId ?? record.userId,
     title: buildDerivedSnippetTitle(sourceSnippet.title),
-    textField1: sourceSnippet.textField1 ?? '',
+    content: sourceSnippet.content || {
+      mainText: {
+        label: 'Main Text',
+        value: '',
+        type: 'longText',
+        isSystem: true,
+        order: 1
+      }
+    },
     position: {
       x: position.x + VIDEO_SNIPPET_HORIZONTAL_OFFSET,
       y: position.y
     },
     tags: normalizeStringArray(sourceSnippet.tags),
-    categories: normalizeStringArray(sourceSnippet.categories),
     version: 1,
     createdAt: timestamp,
     updatedAt: timestamp,
     snippetType: 'text',
     createdFrom: sourceSnippet.id,
     videoS3Key: s3Key,
-    videoMetadata: metadata,
-    videoGenerationStatus: 'COMPLETE'
+    videoMetadata: metadata
   }
 
   await dynamoClient.send(new PutCommand({
@@ -281,34 +286,11 @@ const linkSnippets = async (
   }))
 }
 
-const updateSnippetStatus = async (
+const saveVideoResultToSnippet = async (
   record: GenerationTaskRecord,
-  status: VideoGenerationStatus,
-  attributes: Record<string, unknown>
+  attributes: { videoS3Key: string; videoMetadata: VideoMetadata }
 ): Promise<void> => {
-  const updateExpressionParts = ['videoGenerationStatus = :status', 'updatedAt = :updatedAt']
-  const expressionAttributeValues: Record<string, unknown> = {
-    ':status': status,
-    ':updatedAt': new Date().toISOString(),
-    ':taskId': record.taskId ?? null
-  }
-
-  if ('videoGenerationError' in attributes) {
-    updateExpressionParts.push('videoGenerationError = :error')
-    expressionAttributeValues[':error'] = attributes.videoGenerationError
-  }
-
-  if ('videoS3Key' in attributes) {
-    updateExpressionParts.push('videoS3Key = :videoS3Key')
-    expressionAttributeValues[':videoS3Key'] = attributes.videoS3Key
-  }
-
-  if ('videoMetadata' in attributes) {
-    updateExpressionParts.push('videoMetadata = :videoMetadata')
-    expressionAttributeValues[':videoMetadata'] = attributes.videoMetadata
-  }
-
-  updateExpressionParts.push('videoGenerationTaskId = :taskId')
+  const now = new Date().toISOString()
 
   await dynamoClient.send(new UpdateCommand({
     TableName: SNIPPETS_TABLE,
@@ -316,14 +298,23 @@ const updateSnippetStatus = async (
       projectId: record.projectId,
       id: record.snippetId
     },
-    UpdateExpression: `SET ${updateExpressionParts.join(', ')}`,
-    ExpressionAttributeValues: expressionAttributeValues
+    UpdateExpression: 'SET videoS3Key = :videoS3Key, videoMetadata = :videoMetadata, updatedAt = :updatedAt, #version = if_not_exists(#version, :baseVersion) + :incr',
+    ExpressionAttributeNames: {
+      '#version': 'version'
+    },
+    ExpressionAttributeValues: {
+      ':videoS3Key': attributes.videoS3Key,
+      ':videoMetadata': attributes.videoMetadata,
+      ':updatedAt': now,
+      ':baseVersion': 1,
+      ':incr': 1
+    }
   }))
 }
 
 const updateGenerationRecord = async (
   record: GenerationTaskRecord,
-  status: VideoGenerationStatus,
+  status: string,
   attributes: Record<string, unknown>
 ): Promise<void> => {
   const updateParts = ['#status = :status', '#result = :result', 'updatedAt = :updatedAt']
@@ -531,10 +522,6 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
       if (!creation?.url) {
         const errorMessage = 'Missing creation URL in success payload'
 
-        await updateSnippetStatus(record, 'FAILED', {
-          videoGenerationError: errorMessage
-        })
-
         await updateGenerationRecord(record, 'FAILED', {
           errorMessage,
           result: 'failed'
@@ -580,17 +567,14 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
 
       record.taskId = undefined
 
-      await updateSnippetStatus(record, 'COMPLETE', derivedSnippet
-        ? {
-            videoGenerationError: null
-          }
-        : {
-            videoS3Key: s3Key,
-            videoMetadata: metadata,
-            videoGenerationError: null
-          })
+      if (!derivedSnippet) {
+        await saveVideoResultToSnippet(record, {
+          videoS3Key: s3Key,
+          videoMetadata: metadata
+        })
+      }
 
-      await updateGenerationRecord(record, 'COMPLETE', {
+      await updateGenerationRecord(record, 'COMPLETED', {
         result: s3Key,
         videoS3Key: s3Key,
         videoMetadata: metadata,
@@ -612,10 +596,6 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     if (FAILURE_STATES.has(normalizedState)) {
       const errorMessage = payload.error ?? payload.err_code ?? 'Video generation failed'
 
-      await updateSnippetStatus(record, 'FAILED', {
-        videoGenerationError: errorMessage
-      })
-
       await updateGenerationRecord(record, 'FAILED', {
         errorMessage,
         result: 'failed'
@@ -628,10 +608,6 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
 
       return respond(200, { message: 'Failure recorded' })
     }
-
-    await updateSnippetStatus(record, 'PROCESSING', {
-      videoGenerationError: null
-    })
 
     await updateGenerationRecord(record, 'PROCESSING', {
       result: record.result ?? 'processing'

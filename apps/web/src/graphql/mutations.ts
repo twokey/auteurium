@@ -38,18 +38,17 @@ export const CREATE_SNIPPET = /* GraphQL */ `
       id
       projectId
       title
-      textField1
+      content
       position {
         x
         y
+        zIndex
       }
       tags
-      categories
       version
       createdAt
       updatedAt
       snippetType
-      videoUrl
       videoS3Key
       videoMetadata {
         duration
@@ -61,9 +60,6 @@ export const CREATE_SNIPPET = /* GraphQL */ `
         fileSize
         movementAmplitude
       }
-      videoGenerationStatus
-      videoGenerationTaskId
-      videoGenerationError
     }
   }
 `
@@ -74,18 +70,17 @@ export const UPDATE_SNIPPET = /* GraphQL */ `
       id
       projectId
       title
-      textField1
+      content
       position {
         x
         y
+        zIndex
       }
       tags
-      categories
       version
       createdAt
       updatedAt
       snippetType
-      videoUrl
       videoS3Key
       videoMetadata {
         duration
@@ -97,9 +92,6 @@ export const UPDATE_SNIPPET = /* GraphQL */ `
         fileSize
         movementAmplitude
       }
-      videoGenerationStatus
-      videoGenerationTaskId
-      videoGenerationError
     }
   }
 `
@@ -110,18 +102,17 @@ export const UPDATE_SNIPPET_POSITIONS = /* GraphQL */ `
       id
       projectId
       title
-      textField1
+      content
       position {
         x
         y
+        zIndex
       }
       tags
-      categories
       version
       createdAt
       updatedAt
       snippetType
-      videoUrl
       videoS3Key
       videoMetadata {
         duration
@@ -133,9 +124,6 @@ export const UPDATE_SNIPPET_POSITIONS = /* GraphQL */ `
         fileSize
         movementAmplitude
       }
-      videoGenerationStatus
-      videoGenerationTaskId
-      videoGenerationError
     }
   }
 `
@@ -152,18 +140,17 @@ export const REVERT_SNIPPET = /* GraphQL */ `
       id
       projectId
       title
-      textField1
+      content
       position {
         x
         y
+        zIndex
       }
       tags
-      categories
       version
       createdAt
       updatedAt
       snippetType
-      videoUrl
       videoS3Key
       videoMetadata {
         duration
@@ -175,9 +162,6 @@ export const REVERT_SNIPPET = /* GraphQL */ `
         fileSize
         movementAmplitude
       }
-      videoGenerationStatus
-      videoGenerationTaskId
-      videoGenerationError
     }
   }
 `
@@ -188,24 +172,22 @@ export const GENERATE_SNIPPET_IMAGE = /* GraphQL */ `
       id
       projectId
       title
-      textField1
+      content
       position {
         x
         y
+        zIndex
       }
       tags
-      categories
       version
       createdAt
       updatedAt
-      imageUrl
       imageS3Key
       imageMetadata {
         width
         height
         aspectRatio
       }
-      videoUrl
       videoS3Key
       videoMetadata {
         duration
@@ -217,9 +199,6 @@ export const GENERATE_SNIPPET_IMAGE = /* GraphQL */ `
         fileSize
         movementAmplitude
       }
-      videoGenerationStatus
-      videoGenerationTaskId
-      videoGenerationError
     }
   }
 `
@@ -250,17 +229,16 @@ export const GENERATE_SNIPPET_VIDEO = /* GraphQL */ `
       id
       projectId
       title
-      textField1
+      content
       position {
         x
         y
+        zIndex
       }
       tags
-      categories
       version
       createdAt
       updatedAt
-      videoUrl
       videoS3Key
       videoMetadata {
         duration
@@ -272,9 +250,6 @@ export const GENERATE_SNIPPET_VIDEO = /* GraphQL */ `
         fileSize
         movementAmplitude
       }
-      videoGenerationStatus
-      videoGenerationTaskId
-      videoGenerationError
     }
   }
 `
@@ -285,17 +260,16 @@ export const COMBINE_SNIPPET_CONNECTIONS = /* GraphQL */ `
       id
       projectId
       title
-      textField1
+      content
       position {
         x
         y
+        zIndex
       }
       tags
-      categories
       version
       createdAt
       updatedAt
-      imageUrl
       imageS3Key
       imageMetadata {
         width

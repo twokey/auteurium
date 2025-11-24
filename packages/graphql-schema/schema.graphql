@@ -47,15 +47,16 @@ enum VideoGenerationStatus {
   FAILED
 }
 
+scalar AWSJSON
+
 type Snippet {
   id: ID!
   projectId: ID!
   userId: ID!
-  title: String
-  textField1: String!
+  title: String!
+  content: AWSJSON!
   position: Position!
   tags: [String!]!
-  categories: [String!]!
   version: Int!
   createdAt: String!
   updatedAt: String!
@@ -65,20 +66,19 @@ type Snippet {
   videoUrl: String
   videoS3Key: String
   videoMetadata: VideoMetadata
-  videoGenerationStatus: VideoGenerationStatus
-  videoGenerationTaskId: String
-  videoGenerationError: String
   versions: [SnippetVersion!]!
   createdFrom: ID
-  snippetType: String
+  snippetType: String!
 }
 
 type SnippetVersion {
   id: ID!
   snippetId: ID!
   version: Int!
-  title: String
-  textField1: String!
+  title: String!
+  content: AWSJSON!
+  position: Position
+  tags: [String!]
   createdAt: String!
 }
 
@@ -143,11 +143,13 @@ type ConnectionStats {
 type Position {
   x: Float!
   y: Float!
+  zIndex: Float
 }
 
 input PositionInput {
   x: Float!
   y: Float!
+  zIndex: Float
 }
 
 input CreateProjectInput {
@@ -163,20 +165,18 @@ input UpdateProjectInput {
 input CreateSnippetInput {
   projectId: ID!
   title: String
-  textField1: String
+  content: AWSJSON
   position: PositionInput!
   tags: [String!]
-  categories: [String!]
   createdFrom: ID
   snippetType: String
 }
 
 input UpdateSnippetInput {
   title: String
-  textField1: String
+  content: AWSJSON
   position: PositionInput
   tags: [String!]
-  categories: [String!]
 }
 
 input UpdateSnippetPositionInput {

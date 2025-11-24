@@ -4,6 +4,7 @@ import { Button } from '../../../components/ui/Button'
 import { Modal } from '../../../components/ui/Modal'
 import { ConnectionForm, ConnectionsList } from '../components'
 import { useConnectionManagement, useConnectionListing } from '../hooks'
+import { getPrimaryTextValue } from '../../../utils/snippetContent'
 
 import type { Snippet } from '../../../types'
 
@@ -65,7 +66,7 @@ export const ManageConnectionsModal = ({
 
   if (!isOpen) return null
 
-  const snippetPreview = snippet.textField1?.substring(0, 40) ?? 'Untitled'
+  const snippetPreview = getPrimaryTextValue(snippet).substring(0, 40) || 'Untitled'
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="md">

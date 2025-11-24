@@ -1,8 +1,9 @@
-import type { VideoMetadata, VideoGenerationStatus } from './genai'
+import type { VideoMetadata } from './genai'
 
 export interface Position {
   x: number
   y: number
+  zIndex?: number
 }
 
 export interface ImageMetadata {
@@ -11,29 +12,46 @@ export interface ImageMetadata {
   aspectRatio: string
 }
 
+export interface SnippetField {
+  label?: string
+  value: string
+  type?: string // 'shortText' | 'longText' | 'tagList' | etc.
+  isSystem?: boolean // true = system-defined
+  order?: number // optional for display ordering
+}
+
 export interface Snippet {
-  id: string
-  projectId: string
-  userId: string
-  title?: string
-  textField1: string
-  position: Position
+  // Keys / ownership
+  projectId: string // partition key
+  id: string // sort key
+  userId: string // for access control
+
+  // Classification
+  snippetType: 'text' | 'image' | 'video' | 'audio' | 'generic'
+  title: string
+
+  // New dynamic content field (core of this refactor)
+  content: Record<string, SnippetField>
+
+  // Tags (for filtering)
   tags: string[]
-  categories: string[]
+
+  // Canvas position
+  position: Position
+
+  // Lifecycle
+  createdAt: string // ISO timestamp
+  updatedAt: string // ISO timestamp
+  createdFrom?: string // snippetId, optional
   version: number
-  createdAt: string
-  updatedAt: string
-  imageUrl?: string
+
+  // Media (optional)
   imageS3Key?: string
-  imageMetadata?: ImageMetadata
-  videoUrl?: string
-  videoS3Key?: string
-  videoMetadata?: VideoMetadata
-  videoGenerationStatus?: VideoGenerationStatus
-  videoGenerationTaskId?: string
-  videoGenerationError?: string
-  createdFrom?: string
-  snippetType?: 'text' | 'video'
+  imageMetadata?: any
+  imageUrl?: string // Signed URL
+  videoS3Key?: string | null
+  videoMetadata?: VideoMetadata | null
+  videoUrl?: string | null // Signed URL
 }
 
 export interface SnippetVersion {
@@ -41,11 +59,10 @@ export interface SnippetVersion {
   snippetId: string
   projectId: string
   version: number
-  title?: string
-  textField1: string
+  title: string
+  content: Record<string, SnippetField>
   position?: Position
   tags?: string[]
-  categories?: string[]
   userId: string
   createdAt: string
 }
@@ -53,20 +70,18 @@ export interface SnippetVersion {
 export interface SnippetInput {
   projectId: string
   title?: string
-  textField1?: string
+  content?: Record<string, SnippetField>
   position?: Position
   tags?: string[]
-  categories?: string[]
   createdFrom?: string
-  snippetType?: 'text' | 'video'
+  snippetType?: 'text' | 'image' | 'video' | 'audio' | 'generic'
 }
 
 export interface UpdateSnippetInput {
   title?: string
-  textField1?: string
+  content?: Record<string, SnippetField | null>
   position?: Position
   tags?: string[]
-  categories?: string[]
 }
 
 // Legacy interfaces for backward compatibility

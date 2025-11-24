@@ -5,8 +5,9 @@ import { CREATE_CONNECTION, DELETE_CONNECTION } from '../../graphql/mutations'
 import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
 import { invalidateQueries } from '../../hooks/useGraphQLQueryWithCache'
 import { useToast } from '../../store/toastStore'
+import { getPrimaryTextValue } from '../../utils/snippetContent'
 
-import type { CreateConnectionMutationData, CreateConnectionVariables } from '../../types'
+import type { CreateConnectionMutationData, CreateConnectionVariables, SnippetField } from '../../types'
 
 interface Connection {
   id: string
@@ -24,12 +25,12 @@ interface ManageConnectionsModalProps {
   snippet: {
     id: string
     projectId: string
-    textField1: string
+    content: Record<string, SnippetField>
     connections?: Connection[]
   }
   allSnippets: {
     id: string
-    textField1: string
+    content: Record<string, SnippetField>
     connections?: Connection[]
   }[]
 }
@@ -54,9 +55,9 @@ export const ManageConnectionsModal = ({ isOpen, onClose, onConnectionChange, sn
   // Get all connections where this snippet is the source
   const outgoingConnections = useMemo(() => snippet.connections ?? [], [snippet.connections])
   const snippetTitlePreview = useMemo(() => {
-    const preview = snippet.textField1?.substring(0, 40)
+    const preview = getPrimaryTextValue({ content: snippet.content }).substring(0, 40)
     return preview && preview !== '' ? preview : 'Untitled'
-  }, [snippet.textField1])
+  }, [snippet.content])
 
   // Get all connections where this snippet is the target
   const incomingConnections = useMemo(
@@ -190,7 +191,7 @@ export const ManageConnectionsModal = ({ isOpen, onClose, onConnectionChange, sn
   const getSnippetPreview = useCallback((snippetId: string) => {
     const foundSnippet = allSnippets.find(s => s.id === snippetId)
     if (!foundSnippet) return `Unknown snippet (${snippetId.slice(0, 8)})`
-    const previewSource = foundSnippet.textField1?.trim()
+    const previewSource = getPrimaryTextValue({ content: foundSnippet.content }).trim()
     const preview = previewSource && previewSource !== '' ? previewSource : 'Untitled snippet'
     return preview.length > 40 ? `${preview.substring(0, 40)}...` : preview
   }, [allSnippets])

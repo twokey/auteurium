@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 
 import type { Snippet, Connection } from '../../../types'
+import { getPrimaryTextValue } from '../../../utils/snippetContent'
 
 interface ConnectionWithSource extends Connection {
   sourceSnippet?: Snippet
@@ -40,7 +41,7 @@ export const useConnectionListing = (
     const foundSnippet = snippets.find(s => s.id === snippetId)
     if (!foundSnippet) return `Unknown snippet (${snippetId.slice(0, 8)})`
 
-    const previewSource = foundSnippet.textField1?.trim()
+    const previewSource = getPrimaryTextValue(foundSnippet).trim()
     const preview = previewSource && previewSource !== '' ? previewSource : 'Untitled snippet'
     return preview.length > 40 ? `${preview.substring(0, 40)}...` : preview
   }

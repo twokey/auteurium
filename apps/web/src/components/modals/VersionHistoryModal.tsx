@@ -6,11 +6,13 @@ import { useGraphQLMutation } from '../../hooks/useGraphQLMutation'
 import { useGraphQLQuery } from '../../hooks/useGraphQLQuery'
 import { useToast } from '../../store/toastStore'
 import { formatDetailedDateTime } from '../../utils/dateFormatters'
+import { getRenderableFields } from '../../utils/snippetContent'
+import type { SnippetField } from '../../types'
 
 interface SnippetVersion {
   id: string
   version: number
-  textField1: string
+  content: Record<string, SnippetField>
   createdAt: string
 }
 
@@ -24,7 +26,7 @@ interface VersionHistoryModalProps {
   snippet: {
     id: string
     projectId: string
-    textField1: string
+    content: Record<string, SnippetField>
     version: number
   }
 }
@@ -197,17 +199,25 @@ export const VersionHistoryModal = ({ isOpen, onClose, snippet }: VersionHistory
                   )}
                 </div>
 
-                <div className="border-t border-gray-200 pt-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 mb-2">
-                      Content
-                    </p>
-                    <div className="bg-gray-50 rounded-md p-3 border border-gray-200 whitespace-pre-wrap break-words">
-                      {selectedVersion.textField1 !== ''
-                        ? selectedVersion.textField1
-                        : <span className="text-gray-400 italic">Empty</span>}
+                <div className="border-t border-gray-200 pt-4 space-y-3">
+                  <p className="text-sm font-medium text-gray-700">
+                    Content
+                  </p>
+                  {getRenderableFields({ content: selectedVersion.content }).map((field) => (
+                    <div key={field.key} className="bg-gray-50 rounded-md p-3 border border-gray-200">
+                      <p className="text-xs text-gray-500 mb-1 uppercase tracking-wide font-semibold">
+                        {field.label || field.key}
+                      </p>
+                      <p className="text-sm text-gray-900 whitespace-pre-wrap break-words">
+                        {field.value !== '' ? field.value : <span className="text-gray-400 italic">Empty</span>}
+                      </p>
                     </div>
-                  </div>
+                  ))}
+                  {getRenderableFields({ content: selectedVersion.content }).length === 0 && (
+                    <div className="bg-gray-50 rounded-md p-3 border border-gray-200 text-sm text-gray-400 italic">
+                      No fields available
+                    </div>
+                  )}
                 </div>
 
                 {selectedVersion.version === snippet.version && (

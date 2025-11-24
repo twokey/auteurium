@@ -91,7 +91,7 @@ export interface VideoMetadata {
   movementAmplitude?: string // e.g., "auto", "small", "medium", "large"
 }
 
-export type VideoGenerationStatus = 'PENDING' | 'PROCESSING' | 'COMPLETE' | 'FAILED'
+export type VideoGenerationStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
 
 export interface VideoGenerationRequestDetails {
   duration?: number

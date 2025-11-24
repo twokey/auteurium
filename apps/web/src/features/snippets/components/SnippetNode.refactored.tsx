@@ -36,34 +36,54 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
 
   // Extract editing state
   const editing = useSnippetNodeEditing({
-    textField1: snippet.textField1
+    content: snippet.content
   })
 
   // Extract actions
   const actions = useSnippetNodeActions()
 
   // Handle field blur with auto-save
-  const handleFieldBlur = useCallback(
-    async (
-      field: EditableField,
-      value: string,
-      onSave: (field: EditableField, value: string) => Promise<void>
-    ) => {
-      if (value === snippet[field]) {
-        editing.setActiveField(null)
-        return
-      }
+  const handleFieldBlur = useCallback(async (field: EditableField) => {
+    const newValue = editing.draftValues[field] ?? snippet.content[field]?.value ?? ''
+    const existingField = snippet.content[field]
 
-      editing.setSavingField(field)
-      try {
-        await onSave(field, value)
-      } finally {
-        editing.setSavingField(null)
-        editing.setActiveField(null)
+    editing.setSavingField(field)
+    try {
+      await onUpdateContent(snippet.id, {
+        content: {
+          ...snippet.content,
+          [field]: {
+            ...(existingField ?? { label: field, isSystem: false }),
+            value: newValue
+          }
+        }
+      })
+    } finally {
+      editing.setSavingField(null)
+      editing.setActiveField(null)
+    }
+  }, [editing.draftValues, onUpdateContent, snippet.content, snippet.id, editing])
+
+  const handleAddField = useCallback((key: string, value: string) => {
+    void onUpdateContent(snippet.id, {
+      content: {
+        ...snippet.content,
+        [key]: {
+          label: key,
+          value,
+          type: 'text',
+          isSystem: false,
+          order: 999
+        }
       }
-    },
-    [snippet, editing]
-  )
+    })
+  }, [onUpdateContent, snippet.content, snippet.id])
+
+  const handleDeleteField = useCallback((key: string) => {
+    const updatedContent = { ...snippet.content }
+    delete updatedContent[key]
+    void onUpdateContent(snippet.id, { content: updatedContent })
+  }, [onUpdateContent, snippet.content, snippet.id])
 
   // Display title
   const displayTitle = snippet.title ?? 'Snippet'
@@ -91,19 +111,18 @@ export const SnippetNode = memo(({ data }: SnippetNodeProps) => {
 
         {/* Content */}
         <SnippetNodeContent
+          content={snippet.content}
           activeField={editing.activeField}
           draftValues={editing.draftValues}
           savingField={editing.savingField}
-          textField1Ref={editing.textField1Ref}
           onFieldChange={(field, value) => editing.setDraftValue(field, value)}
           onFieldActivate={(field) => {
             editing.setActiveField(field)
             editing.focusField()
           }}
           onFieldBlur={handleFieldBlur}
-          onFieldSave={(field, value) =>
-            actions.handleFieldSave(field, value, (changes) => onUpdateContent(snippet.id, changes))
-          }
+          onAddField={handleAddField}
+          onDeleteField={handleDeleteField}
         />
 
         {/* Image */}

@@ -2,7 +2,7 @@ import { type UseSnippetGenerationReturn } from '../hooks/useSnippetGeneration'
 
 interface SnippetGenerationPanelProps {
   generation: UseSnippetGenerationReturn
-  textField1: string
+  primaryText: string
   onGenerate: () => Promise<void>
   onGenerateFromField2: () => Promise<void>
   onCombine: () => Promise<void>
@@ -20,7 +20,7 @@ interface SnippetGenerationPanelProps {
  */
 export const SnippetGenerationPanel = ({
   generation,
-  textField1,
+  primaryText,
   onGenerate,
   onGenerateFromField2,
   onCombine,
@@ -31,6 +31,7 @@ export const SnippetGenerationPanel = ({
   streamError,
   isDisabled = false
 }: SnippetGenerationPanelProps) => {
+  const contentText = primaryText ?? ''
   return (
     <div className="space-y-4">
       {/* Primary Generation Panel */}
@@ -66,7 +67,7 @@ export const SnippetGenerationPanel = ({
             isDisabled ||
             isPrimaryBusy ||
             !generation.selectedModelPrimary ||
-            textField1.trim() === '' ||
+            contentText.trim() === '' ||
             generation.isLoadingModels
           }
         >
@@ -100,7 +101,7 @@ export const SnippetGenerationPanel = ({
             void onGenerateImage()
           }}
           className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors disabled:bg-purple-400 flex items-center gap-2"
-          disabled={isDisabled || isGeneratingImage || !textField1.trim()}
+          disabled={isDisabled || isGeneratingImage || !contentText.trim()}
         >
           {isGeneratingImage && (
             <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -191,5 +192,3 @@ export const SnippetGenerationPanel = ({
     </div>
   )
 }
-
-

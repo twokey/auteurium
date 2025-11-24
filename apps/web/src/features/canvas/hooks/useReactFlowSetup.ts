@@ -88,9 +88,12 @@ const haveNodesChanged = (
     if (previousSnippet || nextSnippet) {
       if (!previousSnippet || !nextSnippet) return true
 
+      const previousContent = JSON.stringify(previousSnippet.content)
+      const nextContent = JSON.stringify(nextSnippet.content)
+
       if (
         previousSnippet.title !== nextSnippet.title ||
-        previousSnippet.textField1 !== nextSnippet.textField1 ||
+        previousContent !== nextContent ||
         previousSnippet.connectionCount !== nextSnippet.connectionCount ||
         previousSnippet.snippetType !== nextSnippet.snippetType ||
         previousSnippet.imageUrl !== nextSnippet.imageUrl ||
@@ -271,7 +274,7 @@ export function useReactFlowSetup({
       const fallbackSnippet = snapshot
         ? {
             ...snapshot,
-            position: snapshot.position ? { ...snapshot.position } : null
+            position: snapshot.position ? { ...snapshot.position } : { x: 0, y: 0 }
           }
         : undefined
 

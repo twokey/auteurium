@@ -33,6 +33,26 @@ export const useGraphQLMutation = <TData = unknown, TVariables = Record<string, 
   const [error, setError] = useState<Error | null>(null)
   const operationName = getOperationName(mutation)
 
+  const stringifyAwsJsonFields = useCallback((value: unknown): unknown => {
+    if (Array.isArray(value)) {
+      return value.map(stringifyAwsJsonFields)
+    }
+
+    if (value && typeof value === 'object') {
+      return Object.entries(value as Record<string, unknown>).reduce<Record<string, unknown>>((acc, [key, val]) => {
+        if (key === 'content' && val && typeof val === 'object' && !Array.isArray(val)) {
+          acc[key] = JSON.stringify(val)
+          return acc
+        }
+
+        acc[key] = stringifyAwsJsonFields(val)
+        return acc
+      }, {})
+    }
+
+    return value
+  }, [])
+
   const mutate = useCallback(
     async (mutationOptions: { variables: TVariables }): Promise<TData | null> => {
       setLoading(true)
@@ -51,9 +71,11 @@ export const useGraphQLMutation = <TData = unknown, TVariables = Record<string, 
           graphql: (options: { query: string; variables?: Record<string, unknown> }) => Promise<unknown>
         }
 
+        const variablesWithAwsJson = stringifyAwsJsonFields(mutationOptions.variables) as Record<string, unknown>
+
         const result = (await client.graphql({
           query: mutation,
-          variables: mutationOptions.variables as Record<string, unknown>
+          variables: variablesWithAwsJson
         })) as { data?: TData; errors?: GraphQLError[] }
 
         // Check if result has errors property (GraphQLResult vs GraphqlSubscriptionResult)
@@ -130,7 +152,7 @@ export const useGraphQLMutation = <TData = unknown, TVariables = Record<string, 
         setLoading(false)
       }
     },
-    [mutation, onCompleted, onError, operationName]
+    [mutation, onCompleted, onError, operationName, stringifyAwsJsonFields]
   )
 
   const reset = useCallback(() => {

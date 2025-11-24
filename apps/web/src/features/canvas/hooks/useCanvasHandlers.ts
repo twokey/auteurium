@@ -20,6 +20,7 @@ import { useModalStore } from '../../../store/modalStore'
 import { useToast } from '../../../store/toastStore'
 import { mutateWithInvalidate, mutateOptimisticOnly } from '../../../utils/cacheHelpers'
 import { getColumnIndex, getRelativeColumnX, snapToColumn } from '../../../utils/columnLayout'
+import { getPrimaryTextValue } from '../../../utils/snippetContent'
 import { useCanvasStore } from '../store/canvasStore'
 import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
 
@@ -37,6 +38,7 @@ import type {
   GenerateSnippetVideoMutationData,
   GenerateSnippetVideoVariables,
   Snippet,
+  SnippetField,
   UpdateSnippetMutationData,
   UpdateSnippetVariables,
   GeneratedVideoSnippetData,
@@ -50,7 +52,46 @@ interface SnippetNodeData {
   snippet: Snippet
 }
 
-type SnippetContentChanges = Partial<Pick<Snippet, 'textField1' | 'title'>>
+type SnippetContentChanges = Partial<{
+  title: string
+  content: Record<string, SnippetField | null>
+}>
+
+const buildDefaultContent = (text = ''): Record<string, SnippetField> => {
+  const hasText = typeof text === 'string' && text.trim() !== ''
+  if (!hasText) return {}
+
+  return {
+    mainText: {
+      label: 'mainText',
+      value: text,
+      type: 'longText',
+      isSystem: true,
+      order: 1
+    }
+  }
+}
+
+const applyContentUpdates = (
+  currentContent: Record<string, SnippetField>,
+  updates: Record<string, SnippetField | null>
+): Record<string, SnippetField> => {
+  const nextContent = { ...currentContent }
+
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value === null) {
+      delete nextContent[key]
+      return
+    }
+
+    nextContent[key] = {
+      ...(currentContent[key] ?? {}),
+      ...value
+    }
+  })
+
+  return nextContent
+}
 
 type MeasuredReactFlowNode = Node & {
   measured?: {
@@ -84,38 +125,6 @@ const getNodeMeasurements = (node: Node | undefined) => {
 
   return { width, height }
 }
-
-/**
- * NOTE: findDownstreamSnippets() was removed to fix build errors
- * If you need immediate downstream propagation for textField1 updates,
- * uncomment the code in handleUpdateSnippetContent at lines 355-360
- * and re-implement findDownstreamSnippets with this logic:
- *
- * function findDownstreamSnippets(sourceSnippetId: string, snippets: Snippet[]): Set<string> {
- *   const downstreamIds = new Set<string>()
- *   const visited = new Set<string>()
- *   const queue: string[] = [sourceSnippetId]
- *
- *   while (queue.length > 0) {
- *     const currentId = queue.shift()!
- *     if (visited.has(currentId)) continue
- *     visited.add(currentId)
- *
- *     const currentSnippet = snippets.find(s => s.id === currentId)
- *     if (!currentSnippet) continue
- *
- *     const outgoingConnections = currentSnippet.connections ?? []
- *     for (const connection of outgoingConnections) {
- *       const targetId = connection.targetSnippetId
- *       if (targetId && !visited.has(targetId)) {
- *         downstreamIds.add(targetId)
- *         queue.push(targetId)
- *       }
- *     }
- *   }
- *   return downstreamIds
- * }
- */
 
 export interface UseCanvasHandlersProps {
   projectId: string | undefined
@@ -306,10 +315,9 @@ export function useCanvasHandlers({
       id: tempId,
       projectId,
       title: 'New snippet',
-      textField1: '',
+      content: buildDefaultContent(''),
       position: targetPosition,
       tags: [],
-      categories: [],
       connections: [],
       createdAt: now,
       updatedAt: now,
@@ -326,10 +334,9 @@ export function useCanvasHandlers({
               input: {
                 projectId,
                 title: 'New snippet',
-                textField1: '',
+                content: buildDefaultContent(''),
                 position: targetPosition,
-                tags: [],
-                categories: []
+                tags: []
               }
             }
           }),
@@ -450,14 +457,14 @@ export function useCanvasHandlers({
     const updateInput: SnippetContentChanges = {}
     const previousValues: SnippetContentChanges = {}
 
-    if (Object.prototype.hasOwnProperty.call(changes, 'textField1')) {
-      updateInput.textField1 = changes.textField1 ?? ''
-      previousValues.textField1 = snippetBeforeUpdate.textField1
-    }
-
     if (Object.prototype.hasOwnProperty.call(changes, 'title')) {
       updateInput.title = changes.title ?? ''
       previousValues.title = snippetBeforeUpdate.title
+    }
+
+    if (changes.content) {
+      updateInput.content = changes.content
+      previousValues.content = snippetBeforeUpdate.content
     }
 
     if (Object.keys(updateInput).length === 0) {
@@ -465,9 +472,13 @@ export function useCanvasHandlers({
     }
 
     const previousSnippetSnapshot: Snippet = { ...snippetBeforeUpdate }
+    const mergedContent = updateInput.content
+      ? applyContentUpdates(snippetBeforeUpdate.content, updateInput.content)
+      : snippetBeforeUpdate.content
     const updatedSnippet: Snippet = {
       ...snippetBeforeUpdate,
-      ...updateInput
+      ...(updateInput.title !== undefined ? { title: updateInput.title } : {}),
+      ...(updateInput.content ? { content: mergedContent } : {})
     }
     updateRealSnippet(updatedSnippet)
 
@@ -482,7 +493,8 @@ export function useCanvasHandlers({
               ...snippetNode.data,
               snippet: {
                 ...snippetNode.data.snippet,
-                ...updateInput
+                ...(updateInput.title !== undefined ? { title: updateInput.title } : {}),
+                ...(updateInput.content ? { content: mergedContent } : {})
               }
             }
           }
@@ -520,7 +532,7 @@ export function useCanvasHandlers({
                 ...snippetNode.data,
                 snippet: {
                   ...snippetNode.data.snippet,
-                  ...previousValues
+                  ...previousSnippetSnapshot
                 }
               }
             }
@@ -568,7 +580,7 @@ export function useCanvasHandlers({
                 ...snippetNode.data,
                 snippet: {
                   ...snippetNode.data.snippet,
-                  textField1: updatedSnippet.textField1,
+                  content: updatedSnippet.content,
                   connections: snippetNode.data.snippet.connections
                 }
               }
@@ -595,7 +607,7 @@ export function useCanvasHandlers({
         return
       }
 
-      const prompt = (promptOverride ?? snippet.textField1 ?? '').trim()
+      const prompt = (promptOverride ?? getPrimaryTextValue(snippet) ?? '').trim()
       if (prompt === '') {
         toast.warning('Please provide prompt content for image generation')
         return
@@ -622,10 +634,9 @@ export function useCanvasHandlers({
         id: tempId,
         projectId,
         title: 'Generated image snippet',
-        textField1: '',
+        content: buildDefaultContent(''),
         position: targetPosition,
         tags: [],
-        categories: [],
         connections: [],
         createdAt: now,
         updatedAt: now,
@@ -645,10 +656,9 @@ export function useCanvasHandlers({
                 input: {
                   projectId,
                   title: 'Generated image snippet',
-                  textField1: prompt,
+                  content: buildDefaultContent(prompt),
                   position: targetPosition,
-                  tags: [],
-                  categories: []
+                  tags: []
                 }
               }
             }),
@@ -664,7 +674,7 @@ export function useCanvasHandlers({
 
         replaceOptimisticSnippet(tempId, {
           ...newSnippet,
-          textField1: ''
+          content: buildDefaultContent('')
         })
         setGeneratingImage(tempId, false)
         setGeneratingImage(newSnippet.id, true)
@@ -727,7 +737,7 @@ export function useCanvasHandlers({
 
         const sanitizedSnippet: Snippet = {
           ...generatedSnippet,
-          textField1: ''
+          content: buildDefaultContent('')
         }
 
         updateRealSnippet(sanitizedSnippet)
@@ -738,7 +748,7 @@ export function useCanvasHandlers({
               projectId,
               id: generatedSnippet.id,
               input: {
-                textField1: ''
+                content: buildDefaultContent('')
               }
             }
           })
@@ -901,10 +911,9 @@ export function useCanvasHandlers({
       id: tempId,
       projectId,
       title: 'New snippet',
-      textField1: '',
+      content: buildDefaultContent(''),
       position: targetPosition,
       tags: [],
-      categories: [],
       connections: [],
       createdAt: now,
       updatedAt: now,
@@ -921,10 +930,9 @@ export function useCanvasHandlers({
               input: {
                 projectId,
                 title: 'New snippet',
-                textField1: '',
+                content: buildDefaultContent(''),
                 position: targetPosition,
-                tags: [],
-                categories: []
+                tags: []
               }
             }
           }),
@@ -1055,10 +1063,9 @@ export function useCanvasHandlers({
       id: tempId,
       projectId,
       title: 'New snippet',
-      textField1: '',
+      content: buildDefaultContent(''),
       position: snappedPosition,
       tags: [],
-      categories: [],
       connections: [],
       createdAt: now,
       updatedAt: now,
@@ -1076,10 +1083,9 @@ export function useCanvasHandlers({
       input: {
         projectId,
         title: 'New snippet',
-        textField1: '',
+        content: buildDefaultContent(''),
         position: snappedPosition,
-        tags: [],
-        categories: []
+        tags: []
       }
     } as Record<string, unknown> & CreateSnippetVariables
 
@@ -1130,10 +1136,9 @@ export function useCanvasHandlers({
       id: tempId,
       projectId,
       title: 'Video Snippet',
-      textField1: '',
+      content: buildDefaultContent(''),
       position: snappedPosition,
       tags: [],
-      categories: [],
       connections: [],
       createdAt: now,
       updatedAt: now,
@@ -1146,10 +1151,9 @@ export function useCanvasHandlers({
       input: {
         projectId,
         title: 'Video Snippet',
-        textField1: '',
+        content: buildDefaultContent(''),
         position: snappedPosition,
         tags: [],
-        categories: [],
         snippetType: 'video'
       }
     } as Record<string, unknown> & CreateSnippetVariables
@@ -1219,10 +1223,9 @@ export function useCanvasHandlers({
       id: tempId,
       projectId,
       title: 'Generated snippet',
-      textField1: generatedSnippetPreview.content,
+      content: buildDefaultContent(generatedSnippetPreview.content),
       position: targetPosition,
       tags: [],
-      categories: [],
       connections: [],
       createdAt: now,
       updatedAt: now,
@@ -1244,10 +1247,9 @@ export function useCanvasHandlers({
               input: {
                 projectId,
                 title: 'Generated snippet',
-                textField1: generatedSnippetPreview.content,
+                content: buildDefaultContent(generatedSnippetPreview.content),
                 position: targetPosition,
-                tags: [],
-                categories: []
+                tags: []
               }
             }
           }),
@@ -1360,10 +1362,9 @@ export function useCanvasHandlers({
       id: tempId,
       projectId,
       title: 'Generated text snippet',
-      textField1: generatedContent,
+      content: buildDefaultContent(generatedContent),
       position: targetPosition,
       tags: [],
-      categories: [],
       connections: [],
       createdAt: now,
       updatedAt: now,
@@ -1380,10 +1381,9 @@ export function useCanvasHandlers({
               input: {
                 projectId,
                 title: 'Generated text snippet',
-                textField1: generatedContent,
+                content: buildDefaultContent(generatedContent),
                 position: targetPosition,
-                tags: [],
-                categories: []
+                tags: []
               }
             }
           }),
@@ -1485,9 +1485,8 @@ export function useCanvasHandlers({
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
     const now = new Date().toISOString()
     const resolvedTitle = generatedData.title?.trim() || 'Generated video snippet'
-    const resolvedText = generatedData.textField1?.trim() ?? ''
+    const resolvedText = generatedData.mainText?.trim() ?? ''
     const resolvedTags = generatedData.tags ?? []
-    const resolvedCategories = generatedData.categories ?? []
 
     const buildTextFromFields = (): string | undefined => {
       const parts: string[] = []
@@ -1513,15 +1512,37 @@ export function useCanvasHandlers({
     }
 
     const combinedText = resolvedText || buildTextFromFields() || ''
+    const content = buildDefaultContent(combinedText)
+
+    const addOptionalField = (key: string, label: string, value?: string) => {
+      if (value && value.trim() !== '') {
+        content[key] = {
+          label,
+          value: value.trim(),
+          type: 'shortText',
+          isSystem: false
+        }
+      }
+    }
+
+    addOptionalField('subject', 'Subject', generatedData.subject)
+    addOptionalField('action', 'Action', generatedData.action)
+    addOptionalField('cameraMotion', 'Camera & Motion', generatedData.cameraMotion)
+    addOptionalField('composition', 'Composition', generatedData.composition)
+    addOptionalField('focusLens', 'Focus & Lens', generatedData.focusLens)
+    addOptionalField('style', 'Style', generatedData.style)
+    addOptionalField('ambiance', 'Ambiance', generatedData.ambiance)
+    addOptionalField('dialogue', 'Dialogue', generatedData.dialogue)
+    addOptionalField('soundEffects', 'Sound Effects', generatedData.soundEffects)
+    addOptionalField('ambientNoise', 'Ambient Noise', generatedData.ambientNoise)
 
     addOptimisticSnippet({
       id: tempId,
       projectId,
       title: resolvedTitle,
-      textField1: combinedText,
+      content,
       position: targetPosition,
       tags: resolvedTags,
-      categories: resolvedCategories,
       connections: [],
       createdAt: now,
       updatedAt: now,
@@ -1535,16 +1556,15 @@ export function useCanvasHandlers({
         () =>
           createSnippetMutation({
             variables: {
-              input: {
-                projectId,
-                title: resolvedTitle,
-                textField1: combinedText,
-                position: targetPosition,
-                tags: resolvedTags,
-                categories: resolvedCategories,
-                snippetType: 'video',
-                createdFrom: sourceSnippetId
-              }
+                input: {
+                  projectId,
+                  title: resolvedTitle,
+                  content,
+                  position: targetPosition,
+                  tags: resolvedTags,
+                  snippetType: 'video',
+                  createdFrom: sourceSnippetId
+                }
             }
           }),
         ['ProjectWithSnippets']

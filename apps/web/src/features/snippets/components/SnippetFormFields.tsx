@@ -2,29 +2,29 @@ import type { SnippetFormState } from '../hooks/useSnippetForm'
 
 interface SnippetFormFieldsProps {
   formState: SnippetFormState
-  activeField: 'textField1' | null
-  savingField: 'textField1' | null
+  activeField: 'mainText' | null
+  savingField: 'mainText' | null
   onTitleChange: (title: string) => void
-  onTextField1Change: (value: string) => void
-  onFieldActivate: (field: 'textField1') => void
-  onFieldBlur: (field: 'textField1', value: string) => Promise<void>
-  textField1Ref: React.MutableRefObject<HTMLTextAreaElement | null>
+  onMainTextChange: (value: string) => void
+  onFieldActivate: (field: 'mainText') => void
+  onFieldBlur: (field: 'mainText', value: string) => Promise<void>
+  mainTextRef: React.MutableRefObject<HTMLTextAreaElement | null>
   isDisabled?: boolean
 }
 
 /**
  * SnippetFormFields - Render snippet form fields
- * Displays title and textField1 with edit support
+ * Displays title and primary content with edit support
  */
 export const SnippetFormFields = ({
   formState,
   activeField,
   savingField,
   onTitleChange,
-  onTextField1Change,
+  onMainTextChange,
   onFieldActivate,
   onFieldBlur,
-  textField1Ref,
+  mainTextRef,
   isDisabled = false
 }: SnippetFormFieldsProps) => {
   return (
@@ -44,34 +44,34 @@ export const SnippetFormFields = ({
       </div>
 
       <div>
-        <label htmlFor="textField1" className="block text-sm font-medium text-gray-700 mb-1">
-          Content {savingField === 'textField1' && '(saving...)'}
+        <label htmlFor="mainText" className="block text-sm font-medium text-gray-700 mb-1">
+          Content {savingField === 'mainText' && '(saving...)'}
         </label>
-        {activeField === 'textField1' ? (
+        {activeField === 'mainText' ? (
           <textarea
-            id="textField1"
-            ref={textField1Ref}
-            value={formState.textField1}
-            onChange={(e) => onTextField1Change(e.target.value)}
-            onBlur={(e) => void onFieldBlur('textField1', e.target.value)}
+            id="mainText"
+            ref={mainTextRef}
+            value={formState.mainText}
+            onChange={(e) => onMainTextChange(e.target.value)}
+            onBlur={(e) => void onFieldBlur('mainText', e.target.value)}
             className="w-full px-3 py-2 border border-blue-500 rounded-md focus:outline-none resize-none"
             rows={4}
-            disabled={isDisabled || savingField === 'textField1'}
+            disabled={isDisabled || savingField === 'mainText'}
           />
         ) : (
           <div
-            onClick={() => onFieldActivate('textField1')}
+            onClick={() => onFieldActivate('mainText')}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault()
-                onFieldActivate('textField1')
+                onFieldActivate('mainText')
               }
             }}
             role="button"
             tabIndex={0}
             className="w-full px-3 py-2 bg-gray-100 rounded-md cursor-pointer hover:bg-gray-200 min-h-[100px] text-sm text-gray-700"
           >
-            {formState.textField1 || 'Click to edit...'}
+            {formState.mainText || 'Click to edit...'}
           </div>
         )}
       </div>
