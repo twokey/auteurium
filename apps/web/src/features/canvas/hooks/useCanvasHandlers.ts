@@ -21,6 +21,7 @@ import { useToast } from '../../../store/toastStore'
 import { mutateWithInvalidate, mutateOptimisticOnly } from '../../../utils/cacheHelpers'
 import { getColumnIndex, getRelativeColumnX, snapToColumn } from '../../../utils/columnLayout'
 import { getPrimaryTextValue } from '../../../utils/snippetContent'
+import { buildDefaultVideoContent } from '../../../utils/videoSnippetContent'
 import { useCanvasStore } from '../store/canvasStore'
 import { useOptimisticUpdatesStore } from '../store/optimisticUpdatesStore'
 
@@ -1136,7 +1137,7 @@ export function useCanvasHandlers({
       id: tempId,
       projectId,
       title: 'Video Snippet',
-      content: buildDefaultContent(''),
+      content: buildDefaultVideoContent(),
       position: snappedPosition,
       tags: [],
       connections: [],
@@ -1151,7 +1152,7 @@ export function useCanvasHandlers({
       input: {
         projectId,
         title: 'Video Snippet',
-        content: buildDefaultContent(''),
+        content: buildDefaultVideoContent(),
         position: snappedPosition,
         tags: [],
         snippetType: 'video'
@@ -1512,29 +1513,19 @@ export function useCanvasHandlers({
     }
 
     const combinedText = resolvedText || buildTextFromFields() || ''
-    const content = buildDefaultContent(combinedText)
-
-    const addOptionalField = (key: string, label: string, value?: string) => {
-      if (value && value.trim() !== '') {
-        content[key] = {
-          label,
-          value: value.trim(),
-          type: 'shortText',
-          isSystem: false
-        }
-      }
-    }
-
-    addOptionalField('subject', 'Subject', generatedData.subject)
-    addOptionalField('action', 'Action', generatedData.action)
-    addOptionalField('cameraMotion', 'Camera & Motion', generatedData.cameraMotion)
-    addOptionalField('composition', 'Composition', generatedData.composition)
-    addOptionalField('focusLens', 'Focus & Lens', generatedData.focusLens)
-    addOptionalField('style', 'Style', generatedData.style)
-    addOptionalField('ambiance', 'Ambiance', generatedData.ambiance)
-    addOptionalField('dialogue', 'Dialogue', generatedData.dialogue)
-    addOptionalField('soundEffects', 'Sound Effects', generatedData.soundEffects)
-    addOptionalField('ambientNoise', 'Ambient Noise', generatedData.ambientNoise)
+    const content = buildDefaultVideoContent({
+      subject: generatedData.subject?.trim() ?? '',
+      action: generatedData.action?.trim() ?? '',
+      cameraMotion: generatedData.cameraMotion?.trim() ?? '',
+      composition: generatedData.composition?.trim() ?? '',
+      focusLens: generatedData.focusLens?.trim() ?? '',
+      style: generatedData.style?.trim() ?? '',
+      ambiance: generatedData.ambiance?.trim() ?? '',
+      dialogue: generatedData.dialogue?.trim() ?? '',
+      soundEffects: generatedData.soundEffects?.trim() ?? '',
+      ambientNoise: generatedData.ambientNoise?.trim() ?? '',
+      mainText: combinedText
+    })
 
     addOptimisticSnippet({
       id: tempId,

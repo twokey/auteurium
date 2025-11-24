@@ -8,11 +8,12 @@ import { StarMenu } from '../../features/snippets/components/StarMenu'
 import { usePromptDesignerStore } from '../../features/canvas/store/promptDesignerStore'
 import { useVideoPromptStore } from '../../features/snippets/store/videoPromptStore'
 import { useToast } from '../../store/toastStore'
+import { buildDefaultVideoContent, extractVideoFormData, VideoSnippetFieldKey } from '../../utils/videoSnippetContent'
 
 import { VIDU_Q2_MODEL_CONFIG } from './videoPromptUtils'
 
 import type { AvailableModel, ConnectedContentItem, VideoGenerationInput, VideoMetadata, SnippetField } from '../../types'
-import { getPrimaryFieldValue, getPrimaryTextValue } from '../../utils/snippetContent'
+import { getPrimaryFieldValue } from '../../utils/snippetContent'
 
 interface VideoSnippetNodeProps {
   id: string
@@ -38,18 +39,7 @@ interface VideoSnippetNodeProps {
   }
 }
 
-interface VideoFormData {
-  subject: string
-  action: string
-  cameraMotion: string
-  composition: string
-  focusLens: string
-  style: string
-  ambiance: string
-  dialogue: string
-  soundEffects: string
-  ambientNoise: string
-}
+type VideoFormData = Record<VideoSnippetFieldKey, string>
 
 interface TextareaFieldProps {
   label: string
@@ -59,6 +49,7 @@ interface TextareaFieldProps {
   onBlur?: () => void
   maxLength: number
   rows?: number
+  disabled?: boolean
 }
 
 const TextareaField = ({
@@ -68,7 +59,8 @@ const TextareaField = ({
   onChange,
   onBlur,
   maxLength,
-  rows = 3
+  rows = 3,
+  disabled = false
 }: TextareaFieldProps) => {
   const handleSnippetSelect = (content: string) => {
     // Append content to the current value
@@ -95,6 +87,7 @@ const TextareaField = ({
             placeholder={placeholder}
             rows={rows}
             maxLength={maxLength}
+            disabled={disabled}
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
@@ -107,22 +100,6 @@ const TextareaField = ({
       </div>
     </div>
   )
-}
-
-
-
-const parseLabeledValue = (source: string, labels: string[]): string | undefined => {
-  for (const label of labels) {
-    const regex = new RegExp(`${label} \\s *: \\s * ([^\\n] +)`, 'i')
-    const match = source.match(regex)
-    if (match?.[1]) {
-      const value = match[1].trim()
-      if (value) {
-        return value
-      }
-    }
-  }
-  return undefined
 }
 
 const getVideoReferenceLimit = (modelId: string): number => {
@@ -155,19 +132,12 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
 
   const openPromptDesigner = usePromptDesignerStore((state) => state.open)
 
-  // Local state for all form fields (ephemeral - not persisted)
-  const [formData, setFormData] = useState<VideoFormData>({
-    subject: '',
-    action: '',
-    cameraMotion: '',
-    composition: '',
-    focusLens: '',
-    style: '',
-    ambiance: '',
-    dialogue: '',
-    soundEffects: '',
-    ambientNoise: ''
-  })
+  // Local state for all form fields (draft + persisted sync)
+  const [draftFields, setDraftFields] = useState<VideoFormData>(() =>
+    extractVideoFormData(buildDefaultVideoContent({}, { existing: snippet.content }))
+  )
+  const [activeField, setActiveField] = useState<VideoSnippetFieldKey | null>(null)
+  const [savingField, setSavingField] = useState<VideoSnippetFieldKey | null>(null)
 
   // Accordion expanded states
   const [accordionStates, setAccordionStates] = useState({
@@ -176,7 +146,6 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
     visualTone: true, // Expanded by default
     audioDetails: true // Expanded by default
   })
-  const [isHydratedFromSnippet, setIsHydratedFromSnippet] = useState(false)
 
   // Editable title state
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -184,35 +153,10 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
   const [isSavingTitle, setIsSavingTitle] = useState(false)
   const titleInputRef = useRef<HTMLInputElement | null>(null)
 
-  // Pre-fill form fields from snippet text (if labeled) to show generated values
   useEffect(() => {
-    if (isHydratedFromSnippet) return
-    const sourceText = getPrimaryTextValue({ content: snippet.content }).trim()
-    if (!sourceText) return
-
-    const nextData: Partial<VideoFormData> = {}
-    const setIfPresent = (key: keyof VideoFormData, value?: string) => {
-      if (value) {
-        nextData[key] = value
-      }
-    }
-
-    setIfPresent('subject', parseLabeledValue(sourceText, ['Subject']))
-    setIfPresent('action', parseLabeledValue(sourceText, ['Action']))
-    setIfPresent('cameraMotion', parseLabeledValue(sourceText, ['Camera & Motion', 'Camera positioning and motion']))
-    setIfPresent('composition', parseLabeledValue(sourceText, ['Composition']))
-    setIfPresent('focusLens', parseLabeledValue(sourceText, ['Focus & Lens', 'Focus and lens effects']))
-    setIfPresent('style', parseLabeledValue(sourceText, ['Style']))
-    setIfPresent('ambiance', parseLabeledValue(sourceText, ['Ambiance', 'Ambience']))
-    setIfPresent('dialogue', parseLabeledValue(sourceText, ['Dialogue']))
-    setIfPresent('soundEffects', parseLabeledValue(sourceText, ['Sound Effects', 'Sound Effects (SFX)', 'Sound']))
-    setIfPresent('ambientNoise', parseLabeledValue(sourceText, ['Ambient Noise']))
-
-    if (Object.keys(nextData).length > 0) {
-      setFormData((prev) => ({ ...prev, ...nextData }))
-      setIsHydratedFromSnippet(true)
-    }
-  }, [isHydratedFromSnippet, snippet.content])
+    if (activeField) return
+    setDraftFields(extractVideoFormData(buildDefaultVideoContent({}, { existing: snippet.content })))
+  }, [snippet.content, activeField])
 
   const connectedContent = snippet.connectedContent ?? []
   const connectedImageReferences = connectedContent.filter((item) => item.type === 'image')
@@ -235,8 +179,10 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
     }
   }, [isEditingTitle])
 
-  const handleFieldChange = (field: keyof VideoFormData) => (value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
+  const handleFieldChange = (field: VideoSnippetFieldKey) => (value: string) => {
+    setActiveField(field)
+    markSnippetDirty(snippet.id)
+    setDraftFields((prev) => ({ ...prev, [field]: value }))
   }
 
   const handleAccordionToggle = (section: keyof typeof accordionStates) => (isExpanded: boolean) => {
@@ -248,33 +194,75 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
   }
 
   // Combine all form fields into a single prompt
-  const combineFormFieldsToPrompt = useCallback(() => {
+  const combineFormFieldsToPrompt = useCallback((fields: VideoFormData = draftFields) => {
     const promptParts: string[] = []
+    const push = (label: string, value?: string) => {
+      if (value && value.trim() !== '') {
+        promptParts.push(`${label}: ${value.trim()}`)
+      }
+    }
 
-    if (formData.subject) promptParts.push(`Subject: ${formData.subject} `)
-    if (formData.action) promptParts.push(`Action: ${formData.action} `)
-    if (formData.cameraMotion) promptParts.push(`Camera & Motion: ${formData.cameraMotion} `)
-    if (formData.composition) promptParts.push(`Composition: ${formData.composition} `)
-    if (formData.focusLens) promptParts.push(`Focus & Lens: ${formData.focusLens} `)
-    if (formData.style) promptParts.push(`Style: ${formData.style} `)
-    if (formData.ambiance) promptParts.push(`Ambiance: ${formData.ambiance} `)
-    if (formData.dialogue) promptParts.push(`Dialogue: ${formData.dialogue} `)
-    if (formData.soundEffects) promptParts.push(`Sound Effects: ${formData.soundEffects} `)
-    if (formData.ambientNoise) promptParts.push(`Ambient Noise: ${formData.ambientNoise} `)
+    push('Subject', fields.subject)
+    push('Action', fields.action)
+    push('Camera & Motion', fields.cameraMotion)
+    push('Composition', fields.composition)
+    push('Focus & Lens', fields.focusLens)
+    push('Style', fields.style)
+    push('Ambiance', fields.ambiance)
+    push('Dialogue', fields.dialogue)
+    push('Sound Effects', fields.soundEffects)
+    push('Ambient Noise', fields.ambientNoise)
 
     return promptParts.join('\n')
-  }, [formData])
+  }, [draftFields])
 
-  // Update preview when form data changes
-  const handleFieldBlur = useCallback(() => {
-    // We don't need to update combined prompt in store anymore as preview is gone
-    // But we might want to keep local state or update snippet content if autosave is desired
-    // For now, let's just update the store's combined prompt if we are the active snippet in designer?
-    // Actually, the designer has its own state.
-    // We can probably remove this unless it's used for something else.
-    // Leaving it empty for now to minimize disruption, or we can remove it.
-    // The original code updated the store for the preview panel.
-  }, [])
+  const persistField = useCallback(async (field: VideoSnippetFieldKey) => {
+    const trimmedValue = draftFields[field].trim()
+    const nextFields = { ...draftFields, [field]: trimmedValue }
+    const combinedPrompt = combineFormFieldsToPrompt(nextFields)
+    const currentValue = snippet.content[field]?.value ?? ''
+    const currentMainText = snippet.content.mainText?.value ?? ''
+
+    if (trimmedValue === currentValue && combinedPrompt === currentMainText) {
+      clearSnippetDirty(snippet.id)
+      setActiveField(null)
+      return
+    }
+
+    setSavingField(field)
+    markSnippetSaving(snippet.id)
+
+    try {
+      const updatedContent = buildDefaultVideoContent(
+        { ...nextFields, mainText: combinedPrompt },
+        { existing: snippet.content }
+      )
+
+      await onUpdateContent(snippet.id, {
+        content: updatedContent
+      })
+      clearSnippetDirty(snippet.id)
+    } catch (error) {
+      console.error('Failed to update video snippet field:', error)
+      toast.error('Failed to save changes', error instanceof Error ? error.message : 'Unknown error')
+      setDraftFields((prev) => ({
+        ...prev,
+        [field]: snippet.content[field]?.value ?? ''
+      }))
+      clearSnippetDirty(snippet.id)
+    } finally {
+      setSavingField(null)
+      clearSnippetSaving(snippet.id)
+      setActiveField(null)
+    }
+  }, [draftFields, combineFormFieldsToPrompt, snippet.content, snippet.id, onUpdateContent, toast, markSnippetSaving, clearSnippetSaving, clearSnippetDirty])
+
+  const handleFieldBlur = useCallback(
+    (field: VideoSnippetFieldKey) => () => {
+      void persistField(field)
+    },
+    [persistField]
+  )
 
   // Handle snippet click to open Prompt Designer
   const handleSnippetClick = useCallback(() => {
@@ -529,18 +517,20 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
               <TextareaField
                 label="Subject"
                 placeholder="e.g., A cute creature with snow leopard-like fur and large expressive eyes."
-                value={formData.subject}
+                value={draftFields.subject}
                 onChange={handleFieldChange('subject')}
-                onBlur={handleFieldBlur}
+                onBlur={handleFieldBlur('subject')}
                 maxLength={280}
+                disabled={savingField === 'subject'}
               />
               <TextareaField
                 label="Action"
                 placeholder="e.g., happily prances through a whimsical winter forest."
-                value={formData.action}
+                value={draftFields.action}
                 onChange={handleFieldChange('action')}
-                onBlur={handleFieldBlur}
+                onBlur={handleFieldBlur('action')}
                 maxLength={280}
+                disabled={savingField === 'action'}
               />
             </div>
           </div>
@@ -557,29 +547,32 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
                 <TextareaField
                   label="Camera & Motion"
                   placeholder="e.g., Aerial view, dolly shot"
-                  value={formData.cameraMotion}
+                  value={draftFields.cameraMotion}
                   onChange={handleFieldChange('cameraMotion')}
-                  onBlur={handleFieldBlur}
+                  onBlur={handleFieldBlur('cameraMotion')}
                   maxLength={140}
                   rows={2}
+                  disabled={savingField === 'cameraMotion'}
                 />
                 <TextareaField
                   label="Composition"
                   placeholder="e.g., Wide shot, close-up"
-                  value={formData.composition}
+                  value={draftFields.composition}
                   onChange={handleFieldChange('composition')}
-                  onBlur={handleFieldBlur}
+                  onBlur={handleFieldBlur('composition')}
                   maxLength={140}
                   rows={2}
+                  disabled={savingField === 'composition'}
                 />
                 <TextareaField
                   label="Focus & Lens"
                   placeholder="e.g., Shallow focus, wide-angle"
-                  value={formData.focusLens}
+                  value={draftFields.focusLens}
                   onChange={handleFieldChange('focusLens')}
-                  onBlur={handleFieldBlur}
+                  onBlur={handleFieldBlur('focusLens')}
                   maxLength={140}
                   rows={2}
+                  disabled={savingField === 'focusLens'}
                 />
               </div>
             </Accordion>
@@ -596,18 +589,20 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
                 <TextareaField
                   label="Style"
                   placeholder="e.g., 3D animated scene, joyful cartoon style, bright cheerful colors."
-                  value={formData.style}
+                  value={draftFields.style}
                   onChange={handleFieldChange('style')}
-                  onBlur={handleFieldBlur}
+                  onBlur={handleFieldBlur('style')}
                   maxLength={280}
+                  disabled={savingField === 'style'}
                 />
                 <TextareaField
                   label="Ambiance"
                   placeholder="e.g., Warm sunlight filtering through branches, eerie glow of a neon sign."
-                  value={formData.ambiance}
+                  value={draftFields.ambiance}
                   onChange={handleFieldChange('ambiance')}
-                  onBlur={handleFieldBlur}
+                  onBlur={handleFieldBlur('ambiance')}
                   maxLength={280}
+                  disabled={savingField === 'ambiance'}
                 />
               </div>
             </Accordion>
@@ -625,26 +620,29 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
                 <TextareaField
                   label="Dialogue"
                   placeholder='e.g., "This must be the key," he murmured.'
-                  value={formData.dialogue}
+                  value={draftFields.dialogue}
                   onChange={handleFieldChange('dialogue')}
-                  onBlur={handleFieldBlur}
+                  onBlur={handleFieldBlur('dialogue')}
                   maxLength={280}
+                  disabled={savingField === 'dialogue'}
                 />
                 <TextareaField
                   label="Sound Effects (SFX)"
                   placeholder="e.g., Tires screeching loudly, engine roaring."
-                  value={formData.soundEffects}
+                  value={draftFields.soundEffects}
                   onChange={handleFieldChange('soundEffects')}
-                  onBlur={handleFieldBlur}
+                  onBlur={handleFieldBlur('soundEffects')}
                   maxLength={280}
+                  disabled={savingField === 'soundEffects'}
                 />
                 <TextareaField
                   label="Ambient Noise"
                   placeholder="e.g., A faint, eerie hum resonates."
-                  value={formData.ambientNoise}
+                  value={draftFields.ambientNoise}
                   onChange={handleFieldChange('ambientNoise')}
-                  onBlur={handleFieldBlur}
+                  onBlur={handleFieldBlur('ambientNoise')}
                   maxLength={280}
+                  disabled={savingField === 'ambientNoise'}
                 />
               </div>
             </Accordion>
