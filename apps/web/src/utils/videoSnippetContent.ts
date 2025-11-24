@@ -18,7 +18,6 @@ export type VideoSnippetFieldKey = typeof VIDEO_SNIPPET_FIELD_CONFIG[number]['ke
 type VideoValues = Partial<Record<VideoSnippetFieldKey, string>> & { mainText?: string }
 
 const normalizeField = (
-  key: VideoSnippetFieldKey,
   label: string,
   order: number,
   existing?: SnippetField,
@@ -49,7 +48,7 @@ export const buildDefaultVideoContent = (
   content.mainText = normalizeMainText(existing.mainText, values.mainText)
 
   VIDEO_SNIPPET_FIELD_CONFIG.forEach(({ key, label, order }) => {
-    content[key] = normalizeField(key, label, order, existing[key], values[key])
+    content[key] = normalizeField(label, order, existing[key], values[key])
   })
 
   return content

@@ -13,6 +13,7 @@ import {
   isResolutionOption,
   type ResolutionOption
 } from '../snippets/videoPromptUtils'
+import rawSystemPrompts from '../../../../../system-prompts.md?raw'
 
 const MODE_LABEL: Record<'text' | 'image' | 'video' | 'scenes', string> = {
   text: 'Text generation',
@@ -28,6 +29,13 @@ const VOICE_IDS = [
   { id: 'voice_3', name: 'Voice 3 - Calm' },
 ]
 
+const extractSystemPromptSection = (raw: string, heading: string, fallback: string) => {
+  const pattern = new RegExp(`##\\s+${heading}\\s*\\n([\\s\\S]*?)(?=\\n##\\s+|$)`, 'i')
+  const match = raw.match(pattern)
+  const content = match?.[1]?.trim()
+  return content && content.length > 0 ? content : fallback
+}
+
 export interface PromptDesignerPanelProps {
   width?: number
   style?: CSSProperties
@@ -42,24 +50,46 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
   const snippetTitle = usePromptDesignerStore((state) => state.snippetTitle)
   const mode = usePromptDesignerStore((state) => state.mode)
   const prompt = usePromptDesignerStore((state) => state.prompt)
+  const systemPrompt = usePromptDesignerStore((state) => state.systemPrompt)
   const connectedContent = usePromptDesignerStore((state) => state.connectedContent)
   const generationSettings = usePromptDesignerStore((state) => state.generationSettings)
   const onGenerate = usePromptDesignerStore((state) => state.onGenerate)
   const close = usePromptDesignerStore((state) => state.close)
   const setPrompt = usePromptDesignerStore((state) => state.setPrompt)
+  const setSystemPrompt = usePromptDesignerStore((state) => state.setSystemPrompt)
   const setGenerating = usePromptDesignerStore((state) => state.setGenerating)
   const updateGenerationSettings = usePromptDesignerStore((state) => state.updateGenerationSettings)
 
   const [isEditing, setIsEditing] = useState(false)
+  const [isSystemPromptEditing, setIsSystemPromptEditing] = useState(false)
   const [isSettingsExpanded, setIsSettingsExpanded] = useState(true)
   const [isReferenceImagesExpanded, setIsReferenceImagesExpanded] = useState(true)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const systemPromptRef = useRef<HTMLTextAreaElement | null>(null)
+
+  const { scenesPromptText, shotsPromptText } = useMemo(() => ({
+    scenesPromptText: extractSystemPromptSection(
+      rawSystemPrompts,
+      'Scenes',
+      'Placeholder scene system prompt. Replace with the real content once available.'
+    ),
+    shotsPromptText: extractSystemPromptSection(
+      rawSystemPrompts,
+      'Shots',
+      'Placeholder shot system prompt. Replace with the real content once available.'
+    )
+  }), [])
 
   useEffect(() => {
-    if (!isOpen && isEditing) {
-      setIsEditing(false)
+    if (!isOpen) {
+      if (isEditing) {
+        setIsEditing(false)
+      }
+      if (isSystemPromptEditing) {
+        setIsSystemPromptEditing(false)
+      }
     }
-  }, [isOpen, isEditing])
+  }, [isOpen, isEditing, isSystemPromptEditing])
 
   useEffect(() => {
     if (!isOpen || !isEditing) {
@@ -71,6 +101,17 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
     const length = target?.value.length ?? 0
     target?.setSelectionRange(length, length)
   }, [isOpen, isEditing])
+
+  useEffect(() => {
+    if (!isOpen || !isSystemPromptEditing) {
+      return
+    }
+
+    const target = systemPromptRef.current
+    target?.focus()
+    const length = target?.value.length ?? 0
+    target?.setSelectionRange(length, length)
+  }, [isOpen, isSystemPromptEditing])
 
   const headerSubtitle = useMemo(() => {
     if (!mode) {
@@ -111,10 +152,10 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
       : null
 
     const appliedCredits = pricingSummary
-      ? (settings.offPeak ? pricingSummary.offPeakCredits : pricingSummary.standardCredits)
+      ? pricingSummary.standardCredits
       : null
     const appliedUsd = pricingSummary
-      ? (settings.offPeak ? pricingSummary.offPeakUsd : pricingSummary.standardUsd)
+      ? pricingSummary.standardUsd
       : null
 
     return {
@@ -140,6 +181,11 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
     return null
   }
 
+  const handleApplySystemPrompt = (value: string) => {
+    setSystemPrompt(value)
+    setIsSystemPromptEditing(false)
+  }
+
   const handleGenerate = async () => {
     if (!onGenerate) {
       toast.info('This generation flow is not available yet.')
@@ -156,34 +202,24 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
             return null
           }
 
-          if (item.type === 'text') {
-            return value
-          }
-
-          if (item.type === 'image') {
-            return `Image: ${value}`
-          }
-
-          if (item.type === 'video') {
-            return `Video: ${value}`
-          }
-
-          return null
+          return value
         })
         .filter((line): line is string => Boolean(line))
 
-      const connectedText = lines.join('\n')
+      const connectedText = lines.join(' ')
       const currentText = prompt.trim()
 
-      // Combine connected content with current snippet's text
-      let finalPrompt = ''
-      if (connectedText && currentText) {
-        finalPrompt = `${connectedText}\n\n${currentText}`
-      } else {
-        finalPrompt = connectedText || currentText || ''
-      }
+      const promptPreview = [connectedText, currentText].filter(Boolean).join(' ')
+      const systemPromptText = systemPrompt.trim()
+      const finalTextPrompt = [systemPromptText, promptPreview].filter(Boolean).join('\n\n')
 
-      await Promise.resolve(onGenerate(finalPrompt, generationSettings))
+      console.log('LLM prompt:', finalTextPrompt)
+      console.log('LLM payload:', {
+        prompt: finalTextPrompt,
+        settings: generationSettings
+      })
+
+      await Promise.resolve(onGenerate(finalTextPrompt, generationSettings))
       close()
     } catch (error) {
       console.error('Prompt designer generation failed:', error)
@@ -437,38 +473,6 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
                     </div>
                   )}
 
-                  {/* Seed */}
-                  <div>
-                    <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
-                      Seed (optional)
-                    </label>
-                    <input
-                      type="number"
-                      value={generationSettings.settings.seed ?? ''}
-                      onChange={(e) => updateGenerationSettings({ seed: e.target.value ? Number(e.target.value) : undefined })}
-                      placeholder="Random"
-                      className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 placeholder-gray-400 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                    />
-                  </div>
-
-                  {/* Off-peak Toggle */}
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                      Off-peak Mode
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => updateGenerationSettings({ offPeak: !generationSettings.settings.offPeak })}
-                      className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors ${generationSettings.settings.offPeak ? 'bg-purple-600' : 'bg-gray-300'
-                        }`}
-                    >
-                      <span
-                        className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${generationSettings.settings.offPeak ? 'translate-x-4' : 'translate-x-0.5'
-                          }`}
-                      />
-                    </button>
-                  </div>
-
                   {/* Cost Preview */}
                   {generationSettingsEntries.pricingSummary && (
                     <div className="mt-2 rounded border border-purple-100 bg-purple-50 px-2 py-1.5">
@@ -638,6 +642,70 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
               )}
             </button>
           )}
+        </div>
+
+        <div className="mb-2">
+          <div className="flex items-center justify-between mb-0.5">
+            <p className="text-[10px] text-gray-500 font-medium">System prompt</p>
+            {isSystemPromptEditing && (
+              <span className={`text-[10px] font-mono ${systemPrompt.length > 2000 ? 'text-red-500' : 'text-gray-400'}`}>
+                {systemPrompt.length}/2000
+              </span>
+            )}
+          </div>
+
+          {isSystemPromptEditing ? (
+            <textarea
+              ref={systemPromptRef}
+              value={systemPrompt}
+              onChange={(event) => setSystemPrompt(event.target.value)}
+              onBlur={() => setIsSystemPromptEditing(false)}
+              onKeyDown={(event) => {
+                event.stopPropagation()
+                if (event.key === 'Escape') {
+                  event.preventDefault()
+                  setIsSystemPromptEditing(false)
+                }
+                if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                  event.preventDefault()
+                  setIsSystemPromptEditing(false)
+                }
+              }}
+              className="w-full rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-sm font-medium text-gray-900 focus:outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-300"
+              rows={Math.max(3, Math.min(10, systemPrompt.split('\n').length + 1))}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsSystemPromptEditing(true)}
+              className="w-full cursor-text rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-left transition-colors hover:border-blue-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-300"
+            >
+              {systemPrompt.trim() !== '' ? (
+                <span className="whitespace-pre-wrap break-words text-sm font-medium text-gray-900">
+                  {systemPrompt}
+                </span>
+              ) : (
+                <span className="text-sm text-gray-400">Click to add a system prompt...</span>
+              )}
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => handleApplySystemPrompt(scenesPromptText)}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+          >
+            Create Scenes
+          </button>
+          <button
+            type="button"
+            onClick={() => handleApplySystemPrompt(shotsPromptText)}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+          >
+            Create Shots
+          </button>
         </div>
       </div>
     </div>

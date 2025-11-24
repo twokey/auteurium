@@ -196,24 +196,25 @@ export const VideoSnippetNode = memo(({ data }: VideoSnippetNodeProps) => {
   // Combine all form fields into a single prompt
   const combineFormFieldsToPrompt = useCallback((fields: VideoFormData = draftFields) => {
     const promptParts: string[] = []
-    const push = (label: string, value?: string) => {
-      if (value && value.trim() !== '') {
-        promptParts.push(`${label}: ${value.trim()}`)
+    const pushValue = (value?: string) => {
+      const trimmed = value?.trim()
+      if (trimmed) {
+        promptParts.push(trimmed)
       }
     }
 
-    push('Subject', fields.subject)
-    push('Action', fields.action)
-    push('Camera & Motion', fields.cameraMotion)
-    push('Composition', fields.composition)
-    push('Focus & Lens', fields.focusLens)
-    push('Style', fields.style)
-    push('Ambiance', fields.ambiance)
-    push('Dialogue', fields.dialogue)
-    push('Sound Effects', fields.soundEffects)
-    push('Ambient Noise', fields.ambientNoise)
+    pushValue(fields.subject)
+    pushValue(fields.action)
+    pushValue(fields.cameraMotion)
+    pushValue(fields.composition)
+    pushValue(fields.focusLens)
+    pushValue(fields.style)
+    pushValue(fields.ambiance)
+    pushValue(fields.dialogue)
+    pushValue(fields.soundEffects)
+    pushValue(fields.ambientNoise)
 
-    return promptParts.join('\n')
+    return promptParts.join(' ')
   }, [draftFields])
 
   const persistField = useCallback(async (field: VideoSnippetFieldKey) => {

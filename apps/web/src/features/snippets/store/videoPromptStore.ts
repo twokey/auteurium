@@ -33,7 +33,7 @@ interface VideoPromptState {
 }
 
 export const DEFAULT_SETTINGS: VideoModelSettings = {
-  model: 'vidu-q2-turbo',
+  model: 'vidu-q2',
   duration: 4,
   resolution: '720p',
   audio: false,

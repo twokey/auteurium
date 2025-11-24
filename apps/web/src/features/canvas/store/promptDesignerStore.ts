@@ -16,6 +16,7 @@ interface PromptDesignerOpenPayload {
   snippetTitle?: string | null
   mode: PromptDesignerMode
   initialPrompt: string
+  initialSystemPrompt?: string
   connectedContent?: ConnectedContentItem[]
   onGenerate?: (prompt: string, settings?: PromptDesignerGenerationSettings | null) => Promise<void> | void
   generationSettings?: PromptDesignerGenerationSettings | null
@@ -28,12 +29,14 @@ interface PromptDesignerState {
   snippetTitle: string | null
   mode: PromptDesignerMode | null
   prompt: string
+  systemPrompt: string
   connectedContent: ConnectedContentItem[]
   generationSettings: PromptDesignerGenerationSettings | null
   onGenerate: ((prompt: string, settings?: PromptDesignerGenerationSettings | null) => Promise<void> | void) | null
   open: (payload: PromptDesignerOpenPayload) => void
   close: () => void
   setPrompt: (prompt: string) => void
+  setSystemPrompt: (prompt: string) => void
   setGenerating: (isGenerating: boolean) => void
   updateGenerationSettings: (settings: Partial<VideoModelSettings>) => void
   lastOpenedAt: number | null
@@ -41,7 +44,7 @@ interface PromptDesignerState {
 
 const INITIAL_STATE: Omit<
   PromptDesignerState,
-  'open' | 'close' | 'setPrompt' | 'setGenerating' | 'updateGenerationSettings'
+  'open' | 'close' | 'setPrompt' | 'setSystemPrompt' | 'setGenerating' | 'updateGenerationSettings'
 > = {
   isOpen: false,
   isGenerating: false,
@@ -49,6 +52,7 @@ const INITIAL_STATE: Omit<
   snippetTitle: null,
   mode: null,
   prompt: '',
+  systemPrompt: '',
   connectedContent: [],
   generationSettings: null,
   onGenerate: null,
@@ -62,6 +66,7 @@ export const usePromptDesignerStore = create<PromptDesignerState>((set, get) => 
     snippetTitle = null,
     mode,
     initialPrompt,
+    initialSystemPrompt,
     connectedContent = [],
     onGenerate,
     generationSettings = null
@@ -81,6 +86,7 @@ export const usePromptDesignerStore = create<PromptDesignerState>((set, get) => 
       snippetTitle,
       mode,
       prompt: initialPrompt,
+      systemPrompt: initialSystemPrompt ?? '',
       connectedContent,
       generationSettings: initialSettings,
       onGenerate: onGenerate ?? null,
@@ -99,6 +105,12 @@ export const usePromptDesignerStore = create<PromptDesignerState>((set, get) => 
       return
     }
     set({ prompt })
+  },
+  setSystemPrompt: (prompt) => {
+    if (get().systemPrompt === prompt) {
+      return
+    }
+    set({ systemPrompt: prompt })
   },
   setGenerating: (isGenerating) => {
     set({ isGenerating })

@@ -70,7 +70,7 @@ export const IMAGE_GENERATION = {
 // Video Generation
 export const VIDEO_GENERATION = {
   MAX_REFERENCE_IMAGES: 7, // Vidu Q2 supports up to 7 reference images
-  DEFAULT_MODEL: 'vidu-q2-turbo',
+  DEFAULT_MODEL: 'vidu-q2',
   DEFAULT_DURATION: 4,
   DEFAULT_ASPECT_RATIO: '16:9',
   DEFAULT_RESOLUTION: '540p',
