@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 import type { ConnectedContentItem } from '../../../types/components'
+import { IMAGE_GENERATION } from '../../../constants'
 import { DEFAULT_SETTINGS, type VideoModelSettings } from '../../snippets/store/videoPromptStore'
 
 type PromptDesignerMode = 'text' | 'image' | 'video' | 'scenes'
@@ -93,6 +94,15 @@ export const usePromptDesignerStore = create<PromptDesignerState>((set, get) => 
       initialSettings = {
         type: 'video',
         settings: DEFAULT_SETTINGS
+      }
+    } else if (!initialSettings && mode === 'image') {
+      initialSettings = {
+        type: 'image',
+        settings: {
+          model: IMAGE_GENERATION.DEFAULT_MODEL,
+          aspectRatio: '16:9',
+          numberOfImages: 1
+        }
       }
     }
 

@@ -7,6 +7,7 @@ import { StarMenu } from '../../features/snippets/components/StarMenu'
 import { usePromptDesignerStore, type PromptDesignerGeneratePayload } from '../../features/canvas/store/promptDesignerStore'
 import { useToast } from '../../store/toastStore'
 import { buildDefaultImageContent, extractImageFormData, ImageSnippetFieldKey } from '../../utils/imageSnippetContent'
+import { IMAGE_GENERATION } from '../../constants'
 
 import type { AvailableModel, ConnectedContentItem, SnippetField } from '../../types'
 import { getPrimaryFieldValue } from '../../utils/snippetContent'
@@ -251,7 +252,7 @@ export const ImageSnippetNode = memo(({ data }: ImageSnippetNodeProps) => {
             generationSettings: {
                 type: 'image',
                 settings: {
-                    model: imageModels[0]?.id || 'imagen-3.0-generate-001', // Default model
+                    model: imageModels[0]?.id || IMAGE_GENERATION.DEFAULT_MODEL,
                     aspectRatio: '16:9',
                     numberOfImages: 1
                 }

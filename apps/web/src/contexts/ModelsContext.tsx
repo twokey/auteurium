@@ -44,7 +44,7 @@ export const ModelsProvider = ({ children }: ModelsProviderProps) => {
   )
 
   const filterByModalities = useCallback(
-    (models: AvailableModel[], modalities: AvailableModel['modality'][]) =>
+    (models: AvailableModel[], modalities: Array<AvailableModel['modality'] | string>) =>
       models.filter(model => modalities.includes(model.modality)),
     []
   )
@@ -58,7 +58,7 @@ export const ModelsProvider = ({ children }: ModelsProviderProps) => {
     [allModels, filterByModalities]
   )
   const videoModels = useMemo(
-    () => filterByModalities(allModels, ['TEXT_TO_VIDEO']),
+    () => filterByModalities(allModels, ['TEXT_TO_VIDEO', 'IMAGE_TO_VIDEO', 'VIDEO_TO_VIDEO']),
     [allModels, filterByModalities]
   )
 
