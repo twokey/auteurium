@@ -19,7 +19,7 @@ import { useGraphQLMutation } from '../../../hooks/useGraphQLMutation'
 import { useModalStore } from '../../../store/modalStore'
 import { useToast } from '../../../store/toastStore'
 import { mutateWithInvalidate, mutateOptimisticOnly } from '../../../utils/cacheHelpers'
-import { getColumnIndex, getRelativeColumnX, snapToColumn } from '../../../utils/columnLayout'
+import { calculateStackedPosition, getColumnIndex, getRelativeColumnX, snapToColumn } from '../../../utils/columnLayout'
 import { getPrimaryTextValue } from '../../../utils/snippetContent'
 import { buildDefaultVideoContent } from '../../../utils/videoSnippetContent'
 import { buildDefaultImageContent } from '../../../utils/imageSnippetContent'
@@ -673,10 +673,12 @@ export function useCanvasHandlers({
       const sourceColumnIndex = getColumnIndex(baseX)
       const targetX = getRelativeColumnX(sourceColumnIndex, 1)
 
-      const targetPosition = {
-        x: targetX,
-        y: baseY
-      }
+      const targetPosition = calculateStackedPosition(
+        targetX,
+        snippetsRef.current,
+        reactFlowInstance?.current,
+        baseY
+      )
 
       const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
       const now = new Date().toISOString()
@@ -933,37 +935,12 @@ export function useCanvasHandlers({
     const targetColumnIndex = getColumnIndex(baseX)
     const newColumnX = getRelativeColumnX(targetColumnIndex, -1)
 
-    // Find snippets in the target column to stack below
-    const columnSnippets = snippetsRef.current.filter(s =>
-      Math.abs((s.position?.x ?? 0) - newColumnX) < 10 // Allow small float diffs
+    const targetPosition = calculateStackedPosition(
+      newColumnX,
+      snippetsRef.current,
+      reactFlowInstance?.current,
+      baseY
     )
-
-    let targetY = baseY
-
-    if (columnSnippets.length > 0) {
-      // Find the lowest point
-      const lowestSnippet = columnSnippets.reduce((prev, current) => {
-        const prevY = prev.position?.y ?? 0
-        const currentY = current.position?.y ?? 0
-        return prevY > currentY ? prev : current
-      })
-
-      // Get height from ReactFlow if available, otherwise use estimate
-      let height: number = CANVAS_CONSTANTS.ESTIMATED_SNIPPET_HEIGHT
-      if (reactFlowInstance?.current) {
-        const node = reactFlowInstance.current.getNode(lowestSnippet.id)
-        if (node && node.height) {
-          height = node.height
-        }
-      }
-
-      targetY = (lowestSnippet.position?.y ?? 0) + height + 5 // 5px gap
-    }
-
-    const targetPosition = {
-      x: newColumnX,
-      y: targetY
-    }
 
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
     const now = new Date().toISOString()
@@ -1088,37 +1065,11 @@ export function useCanvasHandlers({
     // Snap position to column constraints
     const snappedX = snapToColumn(position.x)
 
-    // Find snippets in this column to stack below
-    const columnSnippets = snippetsRef.current.filter(s =>
-      Math.abs((s.position?.x ?? 0) - snappedX) < 10 // Allow small float diffs
+    const snappedPosition = calculateStackedPosition(
+      snappedX,
+      snippetsRef.current,
+      reactFlowInstance?.current
     )
-
-    let targetY = position.y
-
-    if (columnSnippets.length > 0) {
-      // Find the lowest point
-      const lowestSnippet = columnSnippets.reduce((prev, current) => {
-        const prevY = prev.position?.y ?? 0
-        const currentY = current.position?.y ?? 0
-        return prevY > currentY ? prev : current
-      })
-
-      // Get height from ReactFlow if available, otherwise use estimate
-      let height: number = CANVAS_CONSTANTS.ESTIMATED_SNIPPET_HEIGHT
-      if (reactFlowInstance?.current) {
-        const node = reactFlowInstance.current.getNode(lowestSnippet.id)
-        if (node && node.height) {
-          height = node.height
-        }
-      }
-
-      targetY = (lowestSnippet.position?.y ?? 0) + height + 5 // 5px gap
-    }
-
-    const snappedPosition = {
-      x: snappedX,
-      y: targetY
-    }
 
     // Add optimistic snippet immediately
     addOptimisticSnippet({
@@ -1275,10 +1226,12 @@ export function useCanvasHandlers({
     const sourceColumnIndex = getColumnIndex(baseX)
     const targetX = getRelativeColumnX(sourceColumnIndex, 1)
 
-    const targetPosition = {
-      x: targetX,
-      y: baseY
-    }
+    const targetPosition = calculateStackedPosition(
+      targetX,
+      snippetsRef.current,
+      reactFlowInstance?.current,
+      baseY
+    )
 
     // Generate temporary ID for optimistic update
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
@@ -1424,10 +1377,12 @@ export function useCanvasHandlers({
     const sourceColumnIndex = getColumnIndex(baseX)
     const targetX = getRelativeColumnX(sourceColumnIndex, 1)
 
-    const targetPosition = {
-      x: targetX,
-      y: baseY
-    }
+    const targetPosition = calculateStackedPosition(
+      targetX,
+      snippetsRef.current,
+      reactFlowInstance?.current,
+      baseY
+    )
 
     // Generate temporary ID for optimistic update
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
@@ -1569,10 +1524,12 @@ export function useCanvasHandlers({
     const sourceColumnIndex = getColumnIndex(baseX)
     const targetX = getRelativeColumnX(sourceColumnIndex, 1)
 
-    const targetPosition = {
-      x: targetX,
-      y: baseY
-    }
+    const targetPosition = calculateStackedPosition(
+      targetX,
+      snippetsRef.current,
+      reactFlowInstance?.current,
+      baseY
+    )
 
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
     const now = new Date().toISOString()
