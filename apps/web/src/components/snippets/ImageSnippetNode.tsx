@@ -357,7 +357,7 @@ export const ImageSnippetNode = memo(({ data }: ImageSnippetNodeProps) => {
             <Handle type="source" position={Position.Right} />
 
             <div
-                className="w-[400px] bg-white border border-gray-200 rounded-lg shadow-lg"
+                className="w-[900px] bg-white border border-gray-200 rounded-lg shadow-lg"
                 data-testid="image-snippet-node"
                 data-snippet-id={snippet.id}
                 onClick={handleSnippetClick}

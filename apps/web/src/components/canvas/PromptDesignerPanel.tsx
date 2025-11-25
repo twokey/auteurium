@@ -352,211 +352,203 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
 
           {isSettingsExpanded && (
             <div className="space-y-2 rounded-md border border-gray-200 bg-gray-50 p-2">
-              {/* Model Selection */}
-              <div>
-                <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
-                  Model
-                </label>
-                <select
-                  value={generationSettings?.settings.model ?? ''}
-                  onChange={(e) => {
-                    const newModel = e.target.value
-                    if (generationSettings?.type === 'video') {
-                      const nextConfig = VIDU_Q2_MODEL_CONFIG[newModel] ?? generationSettingsEntries?.modelConfig
-                      updateGenerationSettings({
-                        model: newModel,
-                        duration: nextConfig?.defaultDuration,
-                        resolution: nextConfig?.defaultResolution
-                      })
-                    }
-                  }}
-                  className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                >
-                  {Object.values(VIDU_Q2_MODEL_CONFIG)
-                    .filter(option => {
-                      if (generationSettings?.type === 'image') {
-                        // For now, assume all models are video unless specified otherwise or filter by capability
-                        // Since we don't have explicit image models in VIDU config yet, we might need to mock or check capability
-                        // For this task, let's assume we only show image-capable models if any, or just all for now but ideally filtered.
-                        // Actually, the requirement says "only display models capable of generating images".
-                        // Let's assume 'imagen' models are for images.
-                        return option.id.includes('imagen') || option.id.includes('image')
-                      }
-                      return true // Show all for video mode
-                    })
-                    .map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                </select>
-                {generationSettingsEntries && (
-                  <p className="mt-1 text-[10px] text-gray-500">
-                    {generationSettingsEntries.modelConfig.description}
-                  </p>
-                )}
-              </div>
-
-              {/* Video Specific Settings */}
-              {generationSettingsEntries && generationSettings?.type === 'video' && (
+              {/* Image Specific Settings */}
+              {generationSettings?.type === 'image' ? (
                 <>
-                  <div className="grid grid-cols-2 gap-2">
-                    {/* Duration */}
-                    <div>
-                      <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
-                        Duration
-                      </label>
-                      <select
-                        value={generationSettingsEntries.activeDuration}
-                        onChange={(e) => updateGenerationSettings({ duration: Number(e.target.value) })}
-                        className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                      >
-                        {generationSettingsEntries.modelConfig.durations.map((duration) => (
-                          <option key={duration} value={duration}>
-                            {duration}s
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                      Model
+                    </label>
+                    <select
+                      value={generationSettings.settings.model}
+                      onChange={(e) => updateGenerationSettings({ model: e.target.value })}
+                      className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    >
+                      <option value="imagen-3.0-generate-001">Imagen 3.0</option>
+                      <option value="gemini-2.5-flash-image">Gemini 2.5 Flash</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                      Aspect Ratio
+                    </label>
+                    <select
+                      value={generationSettings.settings.aspectRatio}
+                      onChange={(e) => updateGenerationSettings({ aspectRatio: e.target.value })}
+                      className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    >
+                      <option value="1:1">1:1 (Square)</option>
+                      <option value="16:9">16:9 (Landscape)</option>
+                      <option value="9:16">9:16 (Portrait)</option>
+                      <option value="4:3">4:3</option>
+                      <option value="3:4">3:4</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                      Number of Images
+                    </label>
+                    <select
+                      value={generationSettings.settings.numberOfImages}
+                      onChange={(e) => updateGenerationSettings({ numberOfImages: Number(e.target.value) })}
+                      className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    >
+                      <option value={1}>1</option>
+                      <option value={2}>2</option>
+                      <option value={4}>4</option>
+                    </select>
+                  </div>
+                </>
+              ) : (
+                /* Video Settings (Original Content) */
+                <>
+                  {/* Model Selection */}
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                      Model
+                    </label>
+                    <select
+                      value={generationSettings?.settings.model ?? ''}
+                      onChange={(e) => {
+                        const newModel = e.target.value
+                        if (generationSettings?.type === 'video') {
+                          const nextConfig = VIDU_Q2_MODEL_CONFIG[newModel] ?? generationSettingsEntries?.modelConfig
+                          updateGenerationSettings({
+                            model: newModel,
+                            duration: nextConfig?.defaultDuration,
+                            resolution: nextConfig?.defaultResolution
+                          })
+                        }
+                      }}
+                      className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    >
+                      {Object.values(VIDU_Q2_MODEL_CONFIG)
+                        .map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
                           </option>
                         ))}
-                      </select>
-                    </div>
-
-                    {/* Resolution */}
-                    <div>
-                      <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
-                        Resolution
-                      </label>
-                      <select
-                        value={generationSettingsEntries.activeResolution}
-                        onChange={(e) => updateGenerationSettings({ resolution: e.target.value as ResolutionOption })}
-                        className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                      >
-                        {generationSettingsEntries.modelConfig.resolutions.map((resolution) => (
-                          <option key={resolution} value={resolution}>
-                            {resolution}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    </select>
+                    {generationSettingsEntries && (
+                      <p className="mt-1 text-[10px] text-gray-500">
+                        {generationSettingsEntries.modelConfig.description}
+                      </p>
+                    )}
                   </div>
 
-                  {/* Movement & Audio */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
-                        Movement
-                      </label>
-                      <select
-                        value={generationSettings.settings.movementAmplitude ?? 'auto'}
-                        onChange={(e) => updateGenerationSettings({ movementAmplitude: e.target.value })}
-                        className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                      >
-                        <option value="auto">Auto</option>
-                        <option value="small">Small</option>
-                        <option value="medium">Medium</option>
-                        <option value="large">Large</option>
-                      </select>
-                    </div>
+                  {/* Video Specific Settings */}
+                  {generationSettingsEntries && generationSettings?.type === 'video' && (
+                    <>
+                      <div className="grid grid-cols-2 gap-2">
+                        {/* Duration */}
+                        <div>
+                          <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                            Duration
+                          </label>
+                          <select
+                            value={generationSettingsEntries.activeDuration}
+                            onChange={(e) => updateGenerationSettings({ duration: Number(e.target.value) })}
+                            className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          >
+                            {generationSettingsEntries.modelConfig.durations.map((duration) => (
+                              <option key={duration} value={duration}>
+                                {duration}s
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
-                    <div className="flex items-end pb-1">
-                      <label className="flex items-center space-x-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={generationSettings.settings.audio}
-                          onChange={(e) => updateGenerationSettings({ audio: e.target.checked })}
-                          className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-4 w-4"
-                        />
-                        <span className="text-xs font-medium text-gray-700">Audio</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Voice Selection (if Audio enabled) */}
-                  {generationSettings.settings.audio && (
-                    <div>
-                      <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
-                        Voice
-                      </label>
-                      <select
-                        value={generationSettings.settings.voiceId ?? ''}
-                        onChange={(e) => updateGenerationSettings({ voiceId: e.target.value })}
-                        className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                      >
-                        <option value="">Select voice...</option>
-                        {VOICE_IDS.map((voice) => (
-                          <option key={voice.id} value={voice.id}>
-                            {voice.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Cost Preview */}
-                  {generationSettingsEntries.pricingSummary && (
-                    <div className="mt-2 rounded border border-purple-100 bg-purple-50 px-2 py-1.5">
-                      <div className="flex items-center justify-between text-[10px]">
-                        <span className="font-medium text-purple-900">Estimated Cost</span>
-                        <span className="font-bold text-purple-700">
-                          {generationSettingsEntries.appliedCredits} credits
-                          <span className="text-purple-400 mx-1">·</span>
-                          {generationSettingsEntries.appliedUsd !== null ? formatUsd(generationSettingsEntries.appliedUsd) : '—'}
-                        </span>
+                        {/* Resolution */}
+                        <div>
+                          <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                            Resolution
+                          </label>
+                          <select
+                            value={generationSettingsEntries.activeResolution}
+                            onChange={(e) => updateGenerationSettings({ resolution: e.target.value as ResolutionOption })}
+                            className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          >
+                            {generationSettingsEntries.modelConfig.resolutions.map((resolution) => (
+                              <option key={resolution} value={resolution}>
+                                {resolution}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
-                    </div>
+
+                      {/* Movement & Audio */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                            Movement
+                          </label>
+                          <select
+                            value={generationSettings.settings.movementAmplitude ?? 'auto'}
+                            onChange={(e) => updateGenerationSettings({ movementAmplitude: e.target.value })}
+                            className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          >
+                            <option value="auto">Auto</option>
+                            <option value="small">Small</option>
+                            <option value="medium">Medium</option>
+                            <option value="large">Large</option>
+                          </select>
+                        </div>
+
+                        <div className="flex items-end pb-1">
+                          <label className="flex items-center space-x-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={generationSettings.settings.audio}
+                              onChange={(e) => updateGenerationSettings({ audio: e.target.checked })}
+                              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-4 w-4"
+                            />
+                            <span className="text-xs font-medium text-gray-700">Audio</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Voice Selection (if Audio enabled) */}
+                      {generationSettings.settings.audio && (
+                        <div>
+                          <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                            Voice
+                          </label>
+                          <select
+                            value={generationSettings.settings.voiceId ?? ''}
+                            onChange={(e) => updateGenerationSettings({ voiceId: e.target.value })}
+                            className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          >
+                            <option value="">Select voice...</option>
+                            {VOICE_IDS.map((voice) => (
+                              <option key={voice.id} value={voice.id}>
+                                {voice.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Cost Preview */}
+                      {generationSettingsEntries.pricingSummary && (
+                        <div className="mt-2 rounded border border-purple-100 bg-purple-50 px-2 py-1.5">
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="font-medium text-purple-900">Estimated Cost</span>
+                            <span className="font-bold text-purple-700">
+                              {generationSettingsEntries.appliedCredits} credits
+                              <span className="text-purple-400 mx-1">·</span>
+                              {generationSettingsEntries.appliedUsd !== null ? formatUsd(generationSettingsEntries.appliedUsd) : '—'}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
               )}
             </div>
           )}
         </div>
-
-        {/* Image Specific Settings */}
-        {generationSettings?.type === 'image' && isSettingsExpanded && (
-          <div className="space-y-2 rounded-md border border-gray-200 bg-gray-50 p-2 mb-3">
-            <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
-                Model
-              </label>
-              <select
-                value={generationSettings.settings.model}
-                onChange={(e) => updateGenerationSettings({ model: e.target.value })}
-                className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-              >
-                <option value="imagen-3.0-generate-001">Imagen 3.0</option>
-                <option value="gemini-2.5-flash-image">Gemini 2.5 Flash</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
-                Aspect Ratio
-              </label>
-              <select
-                value={generationSettings.settings.aspectRatio}
-                onChange={(e) => updateGenerationSettings({ aspectRatio: e.target.value })}
-                className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-              >
-                <option value="1:1">1:1 (Square)</option>
-                <option value="16:9">16:9 (Landscape)</option>
-                <option value="9:16">9:16 (Portrait)</option>
-                <option value="4:3">4:3</option>
-                <option value="3:4">3:4</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
-                Number of Images
-              </label>
-              <select
-                value={generationSettings.settings.numberOfImages}
-                onChange={(e) => updateGenerationSettings({ numberOfImages: Number(e.target.value) })}
-                className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-              >
-                <option value={1}>1</option>
-                <option value={2}>2</option>
-                <option value={4}>4</option>
-              </select>
-            </div>
-          </div>
-        )}
 
         {/* Reference Images Section */}
         {referenceImages.length > 0 && generationSettingsEntries && (

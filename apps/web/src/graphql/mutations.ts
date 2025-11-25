@@ -205,7 +205,9 @@ export const GENERATE_SNIPPET_IMAGE = /* GraphQL */ `
       createdFrom
       generated
       generationId
+      generationId
       generationCreatedAt
+      imageUrl
       imageS3Key
       videoUrl
       imageMetadata {

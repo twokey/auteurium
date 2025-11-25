@@ -99,6 +99,7 @@ export const GET_PROJECT_WITH_SNIPPETS = /* GraphQL */ `
         version
         createdAt
         updatedAt
+        imageUrl
         imageS3Key
         videoUrl
         imageMetadata {
@@ -159,6 +160,7 @@ export const GET_SNIPPET = /* GraphQL */ `
       version
       createdAt
       updatedAt
+      imageUrl
       imageS3Key
       videoUrl
       imageMetadata {
