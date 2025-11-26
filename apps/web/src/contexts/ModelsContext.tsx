@@ -43,6 +43,14 @@ export const ModelsProvider = ({ children }: ModelsProviderProps) => {
     [data?.availableModels]
   )
 
+  const isTextOutputModel = useCallback(
+    (model: AvailableModel) => {
+      const modality = model.modality?.toLowerCase?.() ?? ''
+      return modality === 'text_to_text' || modality.endsWith('to_text') || modality.endsWith('to-text')
+    },
+    []
+  )
+
   const filterByModalities = useCallback(
     (models: AvailableModel[], modalities: Array<AvailableModel['modality'] | string>) =>
       models.filter(model => modalities.includes(model.modality)),
@@ -50,8 +58,8 @@ export const ModelsProvider = ({ children }: ModelsProviderProps) => {
   )
 
   const textModels = useMemo(
-    () => filterByModalities(allModels, ['TEXT_TO_TEXT']),
-    [allModels, filterByModalities]
+    () => allModels.filter(isTextOutputModel),
+    [allModels, isTextOutputModel]
   )
   const imageModels = useMemo(
     () => filterByModalities(allModels, ['TEXT_TO_IMAGE', 'TEXT_AND_IMAGE_TO_IMAGE']),

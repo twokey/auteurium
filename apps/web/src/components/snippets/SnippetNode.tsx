@@ -315,6 +315,7 @@ export const SnippetNode = memo(({ data, id, selected, isConnectable }: SnippetN
   const { id: projectId } = useParams<{ id: string }>()
   const { generateStream, createScenes } = useGenAI({ enabled: true })
   const openPromptDesigner = usePromptDesignerStore((state) => state.open)
+  const promptDesignerSnippetId = usePromptDesignerStore((state) => state.snippetId)
   const { markSnippetDirty, clearSnippetDirty, markSnippetSaving, clearSnippetSaving } = useOptimisticUpdatesStore()
 
   const {
@@ -372,6 +373,7 @@ export const SnippetNode = memo(({ data, id, selected, isConnectable }: SnippetN
   const [isGeneratingScenes, setIsGeneratingScenes] = useState(false)
   const [isGeneratingVideoSnippet, setIsGeneratingVideoSnippet] = useState(false)
   const [isGenerateExpanded, setIsGenerateExpanded] = useState(false)
+  const wasSelectedRef = useRef(false)
 
   const connectedImageReferences = connectedContent.filter((item) => item.type === 'image')
   const videoReferenceLimit = getVideoReferenceLimit(selectedVideoModel || videoModels[0]?.id || '')
@@ -684,6 +686,10 @@ export const SnippetNode = memo(({ data, id, selected, isConnectable }: SnippetN
   const runTextGeneration = useCallback(async (payload: PromptDesignerGeneratePayload) => {
     const trimmedPrompt = payload.fullPrompt.trim()
     const userPrompt = (payload.userPrompt ?? '').trim()
+    const designerModelId = payload.settings?.type === 'text'
+      ? payload.settings.settings.model
+      : undefined
+    const targetModel = designerModelId || selectedTextModel
 
     if (trimmedPrompt === '') {
       toast.warning('Please provide prompt content before generating')
@@ -692,8 +698,8 @@ export const SnippetNode = memo(({ data, id, selected, isConnectable }: SnippetN
       throw handledError
     }
 
-    if (!selectedTextModel || selectedTextModel === '') {
-      toast.warning('Please select a text model')
+    if (!targetModel || targetModel === '') {
+      toast.warning('Please select a text-capable model')
       const handledError = new Error('Missing text model selection')
       Object.assign(handledError, { handled: true })
       throw handledError
@@ -709,11 +715,15 @@ export const SnippetNode = memo(({ data, id, selected, isConnectable }: SnippetN
     setIsGeneratingText(true)
 
     try {
+      if (designerModelId && designerModelId !== selectedTextModel) {
+        setSelectedTextModel(designerModelId)
+      }
+
       // Call generation API
       const { result, fallbackReason } = await generateStream(
         projectId,
         snippet.id,
-        selectedTextModel,
+        targetModel,
         trimmedPrompt,
         payload.systemPrompt ? { systemPrompt: payload.systemPrompt } : undefined
       )
@@ -753,6 +763,50 @@ export const SnippetNode = memo(({ data, id, selected, isConnectable }: SnippetN
       setIsGeneratingText(false)
     }
   }, [selectedTextModel, projectId, generateStream, snippet.id, onGenerateText, toast])
+
+  // Auto-open prompt designer when a text snippet is selected (parity with image/video snippets)
+  useEffect(() => {
+    const wasSelected = wasSelectedRef.current
+    wasSelectedRef.current = Boolean(selected)
+
+    if (!selected) {
+      return
+    }
+
+    if (wasSelected) {
+      return
+    }
+
+    if (promptDesignerSnippetId === snippet.id) {
+      return
+    }
+
+    openPromptDesigner({
+      snippetId: snippet.id,
+      snippetTitle: displayTitle,
+      mode: 'text',
+      initialPrompt: mainText,
+      connectedContent,
+      generationSettings: {
+        type: 'text',
+        settings: {
+          model: selectedTextModel || textModels[0]?.id || ''
+        }
+      },
+      onGenerate: (payload) => runTextGeneration(payload)
+    })
+  }, [
+    selected,
+    promptDesignerSnippetId,
+    snippet.id,
+    displayTitle,
+    mainText,
+    connectedContent,
+    openPromptDesigner,
+    selectedTextModel,
+    textModels,
+    runTextGeneration
+  ])
 
   const runSceneGeneration = useCallback(async (payload: PromptDesignerGeneratePayload) => {
     const trimmedPrompt = (payload.userPrompt || payload.fullPrompt).trim()
@@ -1288,6 +1342,12 @@ export const SnippetNode = memo(({ data, id, selected, isConnectable }: SnippetN
                         mode: 'text',
                         initialPrompt: mainText,
                         connectedContent: connectedContent,
+                        generationSettings: {
+                          type: 'text',
+                          settings: {
+                            model: selectedTextModel || textModels[0]?.id || ''
+                          }
+                        },
                         onGenerate: (payload) => runTextGeneration(payload)
                       })
                     }}

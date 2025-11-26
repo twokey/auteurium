@@ -6,6 +6,10 @@ import { DEFAULT_SETTINGS, type VideoModelSettings } from '../../snippets/store/
 
 type PromptDesignerMode = 'text' | 'image' | 'video' | 'scenes'
 
+export interface TextModelSettings {
+  model: string
+}
+
 export interface ImageModelSettings {
   model: string
   aspectRatio: string
@@ -20,6 +24,10 @@ export type PromptDesignerGenerationSettings =
   | {
     type: 'image'
     settings: ImageModelSettings
+  }
+  | {
+    type: 'text'
+    settings: TextModelSettings
   }
 
 export interface PromptDesignerGeneratePayload {
@@ -56,7 +64,9 @@ interface PromptDesignerState {
   setPrompt: (prompt: string) => void
   setSystemPrompt: (prompt: string) => void
   setGenerating: (isGenerating: boolean) => void
-  updateGenerationSettings: (settings: Partial<VideoModelSettings> | Partial<ImageModelSettings>) => void
+  updateGenerationSettings: (
+    settings: Partial<VideoModelSettings> | Partial<ImageModelSettings> | Partial<TextModelSettings>
+  ) => void
   lastOpenedAt: number | null
 }
 
@@ -102,6 +112,13 @@ export const usePromptDesignerStore = create<PromptDesignerState>((set, get) => 
           model: IMAGE_GENERATION.DEFAULT_MODEL,
           aspectRatio: '16:9',
           numberOfImages: 1
+        }
+      }
+    } else if (!initialSettings && mode === 'text') {
+      initialSettings = {
+        type: 'text',
+        settings: {
+          model: ''
         }
       }
     }

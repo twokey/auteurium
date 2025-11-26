@@ -101,7 +101,7 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
   const setSystemPrompt = usePromptDesignerStore((state) => state.setSystemPrompt)
   const setGenerating = usePromptDesignerStore((state) => state.setGenerating)
   const updateGenerationSettings = usePromptDesignerStore((state) => state.updateGenerationSettings)
-  const { imageModels, isLoadingImageModels } = useModels()
+  const { textModels, imageModels, isLoadingTextModels, isLoadingImageModels } = useModels()
 
   const [isEditing, setIsEditing] = useState(false)
   const [isSystemPromptEditing, setIsSystemPromptEditing] = useState(false)
@@ -164,6 +164,20 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
     return MODE_LABEL[mode]
   }, [mode])
 
+  const textModelOptions = useMemo(() => {
+    const filtered = textModels.filter((model) => {
+      const modality = model.modality?.toLowerCase?.() ?? ''
+      return modality === 'text_to_text' || modality.endsWith('to_text') || modality.endsWith('to-text')
+    })
+
+    return filtered.map((model) => ({
+      value: model.id,
+      label: model.displayName,
+      description: model.description ?? undefined,
+      costPerToken: model.costPerToken ?? null
+    }))
+  }, [textModels])
+
   const imageModelOptions = useMemo(() => {
     const mapped = imageModels.map((model) => ({
       value: model.id,
@@ -193,6 +207,15 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
   }, [imageModels])
 
   const imageModelMap = useMemo(() => new Map(imageModels.map((model) => [model.id, model])), [imageModels])
+
+  const selectedTextModelId = useMemo(() => {
+    if (generationSettings?.type === 'text') {
+      return generationSettings.settings.model || textModelOptions[0]?.value || ''
+    }
+    return textModelOptions[0]?.value || ''
+  }, [generationSettings, textModelOptions])
+
+  const selectedTextModelOption = textModelOptions.find((option) => option.value === selectedTextModelId)
 
   const generationSettingsEntries = useMemo(() => {
     if (generationSettings?.type !== 'video') {
@@ -320,6 +343,56 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
       updateGenerationSettings(updates)
     }
   }, [generationSettings, imageModelOptions, updateGenerationSettings, imageSettingsState])
+
+  useEffect(() => {
+    if (generationSettings?.type !== 'text') {
+      return
+    }
+
+    const hasModelOption = textModelOptions.some((option) => option.value === generationSettings.settings.model)
+    const fallbackModel = textModelOptions[0]?.value ?? ''
+
+    if (!hasModelOption || (generationSettings.settings.model === '' && fallbackModel)) {
+      updateGenerationSettings({ model: fallbackModel })
+    }
+  }, [generationSettings, textModelOptions, updateGenerationSettings])
+
+  const renderTextSettings = () => {
+    if (mode !== 'text') {
+      return null
+    }
+
+    const hasOptions = textModelOptions.length > 0
+
+    return (
+      <div>
+        <label className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+          Model
+        </label>
+        <select
+          value={selectedTextModelId}
+          onChange={(e) => updateGenerationSettings({ model: e.target.value })}
+          disabled={!hasOptions || isLoadingTextModels}
+          className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:bg-gray-100 disabled:text-gray-500"
+        >
+          {hasOptions ? (
+            textModelOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))
+          ) : (
+            <option value="">No text-capable models available</option>
+          )}
+        </select>
+        {selectedTextModelOption?.description && (
+          <p className="mt-1 text-[10px] text-gray-500">
+            {selectedTextModelOption.description}
+          </p>
+        )}
+      </div>
+    )
+  }
 
   const renderImageSettings = () => {
     if (generationSettings?.type !== 'image' || !imageSettingsState) {
@@ -773,7 +846,11 @@ export const PromptDesignerPanel = ({ width, style }: PromptDesignerPanelProps) 
 
           {isSettingsExpanded && (
             <div className="space-y-2 rounded-md border border-gray-200 bg-gray-50 p-2">
-              {generationSettings?.type === 'image' ? renderImageSettings() : renderVideoSettings()}
+              {generationSettings?.type === 'image'
+                ? renderImageSettings()
+                : generationSettings?.type === 'video'
+                  ? renderVideoSettings()
+                  : renderTextSettings()}
             </div>
           )}
         </div>
