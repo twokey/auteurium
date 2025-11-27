@@ -100,30 +100,58 @@ export function calculateStackedPosition(
     Math.abs((s.position?.x ?? 0) - targetColumnX) < 10 // Allow small float diffs
   )
 
-  let targetY = defaultY
+  // Sort snippets by Y position
+  columnSnippets.sort((a, b) => (a.position?.y ?? 0) - (b.position?.y ?? 0))
 
-  if (columnSnippets.length > 0) {
-    // Find the lowest point
-    const lowestSnippet = columnSnippets.reduce((prev, current) => {
-      const prevY = prev.position?.y ?? 0
-      const currentY = current.position?.y ?? 0
-      return prevY > currentY ? prev : current
-    })
+  let candidateY = defaultY
+  const newSnippetHeight = CANVAS_CONSTANTS.ESTIMATED_SNIPPET_HEIGHT
+  const gap = 5
 
-    // Get height from ReactFlow if available, otherwise use estimate
-    let height: number = CANVAS_CONSTANTS.ESTIMATED_SNIPPET_HEIGHT
-    if (reactFlowInstance) {
-      const node = reactFlowInstance.getNode(lowestSnippet.id)
-      if (node && node.height) {
-        height = node.height
+  // Try to place at candidateY, if overlap, move down
+  // We need to check against all snippets to find the first valid spot starting from defaultY
+  // But since we want to "fill gaps", we should check if the candidate spot is valid.
+  // If not, we move to the end of the conflicting snippet and try again.
+
+  let findingSpot = true
+  while (findingSpot) {
+    let collision = false
+    let nextPossibleY = candidateY
+
+    for (const snippet of columnSnippets) {
+      const snippetY = snippet.position?.y ?? 0
+
+      // Get height from ReactFlow if available, otherwise use estimate
+      let snippetHeight: number = CANVAS_CONSTANTS.ESTIMATED_SNIPPET_HEIGHT
+      if (reactFlowInstance) {
+        const node = reactFlowInstance.getNode(snippet.id)
+        if (node && node.height) {
+          snippetHeight = node.height
+        }
+      }
+
+      // Check for overlap
+      // Two intervals [start1, end1] and [start2, end2] overlap if start1 < end2 and start2 < end1
+      const snippetEnd = snippetY + snippetHeight
+      const candidateEnd = candidateY + newSnippetHeight
+
+      if (candidateY < snippetEnd && snippetY < candidateEnd) {
+        collision = true
+        // If we collide, the next possible spot is right after this snippet
+        if (snippetEnd + gap > nextPossibleY) {
+          nextPossibleY = snippetEnd + gap
+        }
       }
     }
 
-    targetY = (lowestSnippet.position?.y ?? 0) + height + 5 // 5px gap
+    if (collision) {
+      candidateY = nextPossibleY
+    } else {
+      findingSpot = false
+    }
   }
 
   return {
     x: targetColumnX,
-    y: targetY
+    y: candidateY
   }
 }
