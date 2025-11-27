@@ -110,6 +110,7 @@ const resolveGraphqlUrl = async (): Promise<string> => {
 }
 
 const publishStreamEvent = async (event: PublishEventInput) => {
+  logger.info('Publishing stream event', { snippetId: event.snippetId, isComplete: event.isComplete, contentLength: event.content.length })
   try {
     const graphqlUrl = await resolveGraphqlUrl()
     const url = new URL(graphqlUrl)
@@ -146,6 +147,8 @@ const publishStreamEvent = async (event: PublishEventInput) => {
         errors: result.errors,
         snippetId: event.snippetId
       })
+    } else {
+      logger.debug('Successfully published stream event', { snippetId: event.snippetId })
     }
   } catch (error) {
     logger.error('Error publishing generation stream event', {
@@ -153,6 +156,19 @@ const publishStreamEvent = async (event: PublishEventInput) => {
       snippetId: event.snippetId
     })
   }
+}
+
+const logPreview = (value: string | undefined | null, maxLength = 500): string => {
+  if (!value) {
+    return ''
+  }
+
+  const condensed = value.replace(/\s+/g, ' ').trim()
+  if (condensed.length <= maxLength) {
+    return condensed
+  }
+
+  return `${condensed.slice(0, maxLength)}...`
 }
 
 export const handler: AppSyncResolverHandler<GenerateContentArgs, GenerationResponse> = async (event) => {
@@ -174,6 +190,13 @@ export const handler: AppSyncResolverHandler<GenerateContentArgs, GenerationResp
     })
 
     const validatedInput = generateContentInputSchema.parse(input)
+    logger.info('Validated generation input', {
+      modelId: validatedInput.modelId,
+      promptLength: validatedInput.prompt.length,
+      systemPromptLength: validatedInput.systemPrompt?.length ?? 0,
+      promptPreview: logPreview(validatedInput.prompt),
+      systemPromptPreview: logPreview(validatedInput.systemPrompt)
+    })
 
     const snippetResult = await dynamoClient.send(new GetCommand({
       TableName: SNIPPETS_TABLE,
@@ -243,17 +266,21 @@ export const handler: AppSyncResolverHandler<GenerateContentArgs, GenerationResp
       }
     }))
 
+    const finalContent = fullContent || response.content
+
     logger.info('Streaming content generation completed', {
       userId,
       snippetId,
       generationId,
       tokensUsed: response.tokensUsed,
-      cost: response.cost
+      cost: response.cost,
+      resultLength: finalContent.length,
+      resultPreview: logPreview(finalContent)
     })
 
     return {
       ...response,
-      content: fullContent || response.content,
+      content: finalContent,
       generationId,
       generationCreatedAt: createdAt
     }

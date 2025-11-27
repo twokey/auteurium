@@ -1286,64 +1286,20 @@ export function useCanvasHandlers({
         throw new Error('Failed to create snippet: missing snippet ID in response')
       }
 
-      const newSnippetId = createdSnippet.id
       // Replace optimistic snippet with real one from server
       replaceOptimisticSnippet(tempId, createdSnippet)
-
-      const optimisticConnectionId = `temp-conn-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
-      const connectionTimestamp = new Date().toISOString()
-
-      addOptimisticConnection({
-        id: optimisticConnectionId,
-        projectId,
-        sourceSnippetId,
-        targetSnippetId: newSnippetId,
-        label: '',
-        createdAt: connectionTimestamp,
-        updatedAt: connectionTimestamp,
-        isOptimistic: true
-      })
-
-      try {
-        // Create connection - changes list shape, so invalidate
-        const connectionResult = await mutateWithInvalidate(
-          () =>
-            createConnectionMutation({
-              variables: {
-                input: {
-                  projectId,
-                  sourceSnippetId,
-                  targetSnippetId: newSnippetId,
-                  label: ''
-                }
-              }
-            }),
-          ['ProjectConnections']
-        )
-
-        const createdConnection = connectionResult?.createConnection
-        if (createdConnection) {
-          replaceOptimisticConnection(optimisticConnectionId, createdConnection)
-        } else {
-          console.warn('createConnection mutation returned no data; optimistic connection will remain until refresh')
-        }
-      } catch (connectionError) {
-        removeOptimisticConnection(optimisticConnectionId)
-        throw connectionError
-      }
 
       toast.success('Generated snippet created successfully!')
     } catch (error) {
       console.error('Failed to create generated snippet:', error)
       // Remove optimistic snippet on failure
       removeOptimisticSnippet(tempId)
-      toast.error('Failed to create snippet or connection', error instanceof Error ? error.message : 'Unknown error')
+      toast.error('Failed to create snippet', error instanceof Error ? error.message : 'Unknown error')
     } finally {
       setGeneratedSnippetCreating(false)
     }
   }, [
     createSnippetMutation,
-    createConnectionMutation,
     generatedSnippetPreview,
     projectId,
     toast,
@@ -1352,10 +1308,7 @@ export function useCanvasHandlers({
     closeEditSnippet,
     addOptimisticSnippet,
     replaceOptimisticSnippet,
-    removeOptimisticSnippet,
-    addOptimisticConnection,
-    replaceOptimisticConnection,
-    removeOptimisticConnection
+    removeOptimisticSnippet
   ])
 
   // Handler for creating snippet from text generation
@@ -1388,14 +1341,15 @@ export function useCanvasHandlers({
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
     const now = new Date().toISOString()
 
-    const promptValue = meta.prompt ?? generatedContent
+    const promptValue = meta.prompt ?? ''
+    const content = buildDefaultContent(generatedContent, promptValue ? { prompt: promptValue } : undefined)
 
     // Add optimistic snippet immediately
     addOptimisticSnippet({
       id: tempId,
       projectId,
       title: 'Generated text snippet',
-      content: buildPromptOnlyContent(promptValue),
+      content,
       position: targetPosition,
       tags: [],
       connections: [],
@@ -1419,7 +1373,7 @@ export function useCanvasHandlers({
               input: {
                 projectId,
                 title: 'Generated text snippet',
-                content: buildPromptOnlyContent(promptValue),
+                content,
                 position: targetPosition,
                 tags: [],
                 snippetType: 'content',
@@ -1438,52 +1392,8 @@ export function useCanvasHandlers({
         throw new Error('Failed to create snippet: missing snippet ID in response')
       }
 
-      const newSnippetId = createdSnippet.id
       // Replace optimistic snippet with real one from server
       replaceOptimisticSnippet(tempId, createdSnippet)
-
-      const optimisticConnectionId = `temp-conn-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
-      const connectionTimestamp = new Date().toISOString()
-
-      addOptimisticConnection({
-        id: optimisticConnectionId,
-        projectId,
-        sourceSnippetId,
-        targetSnippetId: newSnippetId,
-        label: '',
-        createdAt: connectionTimestamp,
-        updatedAt: connectionTimestamp,
-        isOptimistic: true
-      })
-
-      try {
-        // Create connection - changes list shape, so invalidate
-        const connectionResult = await mutateWithInvalidate(
-          () =>
-            createConnectionMutation({
-              variables: {
-                input: {
-                  projectId,
-                  sourceSnippetId,
-                  targetSnippetId: newSnippetId,
-                  label: ''
-                }
-              }
-            }),
-          ['ProjectConnections']
-        )
-
-        const createdConnection = connectionResult?.createConnection
-        if (createdConnection) {
-          replaceOptimisticConnection(optimisticConnectionId, createdConnection)
-        } else {
-          console.warn('createConnection mutation returned no data; optimistic connection will remain until refresh')
-        }
-      } catch (connectionError) {
-        console.error('Failed to connect generated text snippet:', connectionError)
-        removeOptimisticConnection(optimisticConnectionId)
-        toast.error('Failed to connect new text snippet', connectionError instanceof Error ? connectionError.message : 'Unknown error')
-      }
 
       toast.success('Generated text snippet created successfully!')
     } catch (error) {
@@ -1495,13 +1405,9 @@ export function useCanvasHandlers({
   }, [
     projectId,
     createSnippetMutation,
-    createConnectionMutation,
     addOptimisticSnippet,
     replaceOptimisticSnippet,
     removeOptimisticSnippet,
-    addOptimisticConnection,
-    replaceOptimisticConnection,
-    removeOptimisticConnection,
     toast,
     reactFlowInstance
   ])

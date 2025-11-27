@@ -32,6 +32,19 @@ interface SnippetRecord {
   userId: string
 }
 
+const logPreview = (value: string | undefined | null, maxLength = 500): string => {
+  if (!value) {
+    return ''
+  }
+
+  const condensed = value.replace(/\s+/g, ' ').trim()
+  if (condensed.length <= maxLength) {
+    return condensed
+  }
+
+  return `${condensed.slice(0, maxLength)}...`
+}
+
 /**
  * Mutation resolver: generateContent
  * Generates content using specified LLM model
@@ -57,6 +70,13 @@ export const handler: AppSyncResolverHandler<GenerateContentArgs, GenerationResp
 
     // Validate input
     const validatedInput = generateContentInputSchema.parse(input)
+    logger.info('Validated generation input', {
+      modelId: validatedInput.modelId,
+      promptLength: validatedInput.prompt.length,
+      systemPromptLength: validatedInput.systemPrompt?.length ?? 0,
+      promptPreview: logPreview(validatedInput.prompt),
+      systemPromptPreview: logPreview(validatedInput.systemPrompt)
+    })
 
     // Verify snippet exists and belongs to user via direct lookup
     const snippetResult = await dynamoClient.send(new GetCommand({
@@ -122,7 +142,9 @@ export const handler: AppSyncResolverHandler<GenerateContentArgs, GenerationResp
       snippetId,
       generationId,
       tokensUsed: response.tokensUsed,
-      cost: response.cost
+      cost: response.cost,
+      resultLength: response.content.length,
+      resultPreview: logPreview(response.content)
     })
 
     return {

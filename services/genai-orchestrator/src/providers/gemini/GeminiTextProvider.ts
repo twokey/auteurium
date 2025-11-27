@@ -131,10 +131,15 @@ export class GeminiTextProvider implements ITextProvider {
 
       // Stream chunks
       for await (const chunk of response) {
-        const chunkText = chunk.text ?? ''
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rawText = (chunk as any).text
+        const chunkText = typeof rawText === 'function' ? rawText() : (rawText ?? '')
+
+        logger.debug('Received chunk from Gemini', { chunkLength: chunkText.length })
+
         fullContent += chunkText
 
-        onChunk({
+        await onChunk({
           content: chunkText,
           isComplete: false
         })

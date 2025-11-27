@@ -313,7 +313,7 @@ export const SnippetNode = memo(({ data, id, selected, isConnectable }: SnippetN
   // Call all hooks before any conditional returns (Rules of Hooks)
   const toast = useToast()
   const { id: projectId } = useParams<{ id: string }>()
-  const { generateStream, createScenes } = useGenAI({ enabled: true })
+  const { generate, createScenes } = useGenAI({ enabled: true })
   const openPromptDesigner = usePromptDesignerStore((state) => state.open)
   const promptDesignerSnippetId = usePromptDesignerStore((state) => state.snippetId)
   const { markSnippetDirty, clearSnippetDirty, markSnippetSaving, clearSnippetSaving } = useOptimisticUpdatesStore()
@@ -327,7 +327,6 @@ export const SnippetNode = memo(({ data, id, selected, isConnectable }: SnippetN
     onGenerateVideo,
     onGenerateVideoSnippetFromJson,
     onFocusSnippet,
-    onCreateUpstreamSnippet,
     isGeneratingImage,
     isGeneratingVideo = false,
     connectedSnippets = [],
@@ -666,23 +665,6 @@ export const SnippetNode = memo(({ data, id, selected, isConnectable }: SnippetN
     [onFocusSnippet]
   )
 
-  const handleCreateUpstreamSnippetClick = useCallback(
-    (event: React.MouseEvent<HTMLButtonElement>) => {
-      event.stopPropagation()
-      // Don't create snippet if Cmd/Ctrl is held (user is multi-selecting)
-      if (event.metaKey || event.ctrlKey) {
-        event.preventDefault()
-        return
-      }
-      if (!onCreateUpstreamSnippet) {
-        return
-      }
-
-      void onCreateUpstreamSnippet(snippet.id)
-    },
-    [onCreateUpstreamSnippet, snippet.id]
-  )
-
   const runTextGeneration = useCallback(async (payload: PromptDesignerGeneratePayload) => {
     const trimmedPrompt = payload.fullPrompt.trim()
     const userPrompt = (payload.userPrompt ?? '').trim()
@@ -720,7 +702,7 @@ export const SnippetNode = memo(({ data, id, selected, isConnectable }: SnippetN
       }
 
       // Call generation API
-      const { result, fallbackReason } = await generateStream(
+      const result = await generate(
         projectId,
         snippet.id,
         targetModel,
@@ -744,10 +726,6 @@ export const SnippetNode = memo(({ data, id, selected, isConnectable }: SnippetN
         generationId: result.generationId ?? undefined,
         generationCreatedAt: result.generationCreatedAt ?? undefined
       })
-
-      if (fallbackReason) {
-        toast.info('Generation completed with fallback', fallbackReason)
-      }
     } catch (error) {
       console.error('=== Text Generation Error ===')
       console.error('Error:', error)
@@ -762,7 +740,7 @@ export const SnippetNode = memo(({ data, id, selected, isConnectable }: SnippetN
     } finally {
       setIsGeneratingText(false)
     }
-  }, [selectedTextModel, projectId, generateStream, snippet.id, onGenerateText, toast])
+  }, [selectedTextModel, projectId, generate, snippet.id, onGenerateText, toast])
 
   // Auto-open prompt designer when a text snippet is selected (parity with image/video snippets)
   useEffect(() => {
@@ -899,7 +877,7 @@ export const SnippetNode = memo(({ data, id, selected, isConnectable }: SnippetN
     setIsGeneratingVideoSnippet(true)
 
     try {
-      const { result, fallbackReason } = await generateStream(
+      const result = await generate(
         projectId,
         snippet.id,
         selectedVideoSnippetModel,
@@ -921,8 +899,7 @@ export const SnippetNode = memo(({ data, id, selected, isConnectable }: SnippetN
         snippetId: snippet.id,
         modelId: selectedVideoSnippetModel,
         contentPreview: result.content.slice(0, 1000),
-        contentLength: result.content.length,
-        fallbackReason
+        contentLength: result.content.length
       }
 
       console.info('[VideoSnippetGeneration] Raw model response', debugPayload)
@@ -950,10 +927,6 @@ export const SnippetNode = memo(({ data, id, selected, isConnectable }: SnippetN
         generationId: result.generationId ?? undefined,
         generationCreatedAt: result.generationCreatedAt ?? undefined
       })
-
-      if (fallbackReason) {
-        toast.info('Generation completed with fallback', fallbackReason)
-      }
     } catch (error) {
       console.error('=== Video Snippet Generation Error ===')
       console.error('Error:', error)
@@ -968,7 +941,7 @@ export const SnippetNode = memo(({ data, id, selected, isConnectable }: SnippetN
     } finally {
       setIsGeneratingVideoSnippet(false)
     }
-  }, [selectedVideoSnippetModel, projectId, generateStream, snippet.id, onGenerateVideoSnippetFromJson, toast])
+  }, [selectedVideoSnippetModel, projectId, generate, snippet.id, onGenerateVideoSnippetFromJson, toast])
 
   // Route to VideoSnippetNode if this is a video snippet
   if (snippet.snippetType === 'video') {
@@ -1160,18 +1133,6 @@ export const SnippetNode = memo(({ data, id, selected, isConnectable }: SnippetN
             </div>
           </div>
         )}
-
-        <div className="mt-2">
-          <button
-            type="button"
-            onClick={handleCreateUpstreamSnippetClick}
-            onMouseDown={(event) => event.stopPropagation()}
-            className="w-full text-xs font-semibold text-blue-600 border border-blue-200 rounded-md py-1 transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
-            style={POINTER_EVENTS_STYLES.interactive}
-          >
-            + snippet
-          </button>
-        </div>
 
         {/* Image Preview */}
         {snippet.imageUrl && (
